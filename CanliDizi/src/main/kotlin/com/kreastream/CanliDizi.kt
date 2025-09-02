@@ -5,8 +5,8 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.*
 
 class CanliDiziPlugin : MainAPI() {
-    override var mainUrl = "https://www.canlidizi11.com"
-    override var name = "CanliDizi11"
+    override var mainUrl = "https://www.canlidizi12.com"
+    override var name = "CanliDizi"
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Others)
     override var lang = "tr" // Turkish content
     override val hasMainPage = true
