@@ -1,4 +1,4 @@
-import com.lagradost.cloudstream3.gradle.CloudstreamExtension
+iimport com.lagradost.cloudstream3.gradle.CloudstreamExtension
 import com.android.build.gradle.BaseExtension
 
 buildscript {
@@ -38,11 +38,11 @@ subprojects {
         // when running through github workflow, GITHUB_REPOSITORY should contain current repository name
         setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/ramazansancar/keyiflerolsun_Kekik-cloudstream")
 
-        authors = listOf("keyiflerolsun")
+        authors = listOf("kadireksi")
     }
 
     android {
-        namespace = "com.keyiflerolsun"
+        namespace = "com.kadireksi"
 
         defaultConfig {
             minSdk = 21
