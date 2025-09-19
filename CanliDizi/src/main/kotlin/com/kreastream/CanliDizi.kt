@@ -7,7 +7,7 @@ import org.jsoup.nodes.Element
 
 class CanliDizi : MainAPI() {
     override var mainUrl = "https://www.canlidizi14.com"
-    override var name = "CanliDizi"
+    override var name = "Canlı Dizi"
     override val supportedTypes = setOf(TvType.TvSeries)
     override var lang = "tr"
     override val hasMainPage = true
