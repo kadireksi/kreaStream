@@ -23,7 +23,7 @@ class CanliDizi : MainAPI() {
         val homeSections = mutableListOf<HomePageList>()
 
         // Popular Series section
-        val popularSeries = document.select("div.diziler div.list-series").mapNotNull { element ->
+        val popularSeries = document.select("div.list-series").mapNotNull { element ->
             parseSeriesItem(element)
         }.takeIf { it.isNotEmpty() }?.let {
             HomePageList("Popüler Diziler", it)
