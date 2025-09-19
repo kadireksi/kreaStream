@@ -23,7 +23,7 @@ class CanliDizi : MainAPI() {
         val homeSections = mutableListOf<HomePageList>()
 
         // Popular Series section
-        val popularSeries = document.select("div.diziler div.owl-item").mapNotNull { element ->
+        val popularSeries = document.select("div.diziler div.list-series").mapNotNull { element ->
             parseSeriesItem(element)
         }.takeIf { it.isNotEmpty() }?.let {
             HomePageList("Popüler Diziler", it)
@@ -43,7 +43,7 @@ class CanliDizi : MainAPI() {
     }
 
     private fun parseSeriesItem(element: Element): TvSeriesSearchResponse? {
-        val title = element.selectFirst("h3.title")?.text()?.trim() ?: return null
+        val title = element.selectFirst("serie-name")?.text()?.trim() ?: return null
         val url = element.selectFirst("a")?.attr("href")?.let { fixUrl(it) } ?: return null
         val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
 
