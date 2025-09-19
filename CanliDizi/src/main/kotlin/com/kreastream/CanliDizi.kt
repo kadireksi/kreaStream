@@ -43,7 +43,7 @@ class CanliDizi : MainAPI() {
     }
 
     private fun parseSeriesItem(element: Element): TvSeriesSearchResponse? {
-        val title = element.selectFirst("serie-name")?.text()?.trim() ?: return null
+        val title = element.selectFirst("div.serie-name")?.text()?.trim() ?: return null
         val url = element.selectFirst("a")?.attr("href")?.let { fixUrl(it) } ?: return null
         val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
 
