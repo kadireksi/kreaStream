@@ -39,7 +39,7 @@ class CanliDizi : MainAPI() {
         popularSeries?.let { homeSections.add(it) }
         yerliDiziler?.let { homeSections.add(it) }
 
-        return HomePageResponse(homeSections)
+        return newHomePageResponse(homeSections)
     }
 
     private fun parseSeriesItem(element: Element): TvSeriesSearchResponse? {
