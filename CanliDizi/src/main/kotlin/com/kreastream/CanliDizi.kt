@@ -30,7 +30,7 @@ class CanliDizi : MainAPI() {
         }
 
         // Local Series section
-        val yerliDiziler = document.select("div.yerli-diziler div.item").mapNotNull { element ->
+        val yerliDiziler = document.select("div.episodes div.list-episodes").mapNotNull { element ->
             parseSeriesItem(element)
         }.takeIf { it.isNotEmpty() }?.let {
             HomePageList("Yerli Diziler", it)
