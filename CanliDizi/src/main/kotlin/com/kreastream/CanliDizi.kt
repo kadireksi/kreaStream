@@ -15,27 +15,26 @@ class CanliDizi : MainAPI() {
     private fun Element.toSearchResponse(): SearchResponse {
         val a = selectFirst("a") ?: throw ErrorLoadingException("No link found")
         val img = selectFirst("img")
-        val poster = fixUrl(img?.attr("src") ?: "")
+        val posterAttr = if (img?.hasAttr("data-wpfc-original-src") == true) "data-wpfc-original-src" else "src"
+        val poster = fixUrl(img?.attr(posterAttr) ?: "")
         val titleElem = selectFirst("div.serie-name")
         val epElem = selectFirst("div.episode-name")
-        val title = titleElem?.text() ?: epElem?.text() ?: ""
         val href = fixUrl(a.attr("href"))
         val isSeries = href.contains("kategori")
         val isMovie = href.contains("-izle.html") && !href.contains("bolum")
-        val headers = mapOf("referer" to "$mainUrl/")
+
+        val title = if (isMovie) epElem?.text() ?: titleElem?.text() ?: "" else titleElem?.text() ?: epElem?.text() ?: ""
 
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.year = epElem?.text()?.toIntOrNull()
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.posterHeaders = headers
             }
         } else if (isMovie) {
             newMovieSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.posterHeaders = headers
             }
         } else {
             // Episode treated as movie for simplicity
@@ -43,7 +42,6 @@ class CanliDizi : MainAPI() {
             newMovieSearchResponse(epTitle, href, TvType.TvSeries) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.posterHeaders = headers
             }
         }
     }
@@ -82,12 +80,13 @@ class CanliDizi : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
-        val headers = mapOf("referer" to "$mainUrl/")
 
         if (url.contains("kategori")) {
             // Series page
             val title = doc.selectFirst("div.title-border")?.text() ?: doc.selectFirst("title")?.text()?.split(" | ")?.get(0) ?: ""
-            val poster = fixUrl(doc.selectFirst("div.poster img")?.attr("src") ?: "")
+            val posterElem = doc.selectFirst("div.poster img")
+            val posterAttr = if (posterElem?.hasAttr("data-wpfc-original-src") == true) "data-wpfc-original-src" else "src"
+            val poster = fixUrl(posterElem?.attr(posterAttr) ?: "")
             val description = doc.selectFirst("div.synopsis")?.text() // Assuming there's a synopsis div
             val ratingStr = doc.selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
             val rating = (ratingStr?.times(10))?.toInt()
@@ -96,7 +95,9 @@ class CanliDizi : MainAPI() {
                 val epName = el.selectFirst("div.episode-name")?.text() ?: ""
                 val epNum = epName.replace(".Bölüm", "").trim().toIntOrNull() ?: (index + 1)
                 val epUrl = fixUrl(a.attr("href"))
-                val epPoster = fixUrl(el.selectFirst("img")?.attr("src") ?: "")
+                val epImg = el.selectFirst("img")
+                val epPosterAttr = if (epImg?.hasAttr("data-wpfc-original-src") == true) "data-wpfc-original-src" else "src"
+                val epPoster = fixUrl(epImg?.attr(epPosterAttr) ?: "")
                 val epDate = el.selectFirst("div.episode-date")?.text()
                 newEpisode(epUrl) {
                     this.name = epName
@@ -111,12 +112,13 @@ class CanliDizi : MainAPI() {
                 this.posterUrl = poster
                 this.plot = description
                 this.rating = rating
-                this.posterHeaders = headers
             }
         } else {
             // Movie or Episode
             val title = doc.selectFirst("title")?.text()?.split(" | ")?.get(0) ?: ""
-            val poster = fixUrl(doc.selectFirst("div.poster img")?.attr("src") ?: "")
+            val posterElem = doc.selectFirst("div.poster img")
+            val posterAttr = if (posterElem?.hasAttr("data-wpfc-original-src") == true) "data-wpfc-original-src" else "src"
+            val poster = fixUrl(posterElem?.attr(posterAttr) ?: "")
             val description = doc.selectFirst("div.synopsis")?.text()
             val ratingStr = doc.selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
             val rating = (ratingStr?.times(10))?.toInt()
@@ -126,7 +128,6 @@ class CanliDizi : MainAPI() {
                 this.posterUrl = poster
                 this.plot = description
                 this.rating = rating
-                this.posterHeaders = headers
             }
         }
     }
@@ -141,15 +142,17 @@ class CanliDizi : MainAPI() {
 
         // Find all part links like /2, /3 etc.
         val partLinks = doc.select("a[href*=\"$data/\"]").map { fixUrl(it.attr("href")) }.toMutableList()
-        partLinks.add(0, data) // Include the main page as part 1
+        if (partLinks.isEmpty()) partLinks.add(data) else partLinks.add(0, data) // Include the main page if parts exist
 
         partLinks.apmap { partUrl ->
             val partDoc = app.get(partUrl).document
-            val iframeSrc = partDoc.selectFirst("iframe")?.attr("src")
+            val iframe = partDoc.selectFirst("iframe")
+            val iframeAttr = if (iframe?.hasAttr("data-wpfc-original-src") == true) "data-wpfc-original-src" else "src"
+            val iframeSrc = iframe?.attr(iframeAttr)
                 ?: partDoc.selectFirst("div.player embed")?.attr("src")
                 ?: return@apmap
 
-            loadExtractor(iframeSrc, data, subtitleCallback, callback)
+            loadExtractor(iframeSrc, mainUrl, subtitleCallback, callback)
         }
 
         return true
