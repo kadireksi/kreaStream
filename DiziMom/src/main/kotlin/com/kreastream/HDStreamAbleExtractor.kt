@@ -1,6 +1,6 @@
 // ! Bu araç @keyiflerolsun tarafından | @KekikAkademi için yazılmıştır.
 
-package com.keyiflerolsun
+package com.kreastream
 
 class HDStreamAble : PeaceMakerst() {
     override var name    = "HDStreamAble"
