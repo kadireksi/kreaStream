@@ -18,7 +18,7 @@ class CanliDizi : MainAPI() {
         private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
 
-    override suspend fun getMainPage(page: Int, request: HttpRequest): HomePageResponse {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
         val document = app.get(mainUrl, headers = mapOf("User-Agent" to USER_AGENT)).document
         val all = ArrayList<HomePageList>()
         
@@ -42,13 +42,15 @@ class CanliDizi : MainAPI() {
         val title = element.selectFirst(".serie-name a")?.text()?.trim() ?: return null
         val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
         val year = element.selectFirst(".episode-name")?.text()?.trim()?.toIntOrNull()
-        val score = element.selectFirst(".episode-date")?.text()
+        val rawScore = element.selectFirst(".episode-date")?.text()
             ?.removePrefix("IMDb:")
             ?.trim()
             ?.replace(",", ".")
             ?.toFloatOrNull()
-            ?.times(10) // Convert from 0-10 scale to 0-100 scale
-            ?.toInt()
+        
+        val score = rawScore?.let { 
+            Score(it * 10) // Convert from 0-10 scale to 0-100 scale
+        }
         
         return newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
             this.posterUrl = poster
@@ -109,15 +111,14 @@ class CanliDizi : MainAPI() {
         val quality = determineQuality(videoUrl)
 
         callback.invoke(
-            ExtractorLink(
-                name,
-                name,
-                videoUrl,
-                mainUrl,
-                quality,
-                false,
-                mapOf("User-Agent" to USER_AGENT),
-                INFER_TYPE
+            newExtractorLink(
+                source = name,
+                name = name,
+                url = videoUrl,
+                referer = mainUrl,
+                quality = quality,
+                headers = mapOf("User-Agent" to USER_AGENT),
+                type = INFER_TYPE
             )
         )
 
@@ -156,8 +157,4 @@ class CanliDizi : MainAPI() {
     private fun String.encodeToUrl(): String {
         return java.net.URLEncoder.encode(this, "UTF-8")
     }
-
-    // Optional: Add error handling and logging
-    override val instantLinkLoading = true
-    override val useMobileUserAgent = false
 }
