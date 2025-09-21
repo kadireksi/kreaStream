@@ -19,33 +19,49 @@ class CanliDizi : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request: HttpRequest): HomePageResponse {
-        val document = app.get(mainUrl).document
+        val document = app.get(mainUrl, headers = mapOf("User-Agent" to USER_AGENT)).document
         val all = ArrayList<HomePageList>()
         
         // Parse the series slider
         val series = document.select("div.owl-item:not(.cloned) div.list-series").mapNotNull {
-            val link = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-            val title = it.selectFirst(".serie-name a")?.text()?.trim() ?: return@mapNotNull null
-            val poster = it.selectFirst("img")?.attr("src")
-            val year = it.selectFirst(".episode-name")?.text()?.trim()?.toIntOrNull()
-            val rating = it.selectFirst(".episode-date")?.text()?.removePrefix("IMDb:")?.trim()?.replace(",", ".")?.toFloatOrNull()
-            
-            newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
-                this.posterUrl = poster
-                this.year = year
-                this.rating = rating
-            }
+            parseSeriesItem(it)
         }
 
-        all.add(HomePageList("Series", series, isHorizontalImages = true))
+        if (series.isNotEmpty()) {
+            all.add(HomePageList("Popular Series", series, isHorizontalImages = true))
+        }
+
+        // Add more sections if available (latest episodes, trending, etc.)
+        // You can add additional parsing logic here for other sections
         
         return HomePageResponse(all)
+    }
+
+    private fun parseSeriesItem(element: Element): TvSeriesSearchResponse? {
+        val link = element.selectFirst("a")?.attr("href")?.let { fixUrl(it) } ?: return null
+        val title = element.selectFirst(".serie-name a")?.text()?.trim() ?: return null
+        val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
+        val year = element.selectFirst(".episode-name")?.text()?.trim()?.toIntOrNull()
+        val score = element.selectFirst(".episode-date")?.text()
+            ?.removePrefix("IMDb:")
+            ?.trim()
+            ?.replace(",", ".")
+            ?.toFloatOrNull()
+            ?.times(10) // Convert from 0-10 scale to 0-100 scale
+            ?.toInt()
+        
+        return newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
+            this.posterUrl = poster
+            this.year = year
+            this.score = score
+        }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url, headers = mapOf("User-Agent" to USER_AGENT)).document
         
-        val title = document.selectFirst("h1.series-title")?.text()?.trim() ?: throw ErrorLoadingException("Title not found")
+        val title = document.selectFirst("h1.series-title")?.text()?.trim() 
+            ?: throw ErrorLoadingException("Title not found")
         val poster = document.selectFirst("img.poster")?.attr("src")?.let { fixUrl(it) }
         val description = document.selectFirst("div.description")?.text()?.trim()
         
@@ -53,9 +69,14 @@ class CanliDizi : MainAPI() {
             parseEpisode(element)
         }
 
+        val recommendations = document.select("div.recommended-series div.series-item").mapNotNull {
+            parseSeriesItem(it)
+        }
+
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
             this.plot = description
+            this.recommendations = recommendations
         }
     }
 
@@ -64,11 +85,13 @@ class CanliDizi : MainAPI() {
         val epUrl = element.selectFirst("a")?.attr("href")?.let { fixUrl(it) } ?: return null
         val epNum = element.selectFirst("span.episode-number")?.text()?.toIntOrNull() ?: 1
         val season = element.selectFirst("span.season-number")?.text()?.toIntOrNull() ?: 1
+        val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
 
         return newEpisode(epUrl) {
             this.name = epTitle
             this.episode = epNum
             this.season = season
+            this.posterUrl = poster
         }
     }
 
@@ -83,42 +106,48 @@ class CanliDizi : MainAPI() {
         val videoElement = document.selectFirst("video source")
         val videoUrl = videoElement?.attr("src")?.let { fixUrl(it) } ?: return false
         
-        // Determine quality from the source
-        val quality = when {
-            videoUrl.contains("1080") -> Qualities.P1080.value
-            videoUrl.contains("720") -> Qualities.P720.value
-            videoUrl.contains("480") -> Qualities.P480.value
-            else -> Qualities.Unknown.value
-        }
+        val quality = determineQuality(videoUrl)
 
-        // Use the simple ExtractorLink constructor and set properties afterwards
         callback.invoke(
-            newExtractorLink(
+            ExtractorLink(
+                name,
                 name,
                 videoUrl,
-                mainUrl
-            ).apply {
-                this.quality = quality
-                this.headers = mapOf("User-Agent" to USER_AGENT)
-                // Type will be auto-detected from URL
-            }
+                mainUrl,
+                quality,
+                false,
+                mapOf("User-Agent" to USER_AGENT),
+                INFER_TYPE
+            )
         )
 
         // Load subtitles
         document.select("track[kind=subtitles]").forEach { track ->
             val subUrl = track.attr("src").let { fixUrl(it) }
-            val subLang = track.attr("label")?.takeIf { it.isNotBlank() } ?: "Turkish"
+            val subLang = track.attr("label").takeIf { it.isNotBlank() } ?: "Turkish"
             subtitleCallback.invoke(SubtitleFile(subLang, subUrl))
         }
 
         return true
     }
 
+    private fun determineQuality(url: String): Int {
+        return when {
+            url.contains("1080") -> Qualities.P1080.value
+            url.contains("720") -> Qualities.P720.value
+            url.contains("480") -> Qualities.P480.value
+            url.contains("360") -> Qualities.P360.value
+            else -> Qualities.Unknown.value
+        }
+    }
+
     override suspend fun search(query: String): List<SearchResponse> {
+        if (query.isBlank()) return emptyList()
+        
         val searchUrl = "$mainUrl/search?q=${query.encodeToUrl()}"
         val document = app.get(searchUrl, headers = mapOf("User-Agent" to USER_AGENT)).document
         
-        return document.select("div.search-results div.result").mapNotNull { element ->
+        return document.select("div.search-results div.result, div.series-item").mapNotNull { element ->
             parseSeriesItem(element)
         }
     }
@@ -127,4 +156,8 @@ class CanliDizi : MainAPI() {
     private fun String.encodeToUrl(): String {
         return java.net.URLEncoder.encode(this, "UTF-8")
     }
+
+    // Optional: Add error handling and logging
+    override val instantLinkLoading = true
+    override val useMobileUserAgent = false
 }
