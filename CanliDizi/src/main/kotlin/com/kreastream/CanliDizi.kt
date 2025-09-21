@@ -30,13 +30,11 @@ class CanliDizi : MainAPI() {
                 this.posterUrl = poster
                 this.year = epElem?.text()?.toIntOrNull()
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.rating = rating
             }
         } else if (isMovie) {
             newMovieSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.rating = rating
             }
         } else {
             // Episode treated as movie for simplicity
@@ -44,7 +42,6 @@ class CanliDizi : MainAPI() {
             newMovieSearchResponse(epTitle, href, TvType.TvSeries) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.rating = rating
             }
         }
     }
@@ -98,7 +95,13 @@ class CanliDizi : MainAPI() {
                 val epUrl = a.attr("href")
                 val epPoster = el.selectFirst("img")?.attr("src")
                 val epDate = el.selectFirst("div.episode-date")?.text()
-                Episode(epUrl, epName, season = 1, episode = epNum, posterUrl = epPoster, description = epDate)
+                newEpisode(epUrl) {
+                    this.name = epName
+                    this.season = 1
+                    this.episode = epNum
+                    this.posterUrl = epPoster
+                    this.description = epDate
+                }
             }.reversed() // Newest first?
 
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
