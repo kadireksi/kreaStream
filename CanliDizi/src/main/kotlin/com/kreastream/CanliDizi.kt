@@ -7,7 +7,7 @@ import org.jsoup.nodes.Element
 
 class CanliDizi : MainAPI() {
     override var mainUrl = "https://www.canlidizi14.com"
-    override var name = "CanliDizi"
+    override var name = "Canlı Dizi"
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
     override var lang = "tr"
     override val hasMainPage = true
@@ -69,7 +69,7 @@ class CanliDizi : MainAPI() {
         val filmsItems = filmsSection?.select("div.list-episodes")?.map { it.selectFirst("div.episode-box")?.toSearchResponse()!! } ?: emptyList()
         if (filmsItems.isNotEmpty()) lists.add(HomePageList("Filmler", filmsItems))
 
-        return HomePageResponse(lists)
+        return newHomePageResponse(lists)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
@@ -111,7 +111,7 @@ class CanliDizi : MainAPI() {
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
                 this.plot = description
-                this.rating = rating
+                this.score = rating
             }
         } else {
             // Movie or Episode
@@ -127,7 +127,7 @@ class CanliDizi : MainAPI() {
             return newMovieLoadResponse(title, url, type, url) {
                 this.posterUrl = poster
                 this.plot = description
-                this.rating = rating
+                this.score = rating
             }
         }
     }
