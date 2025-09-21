@@ -158,7 +158,7 @@ class CanliDizi : MainAPI() {
                 videoSources.apmap {
                     val src = it.attr("src")
                     val quality = Qualities.values().find { q -> it.attr("title").contains(q.name) } ?: Qualities.Unknown
-                    callback(ExtractorLink(
+                    callback(newExtractorLink(
                         this.name,
                         this.name,
                         fixUrl(src),
@@ -172,7 +172,7 @@ class CanliDizi : MainAPI() {
                 if (video != null) {
                     val src = video.attr("src")
                     if (src.isNotEmpty()) {
-                        callback(ExtractorLink(
+                        callback(newExtractorLink(
                             this.name,
                             this.name,
                             fixUrl(src),
