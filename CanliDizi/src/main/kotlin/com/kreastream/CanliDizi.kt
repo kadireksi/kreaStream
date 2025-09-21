@@ -1,95 +1,125 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.*
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
 class CanliDizi : MainAPI() {
     override var mainUrl = "https://www.canlidizi14.com"
-    override var name = "Canlı Dizi"
-    override val supportedTypes = setOf(TvType.TvSeries)
+    override var name = "CanliDizi"
+    override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
     override var lang = "tr"
     override val hasMainPage = true
-    override val hasDownloadSupport = true
-    override val hasQuickSearch = true
 
-    companion object {
-        private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    private fun Element.toSearchResponse(): SearchResponse {
+        val a = selectFirst("a") ?: throw ErrorLoadingException("No link found")
+        val img = selectFirst("img")
+        val poster = img?.attr("src")
+        val titleElem = selectFirst("div.serie-name")
+        val epElem = selectFirst("div.episode-name")
+        val title = titleElem?.text() ?: epElem?.text() ?: ""
+        val href = a.attr("href")
+        val isSeries = href.contains("kategori")
+        val isMovie = href.contains("-izle.html") && !href.contains("bolum")
+        val ratingStr = selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
+        val rating = (ratingStr?.times(10))?.toInt()
+
+        return if (isSeries) {
+            newTvSeriesSearchResponse(title, href) {
+                this.posterUrl = poster
+                this.year = epElem?.text()?.toIntOrNull()
+                this.quality = getQualityFromString(img?.attr("title"))
+                this.rating = rating
+            }
+        } else if (isMovie) {
+            newMovieSearchResponse(title, href) {
+                this.posterUrl = poster
+                this.quality = getQualityFromString(img?.attr("title"))
+                this.rating = rating
+            }
+        } else {
+            // Episode treated as movie for simplicity
+            val epTitle = "$title ${epElem?.text() ?: ""}".trim()
+            newMovieSearchResponse(epTitle, href, TvType.TvSeries) {
+                this.posterUrl = poster
+                this.quality = getQualityFromString(img?.attr("title"))
+                this.rating = rating
+            }
+        }
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        val document = app.get(mainUrl, headers = mapOf("User-Agent" to USER_AGENT)).document
-        val all = ArrayList<HomePageList>()
-        
-        // Parse the series slider
-        val series = document.select("div.owl-item:not(.cloned) div.list-series").mapNotNull {
-            parseSeriesItem(it)
-        }
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val doc = app.get(mainUrl).document
+        val lists = ArrayList<HomePageList>()
 
-        if (series.isNotEmpty()) {
-            all.add(HomePageList("Popular Series", series, isHorizontalImages = true))
-        }
+        // Popüler Diziler
+        val popularItems = doc.select("div.diziler div.owl-item").map { it.toSearchResponse() }
+        if (popularItems.isNotEmpty()) lists.add(HomePageList("Popüler Diziler", popularItems))
 
-        // Add more sections if available (latest episodes, trending, etc.)
-        // You can add additional parsing logic here for other sections
-        
-        return HomePageResponse(all)
+        // Yerli Diziler
+        val yerliSection = doc.select("div.episodes.episode").getOrNull(0)
+        val yerliItems = yerliSection?.select("div.list-episodes")?.map { it.selectFirst("div.episode-box")?.toSearchResponse()!! } ?: emptyList()
+        if (yerliItems.isNotEmpty()) lists.add(HomePageList("Yerli Diziler", yerliItems))
+
+        // Dijital Diziler
+        val digitalSection = doc.select("div.episodes.episode").getOrNull(1)
+        val digitalItems = digitalSection?.select("div.list-episodes")?.map { it.selectFirst("div.episode-box")?.toSearchResponse()!! } ?: emptyList()
+        if (digitalItems.isNotEmpty()) lists.add(HomePageList("Dijital Diziler", digitalItems))
+
+        // Filmler
+        val filmsSection = doc.select("div.episodes.episode").getOrNull(2)
+        val filmsItems = filmsSection?.select("div.list-episodes")?.map { it.selectFirst("div.episode-box")?.toSearchResponse()!! } ?: emptyList()
+        if (filmsItems.isNotEmpty()) lists.add(HomePageList("Filmler", filmsItems))
+
+        return HomePageResponse(lists)
     }
 
-    private fun parseSeriesItem(element: Element): TvSeriesSearchResponse? {
-        val link = element.selectFirst("a")?.attr("href")?.let { fixUrl(it) } ?: return null
-        val title = element.selectFirst(".serie-name a")?.text()?.trim() ?: return null
-        val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
-        val year = element.selectFirst(".episode-name")?.text()?.trim()?.toIntOrNull()
-        val rating = element.selectFirst(".episode-date")?.text()
-            ?.removePrefix("IMDb:")
-            ?.trim()
-            ?.replace(",", ".")
-            ?.toFloatOrNull()
-        
-        return newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
-            this.posterUrl = poster
-            this.year = year
-            this.rating = rating
-        }
+    override suspend fun search(query: String): List<SearchResponse> {
+        val searchUrl = "$mainUrl/?s=${query.replace(" ", "+")}"
+        val doc = app.get(searchUrl).document
+        return doc.select("div.episodes.episode div.list-episodes div.episode-box").map { it.toSearchResponse() }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url, headers = mapOf("User-Agent" to USER_AGENT)).document
-        
-        val title = document.selectFirst("h1.series-title")?.text()?.trim() 
-            ?: throw ErrorLoadingException("Title not found")
-        val poster = document.selectFirst("img.poster")?.attr("src")?.let { fixUrl(it) }
-        val description = document.selectFirst("div.description")?.text()?.trim()
-        
-        val episodes = document.select("div.episode-list div.episode").mapNotNull { element ->
-            parseEpisode(element)
-        }
+        val doc = app.get(url).document
 
-        val recommendations = document.select("div.recommended-series div.series-item").mapNotNull {
-            parseSeriesItem(it)
-        }
+        if (url.contains("kategori")) {
+            // Series page
+            val title = doc.selectFirst("div.title-border")?.text() ?: doc.selectFirst("title")?.text()?.split(" | ")?.get(0) ?: ""
+            val poster = doc.selectFirst("div.poster img")?.attr("src")
+            val description = doc.selectFirst("div.synopsis")?.text() // Assuming there's a synopsis div
+            val ratingStr = doc.selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
+            val rating = (ratingStr?.times(10))?.toInt()
+            val episodes = doc.select("div.episodes.episode div.list-episodes div.episode-box").mapIndexedNotNull { index, el ->
+                val a = el.selectFirst("a") ?: return@mapIndexedNotNull null
+                val epName = el.selectFirst("div.episode-name")?.text() ?: ""
+                val epNum = epName.replace(".Bölüm", "").trim().toIntOrNull() ?: (index + 1)
+                val epUrl = a.attr("href")
+                val epPoster = el.selectFirst("img")?.attr("src")
+                val epDate = el.selectFirst("div.episode-date")?.text()
+                Episode(epUrl, epName, season = 1, episode = epNum, posterUrl = epPoster, description = epDate)
+            }.reversed() // Newest first?
 
-        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-            this.posterUrl = poster
-            this.plot = description
-            this.recommendations = recommendations
-        }
-    }
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl = poster
+                this.plot = description
+                this.rating = rating
+            }
+        } else {
+            // Movie or Episode
+            val title = doc.selectFirst("title")?.text()?.split(" | ")?.get(0) ?: ""
+            val poster = doc.selectFirst("div.poster img")?.attr("src")
+            val description = doc.selectFirst("div.synopsis")?.text()
+            val ratingStr = doc.selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
+            val rating = (ratingStr?.times(10))?.toInt()
+            val type = if (url.contains("bolum")) TvType.TvSeries else TvType.Movie
 
-    private fun parseEpisode(element: Element): Episode? {
-        val epTitle = element.selectFirst("span.episode-title")?.text()?.trim() ?: "Episode"
-        val epUrl = element.selectFirst("a")?.attr("href")?.let { fixUrl(it) } ?: return null
-        val epNum = element.selectFirst("span.episode-number")?.text()?.toIntOrNull() ?: 1
-        val season = element.selectFirst("span.season-number")?.text()?.toIntOrNull() ?: 1
-        val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
-
-        return newEpisode(epUrl) {
-            this.name = epTitle
-            this.episode = epNum
-            this.season = season
-            this.posterUrl = poster
+            return newMovieLoadResponse(title, url, type, url) {
+                this.posterUrl = poster
+                this.plot = description
+                this.rating = rating
+            }
         }
     }
 
@@ -99,60 +129,21 @@ class CanliDizi : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data, headers = mapOf("User-Agent" to USER_AGENT)).document
-        
-        val videoElement = document.selectFirst("video source")
-        val videoUrl = videoElement?.attr("src")?.let { fixUrl(it) } ?: return false
-        
-        val quality = determineQuality(videoUrl)
-        val isM3u8 = videoUrl.contains(".m3u8")
+        val doc = app.get(data).document
 
-        // Use the recommended newExtractorLink function
-        callback.invoke(
-            newExtractorLink(
-                name,
-                name,
-                videoUrl,
-                mainUrl,
-                quality,
-                isM3u8 = isM3u8,
-                headers = mapOf("User-Agent" to USER_AGENT)
-            )
-        )
+        // Find all part links like /2, /3 etc.
+        val partLinks = doc.select("a[href*=\"$data/\"]").map { it.attr("href") }.toMutableList()
+        partLinks.add(0, data) // Include the main page as part 1
 
-        // Load subtitles
-        document.select("track[kind=subtitles]").forEach { track ->
-            val subUrl = track.attr("src").let { fixUrl(it) }
-            val subLang = track.attr("label").takeIf { it.isNotBlank() } ?: "Turkish"
-            subtitleCallback.invoke(SubtitleFile(subLang, subUrl))
+        partLinks.apmap { partUrl ->
+            val partDoc = app.get(partUrl).document
+            val iframeSrc = partDoc.selectFirst("iframe")?.attr("src")
+                ?: partDoc.selectFirst("div.player embed")?.attr("src")
+                ?: return@apmap
+
+            loadExtractor(iframeSrc, data, subtitleCallback, callback)
         }
 
         return true
-    }
-
-    private fun determineQuality(url: String): Int {
-        return when {
-            url.contains("1080") -> Qualities.P1080.value
-            url.contains("720") -> Qualities.P720.value
-            url.contains("480") -> Qualities.P480.value
-            url.contains("360") -> Qualities.P360.value
-            else -> Qualities.Unknown.value
-        }
-    }
-
-    override suspend fun search(query: String): List<SearchResponse> {
-        if (query.isBlank()) return emptyList()
-        
-        val searchUrl = "$mainUrl/search?q=${query.encodeToUrl()}"
-        val document = app.get(searchUrl, headers = mapOf("User-Agent" to USER_AGENT)).document
-        
-        return document.select("div.search-results div.result, div.series-item").mapNotNull { element ->
-            parseSeriesItem(element)
-        }
-    }
-
-    // Helper function for URL encoding
-    private fun String.encodeToUrl(): String {
-        return java.net.URLEncoder.encode(this, "UTF-8")
     }
 }
