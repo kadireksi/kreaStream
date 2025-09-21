@@ -15,11 +15,11 @@ class CanliDizi : MainAPI() {
     private fun Element.toSearchResponse(): SearchResponse {
         val a = selectFirst("a") ?: throw ErrorLoadingException("No link found")
         val img = selectFirst("img")
-        val poster = img?.attr("src")
+        val poster = fixUrl(img?.attr("src") ?: "")
         val titleElem = selectFirst("div.serie-name")
         val epElem = selectFirst("div.episode-name")
         val title = titleElem?.text() ?: epElem?.text() ?: ""
-        val href = a.attr("href")
+        val href = fixUrl(a.attr("href"))
         val isSeries = href.contains("kategori")
         val isMovie = href.contains("-izle.html") && !href.contains("bolum")
         val ratingStr = selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
@@ -30,11 +30,13 @@ class CanliDizi : MainAPI() {
                 this.posterUrl = poster
                 this.year = epElem?.text()?.toIntOrNull()
                 this.quality = getQualityFromString(img?.attr("title"))
+                this.rating = rating
             }
         } else if (isMovie) {
             newMovieSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
+                this.rating = rating
             }
         } else {
             // Episode treated as movie for simplicity
@@ -42,6 +44,7 @@ class CanliDizi : MainAPI() {
             newMovieSearchResponse(epTitle, href, TvType.TvSeries) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
+                this.rating = rating
             }
         }
     }
@@ -84,7 +87,7 @@ class CanliDizi : MainAPI() {
         if (url.contains("kategori")) {
             // Series page
             val title = doc.selectFirst("div.title-border")?.text() ?: doc.selectFirst("title")?.text()?.split(" | ")?.get(0) ?: ""
-            val poster = doc.selectFirst("div.poster img")?.attr("src")
+            val poster = fixUrl(doc.selectFirst("div.poster img")?.attr("src") ?: "")
             val description = doc.selectFirst("div.synopsis")?.text() // Assuming there's a synopsis div
             val ratingStr = doc.selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
             val rating = (ratingStr?.times(10))?.toInt()
@@ -92,8 +95,8 @@ class CanliDizi : MainAPI() {
                 val a = el.selectFirst("a") ?: return@mapIndexedNotNull null
                 val epName = el.selectFirst("div.episode-name")?.text() ?: ""
                 val epNum = epName.replace(".Bölüm", "").trim().toIntOrNull() ?: (index + 1)
-                val epUrl = a.attr("href")
-                val epPoster = el.selectFirst("img")?.attr("src")
+                val epUrl = fixUrl(a.attr("href"))
+                val epPoster = fixUrl(el.selectFirst("img")?.attr("src") ?: "")
                 val epDate = el.selectFirst("div.episode-date")?.text()
                 newEpisode(epUrl) {
                     this.name = epName
@@ -112,7 +115,7 @@ class CanliDizi : MainAPI() {
         } else {
             // Movie or Episode
             val title = doc.selectFirst("title")?.text()?.split(" | ")?.get(0) ?: ""
-            val poster = doc.selectFirst("div.poster img")?.attr("src")
+            val poster = fixUrl(doc.selectFirst("div.poster img")?.attr("src") ?: "")
             val description = doc.selectFirst("div.synopsis")?.text()
             val ratingStr = doc.selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
             val rating = (ratingStr?.times(10))?.toInt()
@@ -135,7 +138,7 @@ class CanliDizi : MainAPI() {
         val doc = app.get(data).document
 
         // Find all part links like /2, /3 etc.
-        val partLinks = doc.select("a[href*=\"$data/\"]").map { it.attr("href") }.toMutableList()
+        val partLinks = doc.select("a[href*=\"$data/\"]").map { fixUrl(it.attr("href")) }.toMutableList()
         partLinks.add(0, data) // Include the main page as part 1
 
         partLinks.apmap { partUrl ->
