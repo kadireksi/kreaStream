@@ -111,7 +111,7 @@ class CanliDizi : MainAPI() {
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
                 this.plot = description
-                this.score = rating
+                this.rating = rating
             }
         } else {
             // Movie or Episode
@@ -127,7 +127,7 @@ class CanliDizi : MainAPI() {
             return newMovieLoadResponse(title, url, type, url) {
                 this.posterUrl = poster
                 this.plot = description
-                this.score = rating
+                this.rating = rating
             }
         }
     }
