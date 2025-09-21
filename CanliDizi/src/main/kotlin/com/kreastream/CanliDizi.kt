@@ -42,14 +42,11 @@ class CanliDizi : MainAPI() {
         val title = element.selectFirst(".serie-name a")?.text()?.trim() ?: return null
         val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
         val year = element.selectFirst(".episode-name")?.text()?.trim()?.toIntOrNull()
-        val rawScore = element.selectFirst(".episode-date")?.text()
+        val rating = element.selectFirst(".episode-date")?.text()
             ?.removePrefix("IMDb:")
             ?.trim()
             ?.replace(",", ".")
             ?.toFloatOrNull()
-        
-        // For CloudStream 3, use the rating field instead of score
-        val rating = rawScore
         
         return newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
             this.posterUrl = poster
@@ -108,14 +105,17 @@ class CanliDizi : MainAPI() {
         val videoUrl = videoElement?.attr("src")?.let { fixUrl(it) } ?: return false
         
         val quality = determineQuality(videoUrl)
+        val isM3u8 = videoUrl.contains(".m3u8")
 
+        // Use the recommended newExtractorLink function
         callback.invoke(
-            ExtractorLink(
-                source = name,
-                name = name,
-                url = videoUrl,
-                referer = mainUrl,
-                quality = quality,
+            newExtractorLink(
+                name,
+                name,
+                videoUrl,
+                mainUrl,
+                quality,
+                isM3u8 = isM3u8,
                 headers = mapOf("User-Agent" to USER_AGENT)
             )
         )
