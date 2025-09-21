@@ -22,21 +22,17 @@ class CanliDizi : MainAPI() {
         val href = fixUrl(a.attr("href"))
         val isSeries = href.contains("kategori")
         val isMovie = href.contains("-izle.html") && !href.contains("bolum")
-        val ratingStr = selectFirst("div.episode-date")?.text()?.replace("IMDb: ", "")?.replace(",", ".")?.toFloatOrNull()
-        val rating = (ratingStr?.times(10))?.toInt()
 
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.year = epElem?.text()?.toIntOrNull()
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.rating = rating
             }
         } else if (isMovie) {
             newMovieSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.rating = rating
             }
         } else {
             // Episode treated as movie for simplicity
@@ -44,7 +40,6 @@ class CanliDizi : MainAPI() {
             newMovieSearchResponse(epTitle, href, TvType.TvSeries) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
-                this.rating = rating
             }
         }
     }
