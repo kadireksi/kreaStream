@@ -23,33 +23,24 @@ class CanliDizi : MainAPI() {
         val homeSections = mutableListOf<HomePageList>()
 
         // Popular Series section
-        val popularSeries = document.select("div.diziler").mapNotNull { element ->
-            parseSeriesItem(element)
+        val popularSeries = document.select("div.owl-item:not(.cloned) div.list-series").mapNotNull {
+            val link = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
+            val title = it.selectFirst(".serie-name a")?.text()?.trim() ?: return@mapNotNull null
+            val poster = it.selectFirst("img")?.attr("src")
+            val year = it.selectFirst(".episode-name")?.text()?.trim()?.toIntOrNull()
+            val rating = it.selectFirst(".episode-date")?.text()?.removePrefix("IMDb:")?.trim()?.replace(",", ".")?.toFloatOrNull()
+            newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
+                this.posterUrl = poster
+                this.year = year
+                this.rating = rating
+            }
         }.takeIf { it.isNotEmpty() }?.let {
             HomePageList("Popüler Diziler", it)
         }
 
-        // Local Series section
-        val yerliDiziler = document.select("div.episodes episodes").mapNotNull { element ->
-            parseSeriesItem(element)
-        }.takeIf { it.isNotEmpty() }?.let {
-            HomePageList("Yerli Diziler", it)
-        }
-
-        popularSeries?.let { homeSections.add(it) }
-        yerliDiziler?.let { homeSections.add(it) }
+        popularSeries?.let { homeSections.add(it)
 
         return newHomePageResponse(homeSections)
-    }
-
-    private fun parseSeriesItem(element: Element): TvSeriesSearchResponse? {
-        val title = element.selectFirst("div.serie-name")?.text()?.trim() ?: return null
-        val url = element.selectFirst("a")?.attr("href")?.let { fixUrl(it) } ?: return null
-        val poster = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
-
-        return newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
-            this.posterUrl = poster
-        }
     }
 
     override suspend fun load(url: String): LoadResponse {
