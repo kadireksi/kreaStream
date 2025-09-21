@@ -48,14 +48,13 @@ class CanliDizi : MainAPI() {
             ?.replace(",", ".")
             ?.toFloatOrNull()
         
-        val score = rawScore?.let { 
-            Score(it * 10) // Convert from 0-10 scale to 0-100 scale
-        }
+        // For CloudStream 3, use the rating field instead of score
+        val rating = rawScore
         
         return newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
             this.posterUrl = poster
             this.year = year
-            this.score = score
+            this.rating = rating
         }
     }
 
@@ -111,14 +110,13 @@ class CanliDizi : MainAPI() {
         val quality = determineQuality(videoUrl)
 
         callback.invoke(
-            newExtractorLink(
+            ExtractorLink(
                 source = name,
                 name = name,
                 url = videoUrl,
                 referer = mainUrl,
                 quality = quality,
-                headers = mapOf("User-Agent" to USER_AGENT),
-                type = INFER_TYPE
+                headers = mapOf("User-Agent" to USER_AGENT)
             )
         )
 
