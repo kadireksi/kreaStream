@@ -18,29 +18,28 @@ class CanliDizi : MainAPI() {
         private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get(mainUrl, headers = mapOf("User-Agent" to USER_AGENT)).document
-        val homeSections = mutableListOf<HomePageList>()
-
-        // Popular Series section
-        val popularSeries = document.select("div.owl-item:not(.cloned) div.list-series").mapNotNull {
+    override suspend fun getMainPage(page: Int, request: HttpRequest): HomePageResponse {
+        val document = app.get(mainUrl).document
+        val all = ArrayList<HomePageList>()
+        
+        // Parse the series slider
+        val series = document.select("div.owl-item:not(.cloned) div.list-series").mapNotNull {
             val link = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
             val title = it.selectFirst(".serie-name a")?.text()?.trim() ?: return@mapNotNull null
             val poster = it.selectFirst("img")?.attr("src")
             val year = it.selectFirst(".episode-name")?.text()?.trim()?.toIntOrNull()
             val rating = it.selectFirst(".episode-date")?.text()?.removePrefix("IMDb:")?.trim()?.replace(",", ".")?.toFloatOrNull()
+            
             newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
                 this.posterUrl = poster
                 this.year = year
                 this.rating = rating
             }
-        }.takeIf { it.isNotEmpty() }?.let {
-            HomePageList("Popüler Diziler", it)
         }
 
-        popularSeries?.let { homeSections.add(it)
-
-        return newHomePageResponse(homeSections)
+        all.add(HomePageList("Series", series, isHorizontalImages = true))
+        
+        return HomePageResponse(all)
     }
 
     override suspend fun load(url: String): LoadResponse {
