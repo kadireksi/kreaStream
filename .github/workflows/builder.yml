@@ -17,7 +17,7 @@ on:
       - "**/*.py"
 
 jobs:
-  CloudStreamDerleyici:
+  kreaStreamDerleyici:
     runs-on: ubuntu-latest
     steps:
       - name: "'src' Depo Kontrolü"
