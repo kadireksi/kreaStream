@@ -22,17 +22,20 @@ class CanliDizi : MainAPI() {
         val href = fixUrl(a.attr("href"))
         val isSeries = href.contains("kategori")
         val isMovie = href.contains("-izle.html") && !href.contains("bolum")
+        val headers = mapOf("referer" to "$mainUrl/")
 
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.year = epElem?.text()?.toIntOrNull()
                 this.quality = getQualityFromString(img?.attr("title"))
+                this.posterHeaders = headers
             }
         } else if (isMovie) {
             newMovieSearchResponse(title, href) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
+                this.posterHeaders = headers
             }
         } else {
             // Episode treated as movie for simplicity
@@ -40,6 +43,7 @@ class CanliDizi : MainAPI() {
             newMovieSearchResponse(epTitle, href, TvType.TvSeries) {
                 this.posterUrl = poster
                 this.quality = getQualityFromString(img?.attr("title"))
+                this.posterHeaders = headers
             }
         }
     }
@@ -78,6 +82,7 @@ class CanliDizi : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
+        val headers = mapOf("referer" to "$mainUrl/")
 
         if (url.contains("kategori")) {
             // Series page
@@ -106,6 +111,7 @@ class CanliDizi : MainAPI() {
                 this.posterUrl = poster
                 this.plot = description
                 this.rating = rating
+                this.posterHeaders = headers
             }
         } else {
             // Movie or Episode
@@ -120,6 +126,7 @@ class CanliDizi : MainAPI() {
                 this.posterUrl = poster
                 this.plot = description
                 this.rating = rating
+                this.posterHeaders = headers
             }
         }
     }
