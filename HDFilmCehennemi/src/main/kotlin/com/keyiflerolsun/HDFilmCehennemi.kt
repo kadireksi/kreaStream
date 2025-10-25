@@ -238,33 +238,38 @@ class HDFilmCehennemi : MainAPI() {
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
-//        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val script    = app.get(url, referer = "${mainUrl}/").document.select("script")
-            .find { it.data().contains("sources:") }?.data() ?: return
+        val script = app.get(url, referer = "$mainUrl/").document.select("script")
+            .find { it.data().contains("sources:") }?.data()
 
-        Log.d("fix","urlne $url")
+        if (script == null) {
+            Log.e("HDCH", "Script not found at $url")
+            return
+        }
 
-        val videoData = getAndUnpack(script).substringAfter("file_link=\"").substringBefore("\";")
-//        val subData   = script.substringAfter("tracks: [").substringBefore("]")
+        val unpacked = runCatching { getAndUnpack(script) }.getOrNull()
+        if (unpacked == null || !unpacked.contains("file_link=\"")) {
+            Log.e("HDCH", "Unpacking failed or file_link missing at $url")
+            return
+        }
 
-//        Log.d("fix","subdata $subData")
+        val videoData = unpacked.substringAfter("file_link=\"").substringBefore("\";")
+        val decodedUrl = runCatching { base64Decode(videoData) }.getOrNull()
+        if (decodedUrl.isNullOrEmpty()) {
+            Log.e("HDCH", "Decoded video URL is empty at $url")
+            return
+        }
 
         callback.invoke(
-            newExtractorLink(
-                source  = source,
-                name    = source,
-                url     = base64Decode(videoData),
-                type    = INFER_TYPE
-            ) {
-                // DSL builder kullanarak referer ve quality ayarı
-                this.referer = "${mainUrl}/"
-                this.headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Norton/124.0.0.0")
+            newExtractorLink(source, source, decodedUrl, INFER_TYPE) {
+                this.referer = "$mainUrl/"
+                this.headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                 this.quality = Qualities.Unknown.value
             }
         )
     }
+
 
     override suspend fun loadLinks(
         data: String,
@@ -273,12 +278,18 @@ class HDFilmCehennemi : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
+
         val iframealak = fixUrlNull(
             document.selectFirst(".close")?.attr("data-src")
                 ?: document.selectFirst(".rapidrame")?.attr("data-src")
-        ).toString()
+        )?.takeIf { it.isNotBlank() } ?: run {
+            Log.e("HDCH", "iframe not found on $data")
+            return false
+        }
 
-        // Process hdfilmcehennemi.mobi subtitles
+        Log.d("HDCH", "iframe found: $iframealak")
+
+        // Subtitle handling (unchanged)
         if (iframealak.contains("hdfilmcehennemi.mobi")) {
             val iframedoc = app.get(iframealak, referer = mainUrl).document
             val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
@@ -286,12 +297,10 @@ class HDFilmCehennemi : MainAPI() {
             iframedoc.select("track[kind=captions]")
                 .filter { it.attr("srclang") != "forced" }
                 .forEach { track ->
-                    val lang = track.attr("srclang").let {
-                        when (it) {
-                            "tr" -> "Türkçe"
-                            "en" -> "İngilizce"
-                            else -> it
-                        }
+                    val lang = when (val code = track.attr("srclang")) {
+                        "tr" -> "Türkçe"
+                        "en" -> "İngilizce"
+                        else -> code
                     }
                     val subUrl = track.attr("src").let { src ->
                         if (src.startsWith("http")) src else "$baseUri/$src".replace("//", "/")
@@ -300,53 +309,56 @@ class HDFilmCehennemi : MainAPI() {
                 }
         } else if (iframealak.contains("rplayer")) {
             val iframeDoc = app.get(iframealak, referer = "$data/").document
-            val regex = Regex("\"file\":\"((?:[^\"]|\"\")*)\"", options = setOf(RegexOption.IGNORE_CASE))
-            val matches = regex.findAll(iframeDoc.toString())
-
-            for (match in matches) {
-                val fileUrlEscaped = match.groupValues[1]
-                val fileUrl = fileUrlEscaped.replace("\\/", "/")
-                val tamUrl = fixUrlNull(fileUrl).toString()
-                val sonUrl = "${tamUrl}/"
-                val langCode = when {
-                    fileUrl.contains("Turkish", ignoreCase = true) -> "Türkçe"
-                    fileUrl.contains("English", ignoreCase = true) -> "İngilizce"
-                    else -> "Unknown"
+            Regex("\"file\":\"((?:[^\"]|\"\")*)\"", RegexOption.IGNORE_CASE)
+                .findAll(iframeDoc.toString())
+                .forEach { match ->
+                    val fileUrl = match.groupValues[1].replace("\\/", "/")
+                    val finalUrl = fixUrlNull(fileUrl)?.plus("/") ?: return@forEach
+                    val langCode = when {
+                        fileUrl.contains("Turkish", true) -> "Türkçe"
+                        fileUrl.contains("English", true) -> "İngilizce"
+                        else -> "Unknown"
+                    }
+                    subtitleCallback(SubtitleFile(langCode, finalUrl))
                 }
-                subtitleCallback.invoke(SubtitleFile(lang = langCode, url = sonUrl))
-            }
         }
 
+        document.select("div.alternative-links").forEach { element ->
+            val langCode = element.attr("data-lang").uppercase()
+            element.select("button.alternative-link").forEach { button ->
+                val source = button.text().replace("(HDrip Xbet)", "").trim() + " $langCode"
+                val videoID = button.attr("data-video").takeIf { it.isNotBlank() } ?: run {
+                    Log.e("HDCH", "Missing videoID for $source")
+                    return@forEach
+                }
 
-        Log.d("fix", "iframegeldi mi $iframealak")
-
-        document.select("div.alternative-links").map { element ->
-            element to element.attr("data-lang").uppercase()
-        }.forEach { (element, langCode) ->
-            element.select("button.alternative-link").map { button ->
-                button.text().replace("(HDrip Xbet)", "").trim() + " $langCode" to button.attr("data-video")
-            }.forEach { (source, videoID) ->
                 val apiGet = app.get(
-                    "${mainUrl}/video/$videoID/",
+                    "$mainUrl/video/$videoID/",
                     headers = mapOf(
-                        "Content-Type"     to "application/json",
+                        "Content-Type" to "application/json",
                         "X-Requested-With" to "fetch"
                     ),
                     referer = data
                 ).text
 
-                var iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.get(1)!!.replace("\\", "")
-                if (iframe.contains("?rapidrame_id=")) {
-                    iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
+                val iframeMatch = Regex("""data-src=\\"([^"]+)""").find(apiGet)
+                val iframe = iframeMatch?.groupValues?.getOrNull(1)?.replace("\\", "") ?: run {
+                    Log.e("HDCH", "iframe not found for videoID $videoID")
+                    return@forEach
                 }
 
-                Log.d("HDCH", "$source » $videoID » $iframe")
-                invokeLocalSource(source, iframe, callback)
+                val finalIframe = if (iframe.contains("?rapidrame_id=")) {
+                    "$mainUrl/playerr/" + iframe.substringAfter("?rapidrame_id=")
+                } else iframe
+
+                Log.d("HDCH", "$source » $videoID » $finalIframe")
+                invokeLocalSource(source, finalIframe, callback)
             }
         }
 
         return true
     }
+
 
 
     data class Results(
