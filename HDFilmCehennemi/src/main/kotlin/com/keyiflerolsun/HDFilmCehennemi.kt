@@ -340,20 +340,21 @@ class HDFilmCehennemi : MainAPI() {
                     return@forEach
                 }
 
-                val apiGet = app.get(
+                val apiResponse = app.get(
                     "$mainUrl/video/$videoID/",
-                    headers = mapOf(
-                        "Content-Type" to "application/json",
-                        "X-Requested-With" to "fetch"
-                    ),
+                    headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
                     referer = data
-                ).text
-
-                val iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.getOrNull(1)?.replace("\\", "")
-                if (iframe.isNullOrBlank()) {
-                    Log.e("HDCH", "iframe not found for videoID $videoID")
+                ).parsedSafe<VideoIframe>() ?: run {
+                    Log.e("HDCH", "Failed to parse iframe JSON for videoID $videoID")
                     return@forEach
                 }
+
+                val iframe = Jsoup.parse(apiResponse.data.html).selectFirst("iframe")?.attr("data-src")
+                    ?.takeIf { it.isNotBlank() } ?: run {
+                    Log.e("HDCH", "iframe not found in JSON for videoID $videoID")
+                    return@forEach
+                }
+
 
                 val finalIframe = if (iframe.contains("?rapidrame_id=")) {
                     "$mainUrl/playerr/" + iframe.substringAfter("?rapidrame_id=")
@@ -383,4 +384,14 @@ class HDFilmCehennemi : MainAPI() {
         @JsonProperty("canonical") val canonical: Boolean,
         @JsonProperty("keywords") val keywords: Boolean
     )
+
+    data class VideoIframe(
+    @JsonProperty("success") val success: Boolean,
+    @JsonProperty("data") val data: IframeData
+    )
+
+    data class IframeData(
+        @JsonProperty("html") val html: String
+    )
+
 }
