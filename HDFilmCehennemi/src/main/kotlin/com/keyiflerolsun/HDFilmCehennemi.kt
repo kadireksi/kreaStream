@@ -103,24 +103,20 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.attr("title")
-            .takeIf { it.isNotEmpty() }
-            .takeUnless {
-                it.contains("Seri Filmler", ignoreCase = true)
-                        || it.contains("Japonya Filmleri", ignoreCase = true)
-                        || it.contains("Kore Filmleri", ignoreCase = true)
-                        || it.contains("Hint Filmleri", ignoreCase = true)
-                        || it.contains("Türk Filmleri", ignoreCase = true)
-                        || it.contains("DC Yapımları", ignoreCase = true)
-                        || it.contains("Marvel Yapımları", ignoreCase = true)
-                        || it.contains("Amazon Yapımları", ignoreCase = true)
-                        || it.contains("1080p Film izle", ignoreCase = true)
-            } ?: return null
+        val rawTitle = this.attr("title").takeIf { it.isNotEmpty() } ?: return null
+
+        val excluded = listOf(
+            "Seri Filmler", "Japonya Filmleri", "Kore Filmleri", "Hint Filmleri",
+            "Türk Filmleri", "DC Yapımları", "Marvel Yapımları", "Amazon Yapımları",
+            "1080p Film izle"
+        )
+
+        if (excluded.any { rawTitle.contains(it, ignoreCase = true) }) return null
 
         val href      = fixUrlNull(this.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("data-src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+        return newMovieSearchResponse(rawTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
@@ -233,9 +229,7 @@ class HDFilmCehennemi : MainAPI() {
 
         if (iframealak == null) {
             Log.e("HDCH", "iframe not found on $data")
-            // still try alternative-links flow below
         } else {
-            // If iframe is directly present on page (rare), try extracting sources from it
             try {
                 extractFromIframeUrl(iframealak, data, subtitleCallback, callback)
             } catch (e: Exception) {
@@ -243,7 +237,6 @@ class HDFilmCehennemi : MainAPI() {
             }
         }
 
-        // Process alternative-links section: video buttons that return JSON containing iframe HTML
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
@@ -276,7 +269,6 @@ class HDFilmCehennemi : MainAPI() {
                         return@forEach
                     }
 
-                    // Normalize iframe URL
                     val iframeUrl = fixUrlNull(resolveUrl(iframeSrc, mainUrl)) ?: run {
                         Log.e("HDCH", "iframe src invalid for videoID $videoID")
                         return@forEach
@@ -303,7 +295,6 @@ class HDFilmCehennemi : MainAPI() {
         val iframeDocResponse = app.get(iframeUrl, referer = refererForIframe)
         val iframeDoc = iframeDocResponse.document
 
-        // Subtitle extraction if present
         try {
             val baseUri = iframeDoc.location().substringBefore("/", iframeDoc.location())
             iframeDoc.select("track[kind=captions]").filter { it.attr("srclang") != "forced" }.forEach { track ->
@@ -320,10 +311,8 @@ class HDFilmCehennemi : MainAPI() {
             Log.d("HDCH", "Subtitle extraction failed: ${e.message}")
         }
 
-        // Try multiple strategies to locate the real video file:
-        // 1) Inline scripts in iframe page
         val scriptsText = iframeDoc.select("script").mapNotNull { it.data() }.joinToString("\n")
-        // Try to find file_link base64 or similar tokens
+
         val fileLinkEncoded = Regex("""file_link\s*=\s*"([^"]+)"""").find(scriptsText)?.groupValues?.getOrNull(1)
             ?: Regex("""file_link\s*:\s*"([^"]+)"""").find(scriptsText)?.groupValues?.getOrNull(1)
             ?: Regex("""["'](?:file|file_link)["']\s*[:=]\s*["']([^"']+)["']""").find(scriptsText)?.groupValues?.getOrNull(1)
@@ -343,7 +332,6 @@ class HDFilmCehennemi : MainAPI() {
             }
         }
 
-        // 2) Look for "sources" arrays or file fields in script text (common with JW/Flowplayer)
         val sourcesMatch = Regex("""sources\s*:\s*
 
 \[([^\]
@@ -369,7 +357,6 @@ class HDFilmCehennemi : MainAPI() {
             }
         }
 
-        // 3) If page loads external movie.js or other remote JS, fetch and inspect it
         val scriptSrcs = iframeDoc.select("script[src]").mapNotNull { it.attr("src") }.distinct()
         for (src in scriptSrcs) {
             try {
@@ -392,7 +379,6 @@ class HDFilmCehennemi : MainAPI() {
             }
         }
 
-        // 4) Try unpacking obfuscated inline scripts (eval-packed)
         val unpacked = runCatching { getAndUnpack(scriptsText) }.getOrNull()
         if (!unpacked.isNullOrBlank()) {
             val decodedFromUnpacked = extractVideoFromJs(unpacked)
@@ -413,7 +399,6 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     private fun extractVideoFromJs(jsText: String): String? {
-        // Common patterns: base64 file_link, sources: [{file:"..."}], direct http(s) links
         val b64 = Regex("""file_link\s*=\s*["']([A-Za-z0-9+/=]+)["']""").find(jsText)?.groupValues?.getOrNull(1)
         if (!b64.isNullOrBlank()) {
             return runCatching { base64Decode(b64) }.getOrNull()
@@ -422,13 +407,11 @@ class HDFilmCehennemi : MainAPI() {
         val srcFile = Regex("""file\s*[:=]\s*["'](https?://[^"']+)["']""", RegexOption.IGNORE_CASE).find(jsText)?.groupValues?.getOrNull(1)
         if (!srcFile.isNullOrBlank()) return srcFile
 
-        // Sometimes file is encoded as atob("...") or as btoa result
         val atobMatch = Regex("""atob\(\s*["']([A-Za-z0-9+/=]+)["']\s*\)""").find(jsText)?.groupValues?.getOrNull(1)
         if (!atobMatch.isNullOrBlank()) {
             return runCatching { base64Decode(atobMatch) }.getOrNull()
         }
 
-        // Try to find direct mp4/m3u8 links
         val direct = Regex("""https?://[^\s"']+\.(m3u8|mp4|mpd)[^\s"']*""", RegexOption.IGNORE_CASE).find(jsText)?.value
         if (!direct.isNullOrBlank()) return direct
 
@@ -440,7 +423,6 @@ class HDFilmCehennemi : MainAPI() {
             val baseUri = URI(base)
             baseUri.resolve(url).toString()
         } catch (e: Exception) {
-            // fallback: try to normalize simple cases
             if (url.startsWith("//")) "https:$url" else if (url.startsWith("/")) "${mainUrl.trimEnd('/')}$url" else url
         }
     }
