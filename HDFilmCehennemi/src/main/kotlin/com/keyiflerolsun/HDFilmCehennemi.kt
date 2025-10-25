@@ -240,8 +240,9 @@ class HDFilmCehennemi : MainAPI() {
         url: String,
         callback: (ExtractorLink) -> Unit
     ) {
-        val script = app.get(url, referer = "$mainUrl/").document.select("script")
-            .find { it.data().contains("sources:") }?.data()
+        val response = app.get(url, referer = "$mainUrl/")
+        val script = response.document.select("script")
+            .find { it.data().contains("file_link=") }?.data()
 
         if (script == null) {
             Log.e("HDCH", "Script not found at $url")
@@ -249,17 +250,24 @@ class HDFilmCehennemi : MainAPI() {
         }
 
         val unpacked = runCatching { getAndUnpack(script) }.getOrNull()
-        if (unpacked == null || !unpacked.contains("file_link=\"")) {
-            Log.e("HDCH", "Unpacking failed or file_link missing at $url")
+        if (unpacked == null) {
+            Log.e("HDCH", "Unpacking failed at $url")
             return
         }
 
         val videoData = unpacked.substringAfter("file_link=\"").substringBefore("\";")
-        val decodedUrl = runCatching { base64Decode(videoData) }.getOrNull()
-        if (decodedUrl.isNullOrEmpty()) {
-            Log.e("HDCH", "Decoded video URL is empty at $url")
+        if (videoData.isBlank()) {
+            Log.e("HDCH", "file_link not found in unpacked script at $url")
             return
         }
+
+        val decodedUrl = runCatching { base64Decode(videoData) }.getOrNull()
+        if (decodedUrl.isNullOrBlank()) {
+            Log.e("HDCH", "Decoded video URL is invalid at $url")
+            return
+        }
+
+        Log.d("HDCH", "Decoded video URL: $decodedUrl")
 
         callback.invoke(
             newExtractorLink(source, source, decodedUrl, INFER_TYPE) {
@@ -341,8 +349,8 @@ class HDFilmCehennemi : MainAPI() {
                     referer = data
                 ).text
 
-                val iframeMatch = Regex("""data-src=\\"([^"]+)""").find(apiGet)
-                val iframe = iframeMatch?.groupValues?.getOrNull(1)?.replace("\\", "") ?: run {
+                val iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.getOrNull(1)?.replace("\\", "")
+                if (iframe.isNullOrBlank()) {
                     Log.e("HDCH", "iframe not found for videoID $videoID")
                     return@forEach
                 }
