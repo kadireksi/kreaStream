@@ -286,137 +286,237 @@ class HDFilmCehennemi : MainAPI() {
         return true
     }
 
-    private suspend fun extractFromIframeUrl(
-        iframeUrl: String,
-        refererForIframe: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val iframeDocResponse = app.get(iframeUrl, referer = refererForIframe)
-        val iframeDoc = iframeDocResponse.document
+// Replace existing extractFromIframeUrl(...) with this improved version
+private suspend fun extractFromIframeUrl(
+    iframeUrl: String,
+    refererForIframe: String,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+) {
+    val iframeDocResponse = app.get(iframeUrl, referer = refererForIframe)
+    val iframeDoc = iframeDocResponse.document
 
-        try {
-            val baseUri = iframeDoc.location().substringBefore("/", iframeDoc.location())
-            iframeDoc.select("track[kind=captions]").filter { it.attr("srclang") != "forced" }.forEach { track ->
-                val lang = when (track.attr("srclang")) {
-                    "tr" -> "Türkçe"
-                    "en" -> "İngilizce"
-                    else -> track.attr("srclang")
+    // subtitles (unchanged)
+    try {
+        val baseUri = iframeDoc.location().substringBefore("/", iframeDoc.location())
+        iframeDoc.select("track[kind=captions]").filter { it.attr("srclang") != "forced" }.forEach { track ->
+            val lang = when (track.attr("srclang")) {
+                "tr" -> "Türkçe"
+                "en" -> "İngilizce"
+                else -> track.attr("srclang")
+            }
+            val src = track.attr("src")
+            val subUrl = if (src.startsWith("http")) src else "${baseUri.trimEnd('/')}/${src.trimStart('/')}"
+            subtitleCallback(SubtitleFile(lang, subUrl))
+        }
+    } catch (e: Exception) {
+        Log.d("HDCH", "Subtitle extraction failed: ${e.message}")
+    }
+
+    // 1) Collect scripts text (inline + remote references)
+    val inlineScripts = iframeDoc.select("script").mapNotNull { it.data() }.joinToString("\n")
+    val scriptSrcs = iframeDoc.select("script[src]").mapNotNull { it.attr("src") }.distinct()
+
+    // 2) Try to unpack inline scripts first (this often reveals eval-packed variables like s_366WeEc1Du7)
+    val unpackedInline = runCatching { getAndUnpack(inlineScripts) }.getOrNull()
+    val scriptsText = listOfNotNull(unpackedInline, inlineScripts).firstOrNull() ?: inlineScripts
+
+    Log.d("HDCH", "Scripts length: ${scriptsText.length}")
+
+    // 3) Try to find sources usage that references a variable, e.g. sources: [{file:s_366WeEc1Du7}]
+    val varUsageMatch = Regex("""sources\s*:\s*
+
+\[\s*\{\s*file\s*:\s*([A-Za-z0-9_]+)\s*}""", RegexOption.IGNORE_CASE).find(scriptsText)
+    if (varUsageMatch != null) {
+        val varName = varUsageMatch.groupValues[1]
+        Log.d("HDCH", "Found variable usage for source: $varName")
+
+        // Try to resolve variable value in unpacked text first
+        val varValue = run {
+            // 1) look for simple var/let/const assignment: var s_366WeEc1Du7 = "..." or s_366WeEc1Du7="..."
+            Regex("""(?:var|let|const)?\s*${Regex.escape(varName)}\s*=\s*["']([^"']+)["']""")
+                .find(scriptsText)?.groupValues?.getOrNull(1)
+                // 2) look for atob("...") or atob('...') usage: varName = atob("...")
+                ?: Regex("""${Regex.escape(varName)}\s*=\s*atob\(\s*["']([A-Za-z0-9+/=]+)["']\s*\)""")
+                    .find(scriptsText)?.groupValues?.getOrNull(1)?.let { runCatching { base64Decode(it) }.getOrNull() }
+                // 3) look for assignment through the eval/unpacked tokens (common after getAndUnpack)
+                ?: Regex("""["']${Regex.escape(varName)}["']\s*[,=]\s*["']([A-Za-z0-9+/=]+)["']""").find(scriptsText)?.groupValues?.getOrNull(1)
+                // 4) full search for a base64-looking token near varName in unpacked text
+                ?: Regex("""([A-Za-z0-9+/=]{40,})""").findAll(scriptsText).mapNotNull { it.groupValues.getOrNull(1) }
+                    .firstOrNull { candidate ->
+                        // heuristic: candidate appears close to varName
+                        val idxVar = scriptsText.indexOf(varName)
+                        val idxCand = scriptsText.indexOf(candidate)
+                        idxVar >= 0 && idxCand >= 0 && Math.abs(idxVar - idxCand) < 400
+                    }?.let { runCatching { base64Decode(it) }.getOrNull() }
+        }
+
+        if (!varValue.isNullOrBlank()) {
+            // If varValue is base64-decoded content that yields a URL or another JS, try to extract direct urls
+            Log.d("HDCH", "Resolved $varName => $varValue")
+            val direct = extractVideoFromJs(varValue)
+            if (!direct.isNullOrBlank()) {
+                callback.invoke(
+                    newExtractorLink("HDFC", "HDFC", direct, INFER_TYPE) {
+                        this.referer = mainUrl
+                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                return
+            }
+            // varValue itself might be a direct URL
+            if (varValue.startsWith("http")) {
+                Log.d("HDCH", "Using variable value as direct URL: $varValue")
+                callback.invoke(
+                    newExtractorLink("HDFC", "HDFC", varValue, INFER_TYPE) {
+                        this.referer = mainUrl
+                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                return
+            }
+        } else {
+            Log.d("HDCH", "Could not resolve variable $varName from unpacked scripts")
+        }
+    }
+
+    // 4) Try common patterns against the unpacked scriptsText
+    // a) file_link base64 like file_link="..."
+    val fileLinkEncoded = Regex("""file_link\s*=\s*["']([A-Za-z0-9+/=]+)["']""").find(scriptsText)?.groupValues?.getOrNull(1)
+    if (!fileLinkEncoded.isNullOrBlank()) {
+        val decoded = runCatching { base64Decode(fileLinkEncoded) }.getOrNull()
+        if (!decoded.isNullOrBlank()) {
+            Log.d("HDCH", "Found decoded file_link => $decoded")
+            callback.invoke(
+                newExtractorLink("HDFC", "HDFC", decoded, INFER_TYPE) {
+                    this.referer = mainUrl
+                    this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                    this.quality = Qualities.Unknown.value
                 }
-                val src = track.attr("src")
-                val subUrl = if (src.startsWith("http")) src else "${baseUri.trimEnd('/')}/${src.trimStart('/')}"
-                subtitleCallback(SubtitleFile(lang, subUrl))
+            )
+            return
+        }
+    }
+
+    // b) sources: [{file:"..."}] after unpacking
+    val sourcesMatch = Regex("""sources\s*:\s*
+
+\[\s*\{\s*file\s*[:=]\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(scriptsText)
+    if (sourcesMatch != null) {
+        val fileUrl = sourcesMatch.groupValues[1]
+        val finalFile = resolveUrl(fileUrl, iframeDoc.location())
+        Log.d("HDCH", "Found sources file => $finalFile")
+        callback.invoke(
+            newExtractorLink("HDFC", "HDFC", finalFile, INFER_TYPE) {
+                this.referer = mainUrl
+                this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                this.quality = Qualities.Unknown.value
+            }
+        )
+        return
+    }
+
+    // c) direct https links in unpacked scripts
+    val directLink = Regex("""https?://[^\s"']+\.(m3u8|mp4|mpd)[^\s"']*""", RegexOption.IGNORE_CASE).find(scriptsText)?.value
+    if (!directLink.isNullOrBlank()) {
+        Log.d("HDCH", "Found direct media link => $directLink")
+        callback.invoke(
+            newExtractorLink("HDFC", "HDFC", directLink, INFER_TYPE) {
+                this.referer = mainUrl
+                this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                this.quality = Qualities.Unknown.value
+            }
+        )
+        return
+    }
+
+    // 5) If nothing found in inline/unpacked scripts, try external JS resources (movie.js etc)
+    for (src in scriptSrcs) {
+        try {
+            val jsUrl = resolveUrl(src, iframeDoc.location())
+            val jsText = app.get(jsUrl, referer = iframeDoc.location()).text
+            val unpackedJs = runCatching { getAndUnpack(jsText) }.getOrNull() ?: jsText
+            val decodedFromJs = extractVideoFromJs(unpackedJs)
+            if (!decodedFromJs.isNullOrBlank()) {
+                Log.d("HDCH", "Found video in external JS $jsUrl => $decodedFromJs")
+                callback.invoke(
+                    newExtractorLink("HDFC", "HDFC", decodedFromJs, INFER_TYPE) {
+                        this.referer = mainUrl
+                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                return
             }
         } catch (e: Exception) {
-            Log.d("HDCH", "Subtitle extraction failed: ${e.message}")
+            Log.d("HDCH", "External JS fetch failed for $src: ${e.message}")
         }
+    }
 
-        val scriptsText = iframeDoc.select("script").mapNotNull { it.data() }.joinToString("\n")
-
-        val fileLinkEncoded = Regex("""file_link\s*=\s*"([^"]+)"""").find(scriptsText)?.groupValues?.getOrNull(1)
-            ?: Regex("""file_link\s*:\s*"([^"]+)"""").find(scriptsText)?.groupValues?.getOrNull(1)
-            ?: Regex("""["'](?:file|file_link)["']\s*[:=]\s*["']([^"']+)["']""").find(scriptsText)?.groupValues?.getOrNull(1)
-
-        if (!fileLinkEncoded.isNullOrBlank()) {
-            val decoded = runCatching { base64Decode(fileLinkEncoded) }.getOrNull()
-            if (!decoded.isNullOrBlank()) {
-                Log.d("HDCH", "Found decoded video from file_link: $decoded")
-                callback.invoke(
-                    newExtractorLink("HDFC", "HDFC", decoded, INFER_TYPE) {
-                        this.referer = mainUrl
-                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
-                        this.quality = Qualities.Unknown.value
-                    }
-                )
-                return
-            }
-        }
-
-        val sourcesMatch = Regex("""sources\s*:\s*
-
-\[([^\]
-
-]+)\]
-
-""", RegexOption.IGNORE_CASE).find(scriptsText)
-        if (sourcesMatch != null) {
-            val inner = sourcesMatch.groupValues[1]
-            val fileMatch = Regex("""file\s*[:=]\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(inner)
-            val fileUrl = fileMatch?.groupValues?.getOrNull(1)
-            if (!fileUrl.isNullOrBlank()) {
-                val finalFile = resolveUrl(fileUrl, iframeDoc.location())
-                Log.d("HDCH", "Found source file in sources array: $finalFile")
-                callback.invoke(
-                    newExtractorLink("HDFC", "HDFC", finalFile, INFER_TYPE) {
-                        this.referer = mainUrl
-                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
-                        this.quality = Qualities.Unknown.value
-                    }
-                )
-                return
-            }
-        }
-
-        val scriptSrcs = iframeDoc.select("script[src]").mapNotNull { it.attr("src") }.distinct()
-        for (src in scriptSrcs) {
-            try {
-                val jsUrl = resolveUrl(src, iframeDoc.location())
-                val jsText = app.get(jsUrl, referer = iframeDoc.location()).text
-                val decodedFromJs = extractVideoFromJs(jsText)
-                if (!decodedFromJs.isNullOrBlank()) {
-                    Log.d("HDCH", "Found video in external JS $jsUrl: $decodedFromJs")
-                    callback.invoke(
-                        newExtractorLink("HDFC", "HDFC", decodedFromJs, INFER_TYPE) {
-                            this.referer = mainUrl
-                            this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    return
+    // 6) Try unpacking the combined inline scripts again more aggressively
+    val aggressiveUnpacked = runCatching { getAndUnpack(inlineScripts + "\n" + scriptSrcs.joinToString("\n") { try { app.get(resolveUrl(it, iframeDoc.location()), referer = iframeDoc.location()).text } catch (_: Exception) { "" } }) }.getOrNull()
+    if (!aggressiveUnpacked.isNullOrBlank()) {
+        val final = extractVideoFromJs(aggressiveUnpacked)
+        if (!final.isNullOrBlank()) {
+            Log.d("HDCH", "Found video in aggressive unpack => $final")
+            callback.invoke(
+                newExtractorLink("HDFC", "HDFC", final, INFER_TYPE) {
+                    this.referer = mainUrl
+                    this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                    this.quality = Qualities.Unknown.value
                 }
-            } catch (e: Exception) {
-                Log.d("HDCH", "External JS fetch failed for $src: ${e.message}")
-            }
+            )
+            return
         }
-
-        val unpacked = runCatching { getAndUnpack(scriptsText) }.getOrNull()
-        if (!unpacked.isNullOrBlank()) {
-            val decodedFromUnpacked = extractVideoFromJs(unpacked)
-            if (!decodedFromUnpacked.isNullOrBlank()) {
-                Log.d("HDCH", "Found video in unpacked script: $decodedFromUnpacked")
-                callback.invoke(
-                    newExtractorLink("HDFC", "HDFC", decodedFromUnpacked, INFER_TYPE) {
-                        this.referer = mainUrl
-                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
-                        this.quality = Qualities.Unknown.value
-                    }
-                )
-                return
-            }
-        }
-
-        Log.e("HDCH", "No video found in iframe page: $iframeUrl")
     }
 
-    private fun extractVideoFromJs(jsText: String): String? {
-        val b64 = Regex("""file_link\s*=\s*["']([A-Za-z0-9+/=]+)["']""").find(jsText)?.groupValues?.getOrNull(1)
-        if (!b64.isNullOrBlank()) {
-            return runCatching { base64Decode(b64) }.getOrNull()
-        }
+    Log.e("HDCH", "No video found in iframe page: $iframeUrl")
+}
 
-        val srcFile = Regex("""file\s*[:=]\s*["'](https?://[^"']+)["']""", RegexOption.IGNORE_CASE).find(jsText)?.groupValues?.getOrNull(1)
-        if (!srcFile.isNullOrBlank()) return srcFile
 
-        val atobMatch = Regex("""atob\(\s*["']([A-Za-z0-9+/=]+)["']\s*\)""").find(jsText)?.groupValues?.getOrNull(1)
-        if (!atobMatch.isNullOrBlank()) {
-            return runCatching { base64Decode(atobMatch) }.getOrNull()
-        }
+ // Replace existing extractVideoFromJs(...) with this enhanced resolver
+private fun extractVideoFromJs(jsText: String): String? {
+    if (jsText.isBlank()) return null
 
-        val direct = Regex("""https?://[^\s"']+\.(m3u8|mp4|mpd)[^\s"']*""", RegexOption.IGNORE_CASE).find(jsText)?.value
-        if (!direct.isNullOrBlank()) return direct
-
-        return null
+    // 1) atob("base64") pattern
+    val atobMatch = Regex("""atob\(\s*["']([A-Za-z0-9+/=]+)["']\s*\)""").find(jsText)?.groupValues?.getOrNull(1)
+    if (!atobMatch.isNullOrBlank()) {
+        runCatching { val dec = base64Decode(atobMatch); if (!dec.isNullOrBlank()) return dec }
     }
+
+    // 2) file_link = "base64..."
+    val b64 = Regex("""file_link\s*=\s*["']([A-Za-z0-9+/=]+)["']""").find(jsText)?.groupValues?.getOrNull(1)
+    if (!b64.isNullOrBlank()) {
+        val dec = runCatching { base64Decode(b64) }.getOrNull()
+        if (!dec.isNullOrBlank()) return dec
+    }
+
+    // 3) direct assignment var s_xxx = "http..." or = 'http...'
+    val varUrl = Regex("""(?:var|let|const)?\s*([A-Za-z0-9_]+)\s*=\s*["'](https?://[^"']+)["']""").find(jsText)?.groupValues?.getOrNull(2)
+    if (!varUrl.isNullOrBlank()) return varUrl
+
+    // 4) sources: [{file:"..."}]
+    val sourcesFile = Regex("""sources\s*:\s*
+
+\[\s*\{\s*file\s*[:=]\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(jsText)?.groupValues?.getOrNull(1)
+    if (!sourcesFile.isNullOrBlank()) return sourcesFile
+
+    // 5) direct media links (m3u8/mp4/mpd)
+    val direct = Regex("""https?://[^\s"']+\.(m3u8|mp4|mpd)[^\s"']*""", RegexOption.IGNORE_CASE).find(jsText)?.value
+    if (!direct.isNullOrBlank()) return direct
+
+    // 6) base64 token that decodes to http link
+    val base64Token = Regex("""([A-Za-z0-9+/=]{40,})""").findAll(jsText).mapNotNull { it.groupValues.getOrNull(1) }.firstOrNull()
+    if (!base64Token.isNullOrBlank()) {
+        val decoded = runCatching { base64Decode(base64Token) }.getOrNull()
+        if (!decoded.isNullOrBlank() && decoded.startsWith("http")) return decoded
+    }
+
+    return null
+}
+
 
     private fun resolveUrl(url: String, base: String): String {
         return try {
