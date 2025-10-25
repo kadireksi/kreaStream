@@ -15,6 +15,8 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.Document
+import java.net.URI
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -24,12 +26,10 @@ class HDFilmCehennemi : MainAPI() {
     override val hasQuickSearch       = true
     override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
 
-    // ! CloudFlare bypass
-    override var sequentialMainPage = true        // * https://recloudstream.github.io/dokka/-cloudstream/com.lagradost.cloudstream3/-main-a-p-i/index.html#-2049735995%2FProperties%2F101969414
-    override var sequentialMainPageDelay       = 50L  // ? 0.05 saniye
-    override var sequentialMainPageScrollDelay = 50L  // ? 0.05 saniye
+    override var sequentialMainPage = true
+    override var sequentialMainPageDelay       = 50L
+    override var sequentialMainPageScrollDelay = 50L
 
-    // ! CloudFlare v2
     private val cloudflareKiller by lazy { CloudflareKiller() }
     private val interceptor      by lazy { CloudflareInterceptor(cloudflareKiller) }
 
@@ -38,29 +38,24 @@ class HDFilmCehennemi : MainAPI() {
             val request  = chain.request()
             val response = chain.proceed(request)
             val doc      = Jsoup.parse(response.peekBody(1024 * 1024).string())
-
             if (doc.text().contains("Just a moment")) {
                 return cloudflareKiller.intercept(chain)
             }
-
             return response
         }
     }
 
-    // ObjectMapper for JSON parsing
     private val objectMapper = ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     }
 
-    // Standard headers for requests
     private val standardHeaders = mapOf(
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0",
         "Accept" to "*/*",
         "X-Requested-With" to "fetch"
     )
 
-    // Ana sayfa kategorilerini tanımlıyoruz
     override val mainPage = mainPageOf(
         "${mainUrl}/load/page/1/home/"                        to "Yeni Eklenen Filmler",
         "${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
@@ -79,7 +74,6 @@ class HDFilmCehennemi : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // URL'deki sayfa numarasını güncelle
         val url = if (page == 1) {
             request.data
                 .replace("/load/page/1/genres/","/tur/")
@@ -90,29 +84,21 @@ class HDFilmCehennemi : MainAPI() {
                 .replace("/page/1/", "/page/${page}/")
         }
 
-        // API isteği gönder
         val response = app.get(url, headers = standardHeaders, referer = mainUrl)
 
-        // Yanıt başarılı değilse boş liste döndür
         if (response.text.contains("Sayfa Bulunamadı")) {
             Log.d("HDCH", "Sayfa bulunamadı: $url")
             return newHomePageResponse(request.name, emptyList())
         }
 
-        try {
-            // JSON yanıtını parse et
+        return try {
             val hdfc: HDFC = objectMapper.readValue(response.text)
             val document = Jsoup.parse(hdfc.html)
-
-            Log.d("HDCH", "Kategori ${request.name} için ${document.select("a").size} sonuç bulundu")
-
-            // Film/dizi kartlarını SearchResponse listesine dönüştür
             val results = document.select("a").mapNotNull { it.toSearchResult() }
-
-            return newHomePageResponse(request.name, results)
+            newHomePageResponse(request.name, results)
         } catch (e: Exception) {
             Log.e("HDCH", "JSON parse hatası (${request.name}): ${e.message}")
-            return newHomePageResponse(request.name, emptyList())
+            newHomePageResponse(request.name, emptyList())
         }
     }
 
@@ -120,15 +106,15 @@ class HDFilmCehennemi : MainAPI() {
         val title = this.attr("title")
             .takeIf { it.isNotEmpty() }
             .takeUnless {
-                it?.contains("Seri Filmler", ignoreCase = true) == true
-                || it?.contains("Japonya Filmleri", ignoreCase = true) == true
-                || it?.contains("Kore Filmleri", ignoreCase = true) == true
-                || it?.contains("Hint Filmleri", ignoreCase = true) == true
-                || it?.contains("Türk Filmleri", ignoreCase = true) == true
-                || it?.contains("DC Yapımları", ignoreCase = true) == true
-                || it?.contains("Marvel Yapımları", ignoreCase = true) == true
-                || it?.contains("Amazon Yapımları", ignoreCase = true) == true
-                || it?.contains("1080p Film izle", ignoreCase = true) == true
+                it.contains("Seri Filmler", ignoreCase = true)
+                        || it.contains("Japonya Filmleri", ignoreCase = true)
+                        || it.contains("Kore Filmleri", ignoreCase = true)
+                        || it.contains("Hint Filmleri", ignoreCase = true)
+                        || it.contains("Türk Filmleri", ignoreCase = true)
+                        || it.contains("DC Yapımları", ignoreCase = true)
+                        || it.contains("Marvel Yapımları", ignoreCase = true)
+                        || it.contains("Amazon Yapımları", ignoreCase = true)
+                        || it.contains("1080p Film izle", ignoreCase = true)
             } ?: return null
 
         val href      = fixUrlNull(this.attr("href")) ?: return null
@@ -149,7 +135,6 @@ class HDFilmCehennemi : MainAPI() {
 
         response.results.forEach { resultHtml ->
             val document = Jsoup.parse(resultHtml)
-
             val title     = document.selectFirst("h4.title")?.text() ?: return@forEach
             val href      = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
             val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src")) ?:
@@ -168,15 +153,13 @@ class HDFilmCehennemi : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-
-
         val title       = document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
         val poster      = fixUrlNull(document.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
         val tags        = document.select("div.post-info-genres a").map { it.text() }
         val year        = document.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
         val tvType      = if (document.select("div.seasons").isEmpty()) TvType.Movie else TvType.TvSeries
         val description = document.selectFirst("article.post-info-content > p")?.text()?.trim()
-        val score      = document.selectFirst("div.post-info-imdb-rating span")?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
+        val score       = document.selectFirst("div.post-info-imdb-rating span")?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
         val actors      = document.select("div.post-info-cast a").map {
             Actor(it.selectFirst("strong")!!.text(), it.select("img").attr("data-src"))
         }
@@ -235,50 +218,6 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    private suspend fun invokeLocalSource(
-        source: String,
-        url: String,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val response = app.get(url, referer = "$mainUrl/")
-        val script = response.document.select("script")
-            .find { it.data().contains("file_link=") }?.data()
-
-        if (script == null) {
-            Log.e("HDCH", "Script not found at $url")
-            return
-        }
-
-        val unpacked = runCatching { getAndUnpack(script) }.getOrNull()
-        if (unpacked == null) {
-            Log.e("HDCH", "Unpacking failed at $url")
-            return
-        }
-
-        val videoData = unpacked.substringAfter("file_link=\"").substringBefore("\";")
-        if (videoData.isBlank()) {
-            Log.e("HDCH", "file_link not found in unpacked script at $url")
-            return
-        }
-
-        val decodedUrl = runCatching { base64Decode(videoData) }.getOrNull()
-        if (decodedUrl.isNullOrBlank()) {
-            Log.e("HDCH", "Decoded video URL is invalid at $url")
-            return
-        }
-
-        Log.d("HDCH", "Decoded video URL: $decodedUrl")
-
-        callback.invoke(
-            newExtractorLink(source, source, decodedUrl, INFER_TYPE) {
-                this.referer = "$mainUrl/"
-                this.headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                this.quality = Qualities.Unknown.value
-            }
-        )
-    }
-
-
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -290,85 +229,221 @@ class HDFilmCehennemi : MainAPI() {
         val iframealak = fixUrlNull(
             document.selectFirst(".close")?.attr("data-src")
                 ?: document.selectFirst(".rapidrame")?.attr("data-src")
-        )?.takeIf { it.isNotBlank() } ?: run {
+        )?.takeIf { it.isNotBlank() }
+
+        if (iframealak == null) {
             Log.e("HDCH", "iframe not found on $data")
-            return false
+            // still try alternative-links flow below
+        } else {
+            // If iframe is directly present on page (rare), try extracting sources from it
+            try {
+                extractFromIframeUrl(iframealak, data, subtitleCallback, callback)
+            } catch (e: Exception) {
+                Log.d("HDCH", "Direct iframe extraction failed: ${e.message}")
+            }
         }
 
-        Log.d("HDCH", "iframe found: $iframealak")
-
-        // Subtitle handling (unchanged)
-        if (iframealak.contains("hdfilmcehennemi.mobi")) {
-            val iframedoc = app.get(iframealak, referer = mainUrl).document
-            val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
-
-            iframedoc.select("track[kind=captions]")
-                .filter { it.attr("srclang") != "forced" }
-                .forEach { track ->
-                    val lang = when (val code = track.attr("srclang")) {
-                        "tr" -> "Türkçe"
-                        "en" -> "İngilizce"
-                        else -> code
-                    }
-                    val subUrl = track.attr("src").let { src ->
-                        if (src.startsWith("http")) src else "$baseUri/$src".replace("//", "/")
-                    }
-                    subtitleCallback(SubtitleFile(lang, subUrl))
-                }
-        } else if (iframealak.contains("rplayer")) {
-            val iframeDoc = app.get(iframealak, referer = "$data/").document
-            Regex("\"file\":\"((?:[^\"]|\"\")*)\"", RegexOption.IGNORE_CASE)
-                .findAll(iframeDoc.toString())
-                .forEach { match ->
-                    val fileUrl = match.groupValues[1].replace("\\/", "/")
-                    val finalUrl = fixUrlNull(fileUrl)?.plus("/") ?: return@forEach
-                    val langCode = when {
-                        fileUrl.contains("Turkish", true) -> "Türkçe"
-                        fileUrl.contains("English", true) -> "İngilizce"
-                        else -> "Unknown"
-                    }
-                    subtitleCallback(SubtitleFile(langCode, finalUrl))
-                }
-        }
-
+        // Process alternative-links section: video buttons that return JSON containing iframe HTML
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
-                val source = button.text().replace("(HDrip Xbet)", "").trim() + " $langCode"
+                val sourceLabel = button.text().replace("(HDrip Xbet)", "").trim() + " $langCode"
                 val videoID = button.attr("data-video").takeIf { it.isNotBlank() } ?: run {
-                    Log.e("HDCH", "Missing videoID for $source")
+                    Log.e("HDCH", "Missing videoID for $sourceLabel on $data")
                     return@forEach
                 }
 
-                val apiResponse = app.get(
-                    "$mainUrl/video/$videoID/",
-                    headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
-                    referer = data
-                ).parsedSafe<VideoIframe>() ?: run {
-                    Log.e("HDCH", "Failed to parse iframe JSON for videoID $videoID")
-                    return@forEach
+                try {
+                    val apiResponse = app.get(
+                        "$mainUrl/video/$videoID/",
+                        headers = mapOf(
+                            "Content-Type" to "application/json",
+                            "X-Requested-With" to "fetch"
+                        ),
+                        referer = data
+                    ).parsedSafe<VideoIframe>()
+
+                    if (apiResponse == null || apiResponse.data.html.isBlank()) {
+                        Log.e("HDCH", "Failed to parse iframe JSON for videoID $videoID")
+                        return@forEach
+                    }
+
+                    val iframeDoc = Jsoup.parse(apiResponse.data.html)
+                    val iframeSrc = iframeDoc.selectFirst("iframe")?.attr("data-src")?.takeIf { it.isNotBlank() }
+
+                    if (iframeSrc == null) {
+                        Log.e("HDCH", "iframe src not found in JSON html for videoID $videoID")
+                        return@forEach
+                    }
+
+                    // Normalize iframe URL
+                    val iframeUrl = fixUrlNull(resolveUrl(iframeSrc, mainUrl)) ?: run {
+                        Log.e("HDCH", "iframe src invalid for videoID $videoID")
+                        return@forEach
+                    }
+
+                    Log.d("HDCH", "$sourceLabel » $videoID » $iframeUrl")
+
+                    extractFromIframeUrl(iframeUrl, data, subtitleCallback, callback)
+                } catch (e: Exception) {
+                    Log.e("HDCH", "Error processing videoID $videoID: ${e.message}")
                 }
-
-                val iframe = Jsoup.parse(apiResponse.data.html).selectFirst("iframe")?.attr("data-src")
-                    ?.takeIf { it.isNotBlank() } ?: run {
-                    Log.e("HDCH", "iframe not found in JSON for videoID $videoID")
-                    return@forEach
-                }
-
-
-                val finalIframe = if (iframe.contains("?rapidrame_id=")) {
-                    "$mainUrl/playerr/" + iframe.substringAfter("?rapidrame_id=")
-                } else iframe
-
-                Log.d("HDCH", "$source » $videoID » $finalIframe")
-                invokeLocalSource(source, finalIframe, callback)
             }
         }
 
         return true
     }
 
+    private suspend fun extractFromIframeUrl(
+        iframeUrl: String,
+        refererForIframe: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val iframeDocResponse = app.get(iframeUrl, referer = refererForIframe)
+        val iframeDoc = iframeDocResponse.document
 
+        // Subtitle extraction if present
+        try {
+            val baseUri = iframeDoc.location().substringBefore("/", iframeDoc.location())
+            iframeDoc.select("track[kind=captions]").filter { it.attr("srclang") != "forced" }.forEach { track ->
+                val lang = when (track.attr("srclang")) {
+                    "tr" -> "Türkçe"
+                    "en" -> "İngilizce"
+                    else -> track.attr("srclang")
+                }
+                val src = track.attr("src")
+                val subUrl = if (src.startsWith("http")) src else "${baseUri.trimEnd('/')}/${src.trimStart('/')}"
+                subtitleCallback(SubtitleFile(lang, subUrl))
+            }
+        } catch (e: Exception) {
+            Log.d("HDCH", "Subtitle extraction failed: ${e.message}")
+        }
+
+        // Try multiple strategies to locate the real video file:
+        // 1) Inline scripts in iframe page
+        val scriptsText = iframeDoc.select("script").mapNotNull { it.data() }.joinToString("\n")
+        // Try to find file_link base64 or similar tokens
+        val fileLinkEncoded = Regex("""file_link\s*=\s*"([^"]+)"""").find(scriptsText)?.groupValues?.getOrNull(1)
+            ?: Regex("""file_link\s*:\s*"([^"]+)"""").find(scriptsText)?.groupValues?.getOrNull(1)
+            ?: Regex("""["'](?:file|file_link)["']\s*[:=]\s*["']([^"']+)["']""").find(scriptsText)?.groupValues?.getOrNull(1)
+
+        if (!fileLinkEncoded.isNullOrBlank()) {
+            val decoded = runCatching { base64Decode(fileLinkEncoded) }.getOrNull()
+            if (!decoded.isNullOrBlank()) {
+                Log.d("HDCH", "Found decoded video from file_link: $decoded")
+                callback.invoke(
+                    newExtractorLink("HDFC", "HDFC", decoded, INFER_TYPE) {
+                        this.referer = mainUrl
+                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                return
+            }
+        }
+
+        // 2) Look for "sources" arrays or file fields in script text (common with JW/Flowplayer)
+        val sourcesMatch = Regex("""sources\s*:\s*
+
+\[([^\]
+
+]+)\]
+
+""", RegexOption.IGNORE_CASE).find(scriptsText)
+        if (sourcesMatch != null) {
+            val inner = sourcesMatch.groupValues[1]
+            val fileMatch = Regex("""file\s*[:=]\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE).find(inner)
+            val fileUrl = fileMatch?.groupValues?.getOrNull(1)
+            if (!fileUrl.isNullOrBlank()) {
+                val finalFile = resolveUrl(fileUrl, iframeDoc.location())
+                Log.d("HDCH", "Found source file in sources array: $finalFile")
+                callback.invoke(
+                    newExtractorLink("HDFC", "HDFC", finalFile, INFER_TYPE) {
+                        this.referer = mainUrl
+                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                return
+            }
+        }
+
+        // 3) If page loads external movie.js or other remote JS, fetch and inspect it
+        val scriptSrcs = iframeDoc.select("script[src]").mapNotNull { it.attr("src") }.distinct()
+        for (src in scriptSrcs) {
+            try {
+                val jsUrl = resolveUrl(src, iframeDoc.location())
+                val jsText = app.get(jsUrl, referer = iframeDoc.location()).text
+                val decodedFromJs = extractVideoFromJs(jsText)
+                if (!decodedFromJs.isNullOrBlank()) {
+                    Log.d("HDCH", "Found video in external JS $jsUrl: $decodedFromJs")
+                    callback.invoke(
+                        newExtractorLink("HDFC", "HDFC", decodedFromJs, INFER_TYPE) {
+                            this.referer = mainUrl
+                            this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                            this.quality = Qualities.Unknown.value
+                        }
+                    )
+                    return
+                }
+            } catch (e: Exception) {
+                Log.d("HDCH", "External JS fetch failed for $src: ${e.message}")
+            }
+        }
+
+        // 4) Try unpacking obfuscated inline scripts (eval-packed)
+        val unpacked = runCatching { getAndUnpack(scriptsText) }.getOrNull()
+        if (!unpacked.isNullOrBlank()) {
+            val decodedFromUnpacked = extractVideoFromJs(unpacked)
+            if (!decodedFromUnpacked.isNullOrBlank()) {
+                Log.d("HDCH", "Found video in unpacked script: $decodedFromUnpacked")
+                callback.invoke(
+                    newExtractorLink("HDFC", "HDFC", decodedFromUnpacked, INFER_TYPE) {
+                        this.referer = mainUrl
+                        this.headers = mapOf("User-Agent" to standardHeaders["User-Agent"]!!)
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                return
+            }
+        }
+
+        Log.e("HDCH", "No video found in iframe page: $iframeUrl")
+    }
+
+    private fun extractVideoFromJs(jsText: String): String? {
+        // Common patterns: base64 file_link, sources: [{file:"..."}], direct http(s) links
+        val b64 = Regex("""file_link\s*=\s*["']([A-Za-z0-9+/=]+)["']""").find(jsText)?.groupValues?.getOrNull(1)
+        if (!b64.isNullOrBlank()) {
+            return runCatching { base64Decode(b64) }.getOrNull()
+        }
+
+        val srcFile = Regex("""file\s*[:=]\s*["'](https?://[^"']+)["']""", RegexOption.IGNORE_CASE).find(jsText)?.groupValues?.getOrNull(1)
+        if (!srcFile.isNullOrBlank()) return srcFile
+
+        // Sometimes file is encoded as atob("...") or as btoa result
+        val atobMatch = Regex("""atob\(\s*["']([A-Za-z0-9+/=]+)["']\s*\)""").find(jsText)?.groupValues?.getOrNull(1)
+        if (!atobMatch.isNullOrBlank()) {
+            return runCatching { base64Decode(atobMatch) }.getOrNull()
+        }
+
+        // Try to find direct mp4/m3u8 links
+        val direct = Regex("""https?://[^\s"']+\.(m3u8|mp4|mpd)[^\s"']*""", RegexOption.IGNORE_CASE).find(jsText)?.value
+        if (!direct.isNullOrBlank()) return direct
+
+        return null
+    }
+
+    private fun resolveUrl(url: String, base: String): String {
+        return try {
+            val baseUri = URI(base)
+            baseUri.resolve(url).toString()
+        } catch (e: Exception) {
+            // fallback: try to normalize simple cases
+            if (url.startsWith("//")) "https:$url" else if (url.startsWith("/")) "${mainUrl.trimEnd('/')}$url" else url
+        }
+    }
 
     data class Results(
         @JsonProperty("results") val results: List<String> = arrayListOf()
@@ -386,12 +461,11 @@ class HDFilmCehennemi : MainAPI() {
     )
 
     data class VideoIframe(
-    @JsonProperty("success") val success: Boolean,
-    @JsonProperty("data") val data: IframeData
+        @JsonProperty("success") val success: Boolean,
+        @JsonProperty("data") val data: IframeData
     )
 
     data class IframeData(
         @JsonProperty("html") val html: String
     )
-
 }
