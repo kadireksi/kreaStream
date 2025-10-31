@@ -35,7 +35,6 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
-import java.util.*
 
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
@@ -60,8 +59,6 @@ class Hdfc : MainAPI() {
             val doc = Jsoup.parse(response.peekBody(1024 * 1024).string())
 
             if (doc.text().contains("Just a moment")) {
-                // Add Cloudflare bypass logic here if needed
-                // For now, return the original response
                 Log.w("HDFC", "Cloudflare protection detected")
             }
 
@@ -181,12 +178,14 @@ class Hdfc : MainAPI() {
         return newMovieSearchResponse(title, href, tvType) {
             this.posterUrl = posterUrl
             this.year = year
-            this.quality = getQualityFromString("HD")
-            this.plot = buildString {
+            // Remove quality assignment as it's not supported in SearchResponse
+            val plotText = buildString {
                 if (!label.isNullOrBlank()) append("$label • ")
                 if (score != null) append("⭐ ${"%.1f".format(score)} • ")
                 if (!yearText.isNullOrBlank()) append(yearText)
             }.trim()
+            // Set description instead of plot
+            this.description = plotText
         }
     }
 
@@ -245,12 +244,6 @@ class Hdfc : MainAPI() {
 
         val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
         val hasSub = dubSubText?.contains("Altyazı", ignoreCase = true) == true
-        val label = when {
-            hasDub && hasSub -> "Dublaj + Sub"
-            hasDub -> "Dublaj"
-            hasSub -> "Altyazılı"
-            else -> null
-        }
 
         // Description
         val description = document.selectFirst(".popover-description, article.post-info-content > p")
@@ -310,9 +303,6 @@ class Hdfc : MainAPI() {
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
                 this.year = year
-                this.quality = yearText
-                this.posterLabel = label
-                this.posterText = score?.let { "⭐ ${"%.1f".format(it)}" }
                 this.plot = description
                 this.tags = tags
                 this.score = Score.from10(score)
@@ -324,9 +314,6 @@ class Hdfc : MainAPI() {
             newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.year = year
-                this.quality = yearText
-                this.posterLabel = label
-                this.posterText = score?.let { "⭐ ${"%.1f".format(it)}" }
                 this.plot = description
                 this.tags = tags
                 this.score = Score.from10(score)
@@ -407,12 +394,12 @@ class Hdfc : MainAPI() {
                 
                 callback.invoke(
                     newExtractorLink(
-                        source = "Close",
                         name = "Close Player",
+                        source = "Close",
                         url = videoUrl,
                         referer = mainUrl,
                         quality = Qualities.Unknown.value,
-                        type = ExtractorLinkType.HLS
+                        isM3u8 = videoUrl.contains(".m3u8")
                     )
                 )
             }
@@ -442,7 +429,7 @@ class Hdfc : MainAPI() {
                         val lang = when (track.language) {
                             "en" -> "İngilizce"
                             "tr" -> if (track.label?.contains("Forced") == true) "Forced" else "Türkçe"
-                            else -> track.language
+                            else -> track.language ?: "Unknown"
                         }
                         if (lang != "Forced") {
                             val subUrl = if (track.file?.startsWith("/") == true) {
@@ -473,12 +460,12 @@ class Hdfc : MainAPI() {
                             Log.d("HDFC", "Found Rapidrame video: $fileUrl")
                             callback.invoke(
                                 newExtractorLink(
-                                    source = "Rapidrame",
                                     name = "Rapidrame Player",
+                                    source = "Rapidrame",
                                     url = fileUrl,
                                     referer = mainUrl,
                                     quality = Qualities.Unknown.value,
-                                    type = ExtractorLinkType.HLS
+                                    isM3u8 = fileUrl.contains(".m3u8")
                                 )
                             )
                         }
@@ -548,12 +535,12 @@ class Hdfc : MainAPI() {
                 videoUrl?.let { url ->
                     callback.invoke(
                         newExtractorLink(
-                            source = source,
                             name = source,
+                            source = source,
                             url = url,
                             referer = mainUrl,
                             quality = Qualities.Unknown.value,
-                            type = if (url.contains(".m3u8")) ExtractorLinkType.HLS else ExtractorLinkType.VIDEO
+                            isM3u8 = url.contains(".m3u8")
                         )
                     )
                 }
@@ -566,30 +553,18 @@ class Hdfc : MainAPI() {
                 videoUrl?.let { url ->
                     callback.invoke(
                         newExtractorLink(
-                            source = source,
                             name = source,
+                            source = source,
                             url = url,
                             referer = mainUrl,
                             quality = Qualities.Unknown.value,
-                            type = if (url.contains(".m3u8")) ExtractorLinkType.HLS else ExtractorLinkType.VIDEO
+                            isM3u8 = url.contains(".m3u8")
                         )
                     )
                 }
             }
         } catch (e: Exception) {
             Log.e("HDFC", "Error loading video from iframe: ${e.message}")
-        }
-    }
-
-    // Helper function to get quality from string
-    private fun getQualityFromString(quality: String?): String? {
-        return when {
-            quality == null -> null
-            quality.contains("1080") -> "1080p"
-            quality.contains("720") -> "720p"
-            quality.contains("480") -> "480p"
-            quality.contains("360") -> "360p"
-            else -> quality
         }
     }
 
