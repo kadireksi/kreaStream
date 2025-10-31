@@ -27,7 +27,6 @@ import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
@@ -163,13 +162,6 @@ class Hdfc : MainAPI() {
         val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
         val hasSub = dubSubText?.contains("Altyazı", ignoreCase = true) == true
 
-        val label = when {
-            hasDub && hasSub -> "Dublaj + Sub"
-            hasDub -> "Dublaj"
-            hasSub -> "Altyazılı"
-            else -> null
-        }
-
         val tvType = if (this.attr("href").contains("/dizi/", ignoreCase = true)
             || this.attr("href").contains("/series", ignoreCase = true)
             || this.attr("href").contains("home-series", ignoreCase = true)
@@ -178,14 +170,6 @@ class Hdfc : MainAPI() {
         return newMovieSearchResponse(title, href, tvType) {
             this.posterUrl = posterUrl
             this.year = year
-            // Remove quality assignment as it's not supported in SearchResponse
-            val plotText = buildString {
-                if (!label.isNullOrBlank()) append("$label • ")
-                if (score != null) append("⭐ ${"%.1f".format(score)} • ")
-                if (!yearText.isNullOrBlank()) append(yearText)
-            }.trim()
-            // Set description instead of plot
-            this.description = plotText
         }
     }
 
@@ -237,13 +221,6 @@ class Hdfc : MainAPI() {
         val scoreText = document.selectFirst(".imdb, .popover-rating p")?.text()
             ?.substringBefore("(")?.trim()
         val score = scoreText?.toFloatOrNull()
-
-        // Dub/Sub info
-        val dubSubText = document.selectFirst(".poster-lang span")?.text()?.trim()
-            ?: document.selectFirst(".popover-meta span:matchesOwn(Kategori)")?.parent()?.ownText()?.trim()
-
-        val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
-        val hasSub = dubSubText?.contains("Altyazı", ignoreCase = true) == true
 
         // Description
         val description = document.selectFirst(".popover-description, article.post-info-content > p")
@@ -392,15 +369,20 @@ class Hdfc : MainAPI() {
                 val videoUrl = match.value
                 Log.d("HDFC", "Found video URL: $videoUrl")
                 
+                // Create basic extractor link without unsupported parameters
                 callback.invoke(
                     newExtractorLink(
                         name = "Close Player",
-                        source = "Close",
+                        source = "Close", 
                         url = videoUrl,
-                        referer = mainUrl,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = videoUrl.contains(".m3u8")
-                    )
+                        quality = Qualities.Unknown.value
+                    ).apply {
+                        // Set headers for the extractor
+                        this.headers = mapOf(
+                            "Referer" to mainUrl,
+                            "User-Agent" to standardHeaders["User-Agent"] ?: ""
+                        )
+                    }
                 )
             }
         } catch (e: Exception) {
@@ -463,10 +445,14 @@ class Hdfc : MainAPI() {
                                     name = "Rapidrame Player",
                                     source = "Rapidrame",
                                     url = fileUrl,
-                                    referer = mainUrl,
-                                    quality = Qualities.Unknown.value,
-                                    isM3u8 = fileUrl.contains(".m3u8")
-                                )
+                                    quality = Qualities.Unknown.value
+                                ).apply {
+                                    // Set headers for the extractor
+                                    this.headers = mapOf(
+                                        "Referer" to mainUrl,
+                                        "User-Agent" to standardHeaders["User-Agent"] ?: ""
+                                    )
+                                }
                             )
                         }
                     }
@@ -538,10 +524,14 @@ class Hdfc : MainAPI() {
                             name = source,
                             source = source,
                             url = url,
-                            referer = mainUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = url.contains(".m3u8")
-                        )
+                            quality = Qualities.Unknown.value
+                        ).apply {
+                            // Set headers for the extractor
+                            this.headers = mapOf(
+                                "Referer" to mainUrl,
+                                "User-Agent" to standardHeaders["User-Agent"] ?: ""
+                            )
+                        }
                     )
                 }
             }
@@ -556,10 +546,14 @@ class Hdfc : MainAPI() {
                             name = source,
                             source = source,
                             url = url,
-                            referer = mainUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = url.contains(".m3u8")
-                        )
+                            quality = Qualities.Unknown.value
+                        ).apply {
+                            // Set headers for the extractor
+                            this.headers = mapOf(
+                                "Referer" to mainUrl,
+                                "User-Agent" to standardHeaders["User-Agent"] ?: ""
+                            )
+                        }
                     )
                 }
             }
