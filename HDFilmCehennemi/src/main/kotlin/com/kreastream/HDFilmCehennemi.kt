@@ -17,16 +17,14 @@ class Hdfilmcehennemi : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // --------------------------------------------------------------------- //
-    //  JSON mapper (Jackson)
-    // --------------------------------------------------------------------- //
+    // Jackson JSON mapper
     private val mapper = com.fasterxml.jackson.databind.ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     }
 
     // --------------------------------------------------------------------- //
-    //  MAIN PAGE
+    // MAIN PAGE
     // --------------------------------------------------------------------- //
     override val mainPage = mainPageOf(
         "$mainUrl/load/page/1/home/" to "Yeni Filmler",
@@ -59,7 +57,7 @@ class Hdfilmcehennemi : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  SEARCH
+    // SEARCH
     // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val resp = app.get("$mainUrl/search?q=$query").parsedSafe<Results>() ?: return emptyList()
@@ -73,7 +71,7 @@ class Hdfilmcehennemi : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  DETAIL PAGE
+    // LOAD (detail)
     // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
         val doc = app.get(url).document
@@ -81,7 +79,7 @@ class Hdfilmcehennemi : MainAPI() {
         val title = doc.selectFirst("strong.poster-title")?.text()
             ?: doc.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
         val poster = fixUrl(doc.selectFirst("img.lazyload")?.attr("data-src")
-            ?: doc.selectFirst("img")?.attr("src"))
+            ?: doc.selectFirst("img")?.attr("src")) ?: return null
         val year = doc.selectFirst(".poster-meta span")?.text()?.toIntOrNull()
         val plot = doc.selectFirst(".popover-description, article.post-info-content > p")?.text()?.trim()
         val tags = doc.selectFirst(".popover-meta span:containsOwn(Türler)")?.parent()
@@ -107,7 +105,7 @@ class Hdfilmcehennemi : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LINK EXTRACTION – ONLY newExtractorLink DSL
+    // LINK EXTRACTION – newExtractorLink DSL ONLY
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -118,9 +116,8 @@ class Hdfilmcehennemi : MainAPI() {
 
         val doc = app.get(data).document
 
-        // ---------- 1. CLOSE CDN (direct HLS from poster file name) ----------
+        // === 1. CLOSE CDN – from poster filename ===
         doc.selectFirst("img.poster-lazy, img.lazyload")?.attr("data-src")?.let { posterUrl ->
-            // poster example: .../weapons-2025-web-trdualmp4-Fq7iQEPn1r9.jpg
             val fileName = posterUrl.substringAfterLast("/")
             val master = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/master.txt"
 
@@ -136,7 +133,7 @@ class Hdfilmcehennemi : MainAPI() {
             )
         }
 
-        // ---------- 2. RAPIDRAME JW-PLAYER (tokenised HLS) ----------
+        // === 2. RAPIDRAME JW-PLAYER (tokenised) ===
         doc.select("button.alternative-link[data-video]").forEach { btn ->
             val videoId = btn.attr("data-video")
             val sourceName = btn.text().trim() + " (Rapidrame)"
@@ -152,7 +149,7 @@ class Hdfilmcehennemi : MainAPI() {
 
             val iframeDoc = app.get(iframe, referer = data).document
 
-            // ---- subtitles ----
+            // --- Subtitles ---
             iframeDoc.select("track[kind=captions]").forEach { track ->
                 val lang = when (track.attr("srclang")) {
                     "tr" -> "Türkçe"
@@ -165,7 +162,7 @@ class Hdfilmcehennemi : MainAPI() {
                 subtitleCallback(SubtitleFile(lang, subUrl))
             }
 
-            // ---- JW-Player JS (packed) ----
+            // --- JW Player JS (unpacked) ---
             val script = iframeDoc.selectFirst("script:containsData(playerInstance)")?.data()
                 ?: return@forEach
             val unpacked = getAndUnpack(script)
@@ -189,7 +186,7 @@ class Hdfilmcehennemi : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  JSON data classes
+    // JSON MODELS
     // --------------------------------------------------------------------- //
     data class Results(@JsonProperty("results") val results: List<String>)
     data class HDFC(@JsonProperty("html") val html: String)
