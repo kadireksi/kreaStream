@@ -19,9 +19,7 @@ class Hdfilmcehennemi : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // --------------------------------------------------------------------- //
-    //  CloudFlare bypass – the site uses it on many pages
-    // --------------------------------------------------------------------- //
+    // CloudFlare Bypass
     private val cfKiller by lazy { CloudflareKiller() }
     private val cfInterceptor by lazy { CloudflareInterceptor(cfKiller) }
 
@@ -35,17 +33,13 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    //  JSON helper
-    // --------------------------------------------------------------------- //
+    // JSON Mapper
     private val mapper = com.fasterxml.jackson.databind.ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     }
 
-    // --------------------------------------------------------------------- //
-    //  MAIN PAGE
-    // --------------------------------------------------------------------- //
+    // Main Page
     override val mainPage = mainPageOf(
         "$mainUrl/load/page/1/home/" to "Yeni Filmler",
         "$mainUrl/load/page/1/home-series/" to "Yeni Diziler",
@@ -76,9 +70,7 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    //  SEARCH
-    // --------------------------------------------------------------------- //
+    // Search
     override suspend fun search(query: String): List<SearchResponse> {
         val resp = app.get("$mainUrl/search?q=$query", interceptor = cfInterceptor).parsedSafe<Results>()
             ?: return emptyList()
@@ -91,9 +83,7 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    //  LOAD (detail page)
-    // --------------------------------------------------------------------- //
+    // Load Details
     override suspend fun load(url: String): LoadResponse? {
         val doc = app.get(url, interceptor = cfInterceptor).document
 
@@ -125,9 +115,7 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    //  LINK EXTRACTION
-    // --------------------------------------------------------------------- //
+    // Load Links — USING newExtractorLink {}
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -137,25 +125,23 @@ class Hdfilmcehennemi : MainAPI() {
 
         val doc = app.get(data, interceptor = cfInterceptor).document
 
-        // ---------- 1. Close CDN (direct HLS from poster filename) ----------
-        doc.selectFirst("img.poster-lazy")?.attr("data-src")?.let { posterUrl ->
-            // Example: .../weapons-2025-web-trdualmp4-Fq7iQEPn1r9.jpg
+        // === 1. Close CDN (from poster filename) ===
+        doc.selectFirst("img.poster-lazy, img.lazyload")?.attr("data-src")?.let { posterUrl ->
             val fileName = posterUrl.substringAfterLast("/")
-            val base = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/"
-            val master = "$base/master.txt"
+            val masterUrl = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/master.txt"
+
             callback.invoke(
-                ExtractorLink(
-                    source = name,
-                    name = "Close (1080p)",
-                    url = master,
-                    referer = mainUrl,
-                    quality = Qualities.Unknown.value,
-                    type = ExtractorLinkType.M3U8
-                )
+                newExtractorLink {
+                    this.name = "Close (1080p)"
+                    this.url = masterUrl
+                    this.referer = mainUrl
+                    this.type = ExtractorLinkType.M3U8
+                    this.quality = Qualities.Unknown.value
+                }
             )
         }
 
-        // ---------- 2. Rapidrame JW-Player (tokenised HLS) ----------
+        // === 2. Rapidrame JW Player (tokenized) ===
         doc.select("button.alternative-link[data-video]").forEach { btn ->
             val videoId = btn.attr("data-video")
             val sourceName = btn.text().trim() + " (Rapidrame)"
@@ -167,38 +153,38 @@ class Hdfilmcehennemi : MainAPI() {
                 interceptor = cfInterceptor
             ).text
 
-            // data-src inside the JSON response
             val iframe = Regex("""data-src=["']([^"']+)""").find(apiResp)?.groupValues?.get(1)
                 ?: return@forEach
 
             val iframeDoc = app.get(iframe, referer = data, interceptor = cfInterceptor).document
 
-            // ----- subtitles -----
-            iframeDoc.select("track[kind=captions]").forEach { t ->
-                val lang = when (t.attr("srclang")) {
+            // --- Subtitles ---
+            iframeDoc.select("track[kind=captions]").forEach { track ->
+                val lang = when (track.attr("srclang")) {
                     "tr" -> "Türkçe"
                     "en" -> "English"
-                    else -> t.attr("label")
+                    "fr" -> "Français"
+                    "pt" -> "Português"
+                    else -> track.attr("label") ?: track.attr("srclang").uppercase()
                 }
-                val subUrl = URI(iframe).resolve(t.attr("src")).toString()
+                val subUrl = URI(iframe).resolve(track.attr("src")).toString()
                 subtitleCallback(SubtitleFile(lang, subUrl))
             }
 
-            // ----- JW Player config (packed JS) -----
+            // --- JW Player JS (unpacked) ---
             val script = iframeDoc.selectFirst("script:containsData(playerInstance)")?.data() ?: return@forEach
             val unpacked = getAndUnpack(script)
 
-            // file: "https://.../master.m3u8?t=..."
             Regex("""file\s*:\s*["']([^"']+)["']""").find(unpacked)?.groupValues?.get(1)?.let { hlsUrl ->
                 callback.invoke(
-                    ExtractorLink(
-                        source = name,
-                        name = sourceName,
-                        url = hlsUrl,
-                        referer = iframe,
-                        quality = Qualities.Unknown.value,
-                        type = ExtractorLinkType.M3U8
-                    )
+                    newExtractorLink {
+                        this.name = sourceName
+                        this.url = hlsUrl
+                        this.referer = iframe
+                        this.type = ExtractorLinkType.M3U8
+                        this.quality = Qualities.Unknown.value
+                        this.headers = mapOf("Origin" to mainUrl)
+                    }
                 )
             }
         }
@@ -206,9 +192,7 @@ class Hdfilmcehennemi : MainAPI() {
         return true
     }
 
-    // --------------------------------------------------------------------- //
-    //  JSON models
-    // --------------------------------------------------------------------- //
+    // JSON Models
     data class Results(@JsonProperty("results") val results: List<String>)
     data class HDFC(@JsonProperty("html") val html: String)
 }
