@@ -1,193 +1,624 @@
 package com.kreastream
 
+import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.Actor
+import com.lagradost.cloudstream3.HomePageResponse
+import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.MainPageRequest
+import com.lagradost.cloudstream3.Score
+import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.fixUrlNull
+import com.lagradost.cloudstream3.mainPageOf
+import com.lagradost.cloudstream3.newEpisode
+import com.lagradost.cloudstream3.newHomePageResponse
+import com.lagradost.cloudstream3.newMovieLoadResponse
+import com.lagradost.cloudstream3.newMovieSearchResponse
+import com.lagradost.cloudstream3.newTvSeriesLoadResponse
+import com.lagradost.cloudstream3.newTvSeriesSearchResponse
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.newExtractorLink
+import okhttp3.Interceptor
+import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
-import java.net.URI
+import java.util.*
 
 class Hdfc : MainAPI() {
-    override var name = "HDFC"
     override var mainUrl = "https://www.hdfilmcehennemi.la"
-    override var lang = "tr"
+    override var name = "HDFC"
     override val hasMainPage = true
+    override var lang = "tr"
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // Jackson JSON mapper
-    private val mapper = com.fasterxml.jackson.databind.ObjectMapper().apply {
-        registerModule(KotlinModule.Builder().build())
-        configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    // CloudFlare bypass
+    override var sequentialMainPage = true
+    override var sequentialMainPageDelay = 50L
+    override var sequentialMainPageScrollDelay = 50L
+
+    // CloudFlare handling
+    private val interceptor by lazy { CloudflareInterceptor() }
+
+    class CloudflareInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+            val response = chain.proceed(request)
+            val doc = Jsoup.parse(response.peekBody(1024 * 1024).string())
+
+            if (doc.text().contains("Just a moment")) {
+                // Add Cloudflare bypass logic here if needed
+                // For now, return the original response
+                Log.w("HDFC", "Cloudflare protection detected")
+            }
+
+            return response
+        }
     }
 
-    // --------------------------------------------------------------------- //
-    // MAIN PAGE
-    // --------------------------------------------------------------------- //
+    // ObjectMapper for JSON parsing
+    private val objectMapper = jacksonObjectMapper().apply {
+        registerModule(KotlinModule.Builder().build())
+        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
+
+    // Standard headers for requests
+    private val standardHeaders = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0",
+        "Accept" to "*/*",
+        "X-Requested-With" to "fetch"
+    )
+
+    // Main page categories
     override val mainPage = mainPageOf(
-        "$mainUrl/load/page/1/home/" to "Yeni Filmler",
-        "$mainUrl/load/page/1/home-series/" to "Yeni Diziler",
-        "$mainUrl/load/page/1/imdb7/" to "IMDB 7+",
-        "$mainUrl/load/page/1/mostLiked/" to "En Çok Beğenilen"
+        "${mainUrl}/load/page/1/home/" to "Yeni Eklenen Filmler",
+        "${mainUrl}/load/page/1/categories/nette-ilk-filmler/" to "Nette İlk Filmler",
+        "${mainUrl}/load/page/1/home-series/" to "Yeni Eklenen Diziler",
+        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/" to "Tavsiye Filmler",
+        "${mainUrl}/load/page/1/imdb7/" to "IMDB 7+ Filmler",
+        "${mainUrl}/load/page/1/mostLiked/" to "En Çok Beğenilenler",
+        "${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/" to "Aile Filmleri",
+        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/" to "Aksiyon Filmleri",
+        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/" to "Animasyon Filmleri",
+        "${mainUrl}/load/page/1/genres/belgesel-filmlerini-izle-1/" to "Belgesel Filmleri",
+        "${mainUrl}/load/page/1/genres/bilim-kurgu-filmlerini-izleyin-3/" to "Bilim Kurgu Filmleri",
+        "${mainUrl}/load/page/1/genres/komedi-filmlerini-izleyin-1/" to "Komedi Filmleri",
+        "${mainUrl}/load/page/1/genres/korku-filmlerini-izle-4/" to "Korku Filmleri",
+        "${mainUrl}/load/page/1/genres/romantik-filmleri-izle-2/" to "Romantik Filmleri"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = request.data.replace("/page/1/", "/page/$page/")
-        val html = app.get(url).text
-        val json = mapper.readValue<HDFC>(html)
-        val doc = Jsoup.parse(json.html)
+        // Update page number in URL
+        val url = if (page == 1) {
+            request.data
+                .replace("/load/page/1/genres/", "/tur/")
+                .replace("/load/page/1/categories/", "/category/")
+                .replace("/load/page/1/imdb7/", "/imdb-7-puan-uzeri-filmler/")
+        } else {
+            request.data
+                .replace("/page/1/", "/page/${page}/")
+        }
 
-        val items = doc.select("a").mapNotNull { it.toSearchResponse() }
-        return newHomePageResponse(request.name, items)
+        // Send API request
+        val response = app.get(url, headers = standardHeaders, referer = mainUrl)
+
+        // Return empty list if response is not successful
+        if (response.text.contains("Sayfa Bulunamadı")) {
+            Log.d("HDFC", "Sayfa bulunamadı: $url")
+            return newHomePageResponse(request.name, emptyList())
+        }
+
+        try {
+            // Parse JSON response
+            val hdfc: HDFC = objectMapper.readValue(response.text)
+            val document = Jsoup.parse(hdfc.html)
+
+            Log.d("HDFC", "Kategori ${request.name} için ${document.select("a").size} sonuç bulundu")
+
+            // Convert film/series cards to SearchResponse list
+            val results = document.select("a").mapNotNull { it.toSearchResult() }
+
+            return newHomePageResponse(request.name, results)
+        } catch (e: Exception) {
+            Log.e("HDFC", "JSON parse hatası (${request.name}): ${e.message}")
+            return newHomePageResponse(request.name, emptyList())
+        }
     }
 
-    private fun Element.toSearchResponse(): SearchResponse? {
-        val title = attr("title").ifEmpty { selectFirst("strong.poster-title")?.text() }?.trim() ?: return null
-        val href = fixUrl(attr("href")) ?: return null
-        val poster = fixUrl(selectFirst("img")?.attr("data-src") ?: selectFirst("img")?.attr("src"))
-        val year = selectFirst(".poster-meta span")?.text()?.toIntOrNull()
-        val tvType = if (href.contains("/dizi/") || href.contains("/series")) TvType.TvSeries else TvType.Movie
+    private fun Element.toSearchResult(): SearchResponse? {
+        val title = this.attr("title")
+            .takeIf { it.isNotEmpty() }
+            ?.trim()
+            ?: this.selectFirst("strong.poster-title")?.text()?.trim()
+            ?: return null
+
+        val href = fixUrlNull(this.attr("href")) ?: return null
+        val posterUrl = fixUrlNull(
+            this.selectFirst("img[data-src], img[src]")?.attr("data-src")
+                ?: this.selectFirst("img")?.attr("src")
+        )
+
+        // Year
+        val yearText = this.selectFirst(".poster-meta span")?.text()?.trim()
+        val year = yearText?.toIntOrNull()
+
+        // IMDb Score
+        val scoreText = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
+        val score = scoreText?.toFloatOrNull()
+
+        // Dub/Sub info
+        val dubSubText = this.selectFirst(".poster-lang span")?.text()?.trim()
+
+        // Determine which labels to show
+        val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
+        val hasSub = dubSubText?.contains("Altyazı", ignoreCase = true) == true
+
+        val label = when {
+            hasDub && hasSub -> "Dublaj + Sub"
+            hasDub -> "Dublaj"
+            hasSub -> "Altyazılı"
+            else -> null
+        }
+
+        val tvType = if (this.attr("href").contains("/dizi/", ignoreCase = true)
+            || this.attr("href").contains("/series", ignoreCase = true)
+            || this.attr("href").contains("home-series", ignoreCase = true)
+        ) TvType.TvSeries else TvType.Movie
 
         return newMovieSearchResponse(title, href, tvType) {
-            this.posterUrl = poster
+            this.posterUrl = posterUrl
             this.year = year
+            this.quality = getQualityFromString("HD")
+            this.plot = buildString {
+                if (!label.isNullOrBlank()) append("$label • ")
+                if (score != null) append("⭐ ${"%.1f".format(score)} • ")
+                if (!yearText.isNullOrBlank()) append(yearText)
+            }.trim()
         }
     }
 
-    // --------------------------------------------------------------------- //
-    // SEARCH
-    // --------------------------------------------------------------------- //
+    override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
+
     override suspend fun search(query: String): List<SearchResponse> {
-        val resp = app.get("$mainUrl/search?q=$query").parsedSafe<Results>() ?: return emptyList()
-        return resp.results.mapNotNull { html ->
-            val doc = Jsoup.parse(html)
-            val title = doc.selectFirst("h4.title")?.text() ?: return@mapNotNull null
-            val href = fixUrl(doc.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
-            val poster = fixUrl(doc.selectFirst("img")?.attr("src"))
-            newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = poster }
+        val response = app.get(
+            "${mainUrl}/search?q=${query}",
+            headers = mapOf("X-Requested-With" to "fetch")
+        ).parsedSafe<Results>() ?: return emptyList()
+
+        val searchResults = mutableListOf<SearchResponse>()
+
+        response.results.forEach { resultHtml ->
+            val document = Jsoup.parse(resultHtml)
+
+            val title = document.selectFirst("h4.title")?.text() ?: return@forEach
+            val href = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
+            val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src"))
+                ?: fixUrlNull(document.selectFirst("img")?.attr("data-src"))
+
+            searchResults.add(
+                newMovieSearchResponse(title, href, TvType.Movie) {
+                    this.posterUrl = posterUrl?.replace("/thumb/", "/list/")
+                }
+            )
         }
+
+        return searchResults
     }
 
-    // --------------------------------------------------------------------- //
-    // LOAD (detail)
-    // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
-        val doc = app.get(url).document
+        val document = app.get(url).document
 
-        val title = doc.selectFirst("strong.poster-title")?.text()
-            ?: doc.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
-        val poster = fixUrl(doc.selectFirst("img.lazyload")?.attr("data-src")
-            ?: doc.selectFirst("img")?.attr("src")) ?: return null
-        val year = doc.selectFirst(".poster-meta span")?.text()?.toIntOrNull()
-        val plot = doc.selectFirst(".popover-description, article.post-info-content > p")?.text()?.trim()
-        val tags = doc.selectFirst(".popover-meta span:containsOwn(Türler)")?.parent()
-            ?.ownText()?.split(",")?.map { it.trim() } ?: emptyList()
+        val title = document.selectFirst("strong.poster-title")?.text()?.trim()
+            ?: document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle")
+            ?: return null
 
-        val isSeries = url.contains("/dizi/") || url.contains("/series")
-        if (isSeries) {
-            val episodes = doc.select("div.seasons-tab-content a").mapNotNull {
-                val name = it.selectFirst("h4")?.text() ?: return@mapNotNull null
-                val href = fixUrl(it.attr("href")) ?: return@mapNotNull null
-                val season = Regex("""(\d+)\. Sezon""").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                val episode = Regex("""(\d+)\. Bölüm""").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                newEpisode(href) { this.name = name; this.season = season; this.episode = episode }
-            }
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster; this.year = year; this.plot = plot; this.tags = tags
+        val poster = fixUrlNull(
+            document.selectFirst("img.lazyload, img[data-src]")?.attr("data-src")
+                ?: document.selectFirst("img[src]")?.attr("src")
+        )
+
+        // Year
+        val yearText = document.selectFirst(".poster-meta span")?.text()?.trim()
+        val year = yearText?.toIntOrNull()
+
+        // IMDb Score
+        val scoreText = document.selectFirst(".imdb, .popover-rating p")?.text()
+            ?.substringBefore("(")?.trim()
+        val score = scoreText?.toFloatOrNull()
+
+        // Dub/Sub info
+        val dubSubText = document.selectFirst(".poster-lang span")?.text()?.trim()
+            ?: document.selectFirst(".popover-meta span:matchesOwn(Kategori)")?.parent()?.ownText()?.trim()
+
+        val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
+        val hasSub = dubSubText?.contains("Altyazı", ignoreCase = true) == true
+        val label = when {
+            hasDub && hasSub -> "Dublaj + Sub"
+            hasDub -> "Dublaj"
+            hasSub -> "Altyazılı"
+            else -> null
+        }
+
+        // Description
+        val description = document.selectFirst(".popover-description, article.post-info-content > p")
+            ?.text()?.replace("Özet", "")?.trim()
+
+        // Genres
+        val genresText = document.selectFirst(".popover-meta span:matchesOwn(Türler)")
+            ?.parent()?.ownText()?.trim()
+        val tags = genresText?.split(",")?.map { it.trim() } ?: emptyList()
+
+        // Determine type (Movie or Series)
+        val typeText = document.selectFirst(".popover-meta span:matchesOwn(Kategori)")
+            ?.parent()?.ownText()?.lowercase()
+        val tvType = when {
+            typeText?.contains("dizi") == true -> TvType.TvSeries
+            else -> TvType.Movie
+        }
+
+        // Actors
+        val actors = document.select("div.post-info-cast a").map {
+            val name = it.selectFirst("strong")?.text() ?: it.text()
+            val image = fixUrlNull(it.selectFirst("img")?.attr("data-src"))
+            Actor(name, image)
+        }
+
+        // Recommendations
+        val recommendations = document.select("div.section-slider-container div.slider-slide").mapNotNull {
+            val recName = it.selectFirst("a")?.attr("title") ?: return@mapNotNull null
+            val recHref = fixUrlNull(it.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
+            val recPosterUrl = fixUrlNull(it.selectFirst("img")?.attr("data-src"))
+                ?: fixUrlNull(it.selectFirst("img")?.attr("src"))
+
+            newTvSeriesSearchResponse(recName, recHref, TvType.TvSeries) {
+                this.posterUrl = recPosterUrl
             }
         }
 
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            this.posterUrl = poster; this.year = year; this.plot = plot; this.tags = tags
+        // Trailer
+        val trailer = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")
+            ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
+
+        // Construct final response
+        return if (tvType == TvType.TvSeries) {
+            val episodes = document.select("div.seasons-tab-content a").mapNotNull {
+                val epName = it.selectFirst("h4")?.text()?.trim() ?: return@mapNotNull null
+                val epHref = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
+                val epEpisode = Regex("""(\d+)\. ?Bölüm""").find(epName)?.groupValues?.get(1)?.toIntOrNull()
+                val epSeason = Regex("""(\d+)\. ?Sezon""").find(epName)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+
+                newEpisode(epHref) {
+                    this.name = epName
+                    this.season = epSeason
+                    this.episode = epEpisode
+                }
+            }
+
+            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl = poster
+                this.year = year
+                this.quality = yearText
+                this.posterLabel = label
+                this.posterText = score?.let { "⭐ ${"%.1f".format(it)}" }
+                this.plot = description
+                this.tags = tags
+                this.score = Score.from10(score)
+                this.recommendations = recommendations
+                addActors(actors)
+                addTrailer(trailer)
+            }
+        } else {
+            newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = poster
+                this.year = year
+                this.quality = yearText
+                this.posterLabel = label
+                this.posterText = score?.let { "⭐ ${"%.1f".format(it)}" }
+                this.plot = description
+                this.tags = tags
+                this.score = Score.from10(score)
+                this.recommendations = recommendations
+                addActors(actors)
+                addTrailer(trailer)
+            }
         }
     }
 
-    // --------------------------------------------------------------------- //
-    // LINK EXTRACTION – newExtractorLink DSL ONLY
-    // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        val document = app.get(data).document
+        
+        // Extract the main iframe source
+        val iframeSrc = fixUrlNull(
+            document.selectFirst(".close")?.attr("data-src")
+                ?: document.selectFirst(".rapidrame")?.attr("data-src")
+        )
 
-        val doc = app.get(data).document
+        Log.d("HDFC", "Found iframe source: $iframeSrc")
 
-        // === 1. CLOSE CDN – from poster filename ===
-        doc.selectFirst("img.poster-lazy, img.lazyload")?.attr("data-src")?.let { posterUrl ->
-            val fileName = posterUrl.substringAfterLast("/")
-            val master = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/master.txt"
-
-            callback(
-                newExtractorLink {
-                    source = name
-                    name = "Close (1080p)"
-                    url = master
-                    referer = mainUrl
-                    type = ExtractorLinkType.M3U8
-                    quality = Qualities.Unknown.value
-                }
-            )
-        }
-
-        // === 2. RAPIDRAME JW-PLAYER (tokenised) ===
-        doc.select("button.alternative-link[data-video]").forEach { btn ->
-            val videoId = btn.attr("data-video")
-            val sourceName = btn.text().trim() + " (Rapidrame)"
-
-            val apiResp = app.get(
-                "$mainUrl/video/$videoId/",
-                headers = mapOf("X-Requested-With" to "fetch"),
-                referer = data
-            ).text
-
-            val iframe = Regex("""data-src=["']([^"']+)""").find(apiResp)?.groupValues?.get(1)
-                ?: return@forEach
-
-            val iframeDoc = app.get(iframe, referer = data).document
-
-            // --- Subtitles ---
-            iframeDoc.select("track[kind=captions]").forEach { track ->
-                val lang = when (track.attr("srclang")) {
-                    "tr" -> "Türkçe"
-                    "en" -> "English"
-                    "fr" -> "Français"
-                    "pt" -> "Português"
-                    else -> track.attr("label") ?: track.attr("srclang").uppercase()
-                }
-                val subUrl = URI(iframe).resolve(track.attr("src")).toString()
-                subtitleCallback(SubtitleFile(lang, subUrl))
-            }
-
-            // --- JW Player JS (unpacked) ---
-            val script = iframeDoc.selectFirst("script:containsData(playerInstance)")?.data()
-                ?: return@forEach
-            val unpacked = getAndUnpack(script)
-
-            Regex("""file\s*:\s*["']([^"']+)["']""").find(unpacked)?.groupValues?.get(1)?.let { hlsUrl ->
-                callback(
-                    newExtractorLink {
-                        source = name
-                        name = sourceName
-                        url = hlsUrl
-                        referer = iframe
-                        type = ExtractorLinkType.M3U8
-                        quality = Qualities.Unknown.value
-                        headers = mapOf("Origin" to mainUrl)
-                    }
-                )
+        if (iframeSrc != null) {
+            if (iframeSrc.contains("hdfilmcehennemi.mobi")) {
+                // Handle Close player
+                handleClosePlayer(iframeSrc, subtitleCallback, callback)
+            } else if (iframeSrc.contains("rplayer")) {
+                // Handle Rapidrame player
+                handleRapidramePlayer(iframeSrc, subtitleCallback, callback)
             }
         }
+
+        // Also process alternative links from the main page
+        processAlternativeLinks(document, data, subtitleCallback, callback)
 
         return true
     }
 
-    // --------------------------------------------------------------------- //
-    // JSON MODELS
-    // --------------------------------------------------------------------- //
-    data class Results(@JsonProperty("results") val results: List<String>)
-    data class HDFC(@JsonProperty("html") val html: String)
+    private suspend fun handleClosePlayer(
+        iframeUrl: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        try {
+            val iframeDoc = app.get(iframeUrl, referer = mainUrl).document
+            val baseUri = iframeDoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
+
+            // Extract subtitles
+            iframeDoc.select("track[kind=captions]")
+                .filter { it.attr("srclang") != "forced" }
+                .forEach { track ->
+                    val lang = track.attr("srclang").let {
+                        when (it) {
+                            "tr" -> "Türkçe"
+                            "en" -> "İngilizce"
+                            else -> it
+                        }
+                    }
+                    val subUrl = track.attr("src").let { src ->
+                        if (src.startsWith("http")) src else "$baseUri/$src".replace("//", "/")
+                    }
+                    subtitleCallback(SubtitleFile(lang, subUrl))
+                }
+
+            // Extract video source from script
+            val script = iframeDoc.select("script")
+                .find { it.data().contains("sources:") }?.data() ?: return
+
+            // Look for master.m3u8 or similar video URLs
+            val videoUrls = Regex("""https?://[^\s"']+\.(m3u8|mp4)[^\s"']*""").findAll(script)
+            videoUrls.forEach { match ->
+                val videoUrl = match.value
+                Log.d("HDFC", "Found video URL: $videoUrl")
+                
+                callback.invoke(
+                    newExtractorLink(
+                        source = "Close",
+                        name = "Close Player",
+                        url = videoUrl,
+                        referer = mainUrl,
+                        quality = Qualities.Unknown.value,
+                        type = ExtractorLinkType.HLS
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("HDFC", "Error handling Close player: ${e.message}")
+        }
+    }
+
+    private suspend fun handleRapidramePlayer(
+        iframeUrl: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        try {
+            val iframeDoc = app.get(iframeUrl, referer = "$mainUrl/").document
+            
+            // Extract subtitles from JSON config
+            val scriptContent = iframeDoc.toString()
+            val tracksRegex = Regex("""tracks\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
+            val tracksMatch = tracksRegex.find(scriptContent)
+            
+            if (tracksMatch != null) {
+                val tracksJson = "[${tracksMatch.groupValues[1]}]"
+                try {
+                    val subtitles: List<SubtitleTrack> = objectMapper.readValue(tracksJson)
+                    subtitles.forEach { track ->
+                        val lang = when (track.language) {
+                            "en" -> "İngilizce"
+                            "tr" -> if (track.label?.contains("Forced") == true) "Forced" else "Türkçe"
+                            else -> track.language
+                        }
+                        if (lang != "Forced") {
+                            val subUrl = if (track.file?.startsWith("/") == true) {
+                                "$mainUrl${track.file}"
+                            } else {
+                                track.file
+                            }
+                            subUrl?.let {
+                                subtitleCallback(SubtitleFile(lang, it))
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("HDFC", "Error parsing subtitle tracks: ${e.message}")
+                }
+            }
+
+            // Extract video source
+            val sourceRegex = Regex("""sources\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
+            val sourceMatch = sourceRegex.find(scriptContent)
+            
+            if (sourceMatch != null) {
+                val sourcesJson = "[${sourceMatch.groupValues[1]}]"
+                try {
+                    val sources: List<VideoSource> = objectMapper.readValue(sourcesJson)
+                    sources.forEach { source ->
+                        source.file?.let { fileUrl ->
+                            Log.d("HDFC", "Found Rapidrame video: $fileUrl")
+                            callback.invoke(
+                                newExtractorLink(
+                                    source = "Rapidrame",
+                                    name = "Rapidrame Player",
+                                    url = fileUrl,
+                                    referer = mainUrl,
+                                    quality = Qualities.Unknown.value,
+                                    type = ExtractorLinkType.HLS
+                                )
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("HDFC", "Error parsing video sources: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("HDFC", "Error handling Rapidrame player: ${e.message}")
+        }
+    }
+
+    private suspend fun processAlternativeLinks(
+        document: org.jsoup.nodes.Document,
+        data: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        document.select("div.alternative-links").map { element ->
+            element to element.attr("data-lang").uppercase()
+        }.forEach { (element, langCode) ->
+            element.select("button.alternative-link").map { button ->
+                button.text().replace("(HDrip Xbet)", "").trim() + " $langCode" to button.attr("data-video")
+            }.forEach { (source, videoID) ->
+                try {
+                    val apiResponse = app.get(
+                        "${mainUrl}/video/$videoID/",
+                        headers = mapOf(
+                            "Content-Type" to "application/json",
+                            "X-Requested-With" to "fetch"
+                        ),
+                        referer = data
+                    ).text
+
+                    var iframe = Regex("""data-src=\\"([^"]+)""").find(apiResponse)?.groupValues?.get(1)
+                        ?.replace("\\", "") ?: return@forEach
+
+                    if (iframe.contains("?rapidrame_id=")) {
+                        iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
+                    }
+
+                    Log.d("HDFC", "$source » $videoID » $iframe")
+                    
+                    // Load the iframe and extract video
+                    loadVideoFromIframe(source, iframe, data, callback)
+                } catch (e: Exception) {
+                    Log.e("HDFC", "Error processing alternative link $source: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private suspend fun loadVideoFromIframe(
+        source: String,
+        iframeUrl: String,
+        referer: String,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        try {
+            val iframeDoc = app.get(iframeUrl, referer = referer).document
+            
+            // Look for video sources in the iframe
+            val videoSources = iframeDoc.select("source[src]")
+            videoSources.forEach { sourceElement ->
+                val videoUrl = fixUrlNull(sourceElement.attr("src"))
+                videoUrl?.let { url ->
+                    callback.invoke(
+                        newExtractorLink(
+                            source = source,
+                            name = source,
+                            url = url,
+                            referer = mainUrl,
+                            quality = Qualities.Unknown.value,
+                            type = if (url.contains(".m3u8")) ExtractorLinkType.HLS else ExtractorLinkType.VIDEO
+                        )
+                    )
+                }
+            }
+
+            // Also check for video elements
+            val videoElements = iframeDoc.select("video[src]")
+            videoElements.forEach { videoElement ->
+                val videoUrl = fixUrlNull(videoElement.attr("src"))
+                videoUrl?.let { url ->
+                    callback.invoke(
+                        newExtractorLink(
+                            source = source,
+                            name = source,
+                            url = url,
+                            referer = mainUrl,
+                            quality = Qualities.Unknown.value,
+                            type = if (url.contains(".m3u8")) ExtractorLinkType.HLS else ExtractorLinkType.VIDEO
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("HDFC", "Error loading video from iframe: ${e.message}")
+        }
+    }
+
+    // Helper function to get quality from string
+    private fun getQualityFromString(quality: String?): String? {
+        return when {
+            quality == null -> null
+            quality.contains("1080") -> "1080p"
+            quality.contains("720") -> "720p"
+            quality.contains("480") -> "480p"
+            quality.contains("360") -> "360p"
+            else -> quality
+        }
+    }
+
+    // Data classes for JSON parsing
+    data class Results(
+        @JsonProperty("results") val results: List<String> = arrayListOf()
+    )
+
+    data class HDFC(
+        @JsonProperty("html") val html: String,
+        @JsonProperty("meta") val meta: Meta
+    )
+
+    data class Meta(
+        @JsonProperty("title") val title: String,
+        @JsonProperty("canonical") val canonical: Boolean,
+        @JsonProperty("keywords") val keywords: Boolean
+    )
+
+    data class SubtitleTrack(
+        @JsonProperty("file") val file: String? = null,
+        @JsonProperty("label") val label: String? = null,
+        @JsonProperty("language") val language: String? = null,
+        @JsonProperty("kind") val kind: String? = null,
+        @JsonProperty("default") val default: Boolean? = null
+    )
+
+    data class VideoSource(
+        @JsonProperty("file") val file: String? = null,
+        @JsonProperty("type") val type: String? = null
+    )
 }
