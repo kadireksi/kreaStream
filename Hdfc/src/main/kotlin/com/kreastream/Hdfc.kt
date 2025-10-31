@@ -5,8 +5,6 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import okhttp3.Interceptor
-import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URI
@@ -19,27 +17,17 @@ class Hdfc : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // CloudFlare Bypass
-    private val cfKiller by lazy { CloudflareKiller() }
-    private val cfInterceptor by lazy { CloudflareInterceptor(cfKiller) }
-
-    class CloudflareInterceptor(private val killer: CloudflareKiller) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val resp = chain.proceed(chain.request())
-            if (resp.peekBody(2000).string().contains("Just a moment")) {
-                return killer.intercept(chain)
-            }
-            return resp
-        }
-    }
-
-    // JSON Mapper
+    // --------------------------------------------------------------------- //
+    //  JSON mapper (Jackson)
+    // --------------------------------------------------------------------- //
     private val mapper = com.fasterxml.jackson.databind.ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     }
 
-    // Main Page
+    // --------------------------------------------------------------------- //
+    //  MAIN PAGE
+    // --------------------------------------------------------------------- //
     override val mainPage = mainPageOf(
         "$mainUrl/load/page/1/home/" to "Yeni Filmler",
         "$mainUrl/load/page/1/home-series/" to "Yeni Diziler",
@@ -49,8 +37,8 @@ class Hdfc : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data.replace("/page/1/", "/page/$page/")
-        val resp = app.get(url, interceptor = cfInterceptor).text
-        val json = mapper.readValue<HDFC>(resp)
+        val html = app.get(url).text
+        val json = mapper.readValue<HDFC>(html)
         val doc = Jsoup.parse(json.html)
 
         val items = doc.select("a").mapNotNull { it.toSearchResponse() }
@@ -70,10 +58,11 @@ class Hdfc : MainAPI() {
         }
     }
 
-    // Search
+    // --------------------------------------------------------------------- //
+    //  SEARCH
+    // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
-        val resp = app.get("$mainUrl/search?q=$query", interceptor = cfInterceptor).parsedSafe<Results>()
-            ?: return emptyList()
+        val resp = app.get("$mainUrl/search?q=$query").parsedSafe<Results>() ?: return emptyList()
         return resp.results.mapNotNull { html ->
             val doc = Jsoup.parse(html)
             val title = doc.selectFirst("h4.title")?.text() ?: return@mapNotNull null
@@ -83,9 +72,11 @@ class Hdfc : MainAPI() {
         }
     }
 
-    // Load Details
+    // --------------------------------------------------------------------- //
+    //  DETAIL PAGE
+    // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
-        val doc = app.get(url, interceptor = cfInterceptor).document
+        val doc = app.get(url).document
 
         val title = doc.selectFirst("strong.poster-title")?.text()
             ?: doc.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
@@ -115,7 +106,9 @@ class Hdfc : MainAPI() {
         }
     }
 
-    // Load Links — USING newExtractorLink {}
+    // --------------------------------------------------------------------- //
+    //  LINK EXTRACTION – ONLY newExtractorLink DSL
+    // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -123,25 +116,27 @@ class Hdfc : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        val doc = app.get(data, interceptor = cfInterceptor).document
+        val doc = app.get(data).document
 
-        // === 1. Close CDN (from poster filename) ===
+        // ---------- 1. CLOSE CDN (direct HLS from poster file name) ----------
         doc.selectFirst("img.poster-lazy, img.lazyload")?.attr("data-src")?.let { posterUrl ->
+            // poster example: .../weapons-2025-web-trdualmp4-Fq7iQEPn1r9.jpg
             val fileName = posterUrl.substringAfterLast("/")
-            val masterUrl = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/master.txt"
+            val master = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/master.txt"
 
-            callback.invoke(
+            callback(
                 newExtractorLink {
-                    this.name = "Close (1080p)"
-                    this.url = masterUrl
-                    this.referer = mainUrl
-                    this.type = ExtractorLinkType.M3U8
-                    this.quality = Qualities.Unknown.value
+                    source = name
+                    name = "Close (1080p)"
+                    url = master
+                    referer = mainUrl
+                    type = ExtractorLinkType.M3U8
+                    quality = Qualities.Unknown.value
                 }
             )
         }
 
-        // === 2. Rapidrame JW Player (tokenized) ===
+        // ---------- 2. RAPIDRAME JW-PLAYER (tokenised HLS) ----------
         doc.select("button.alternative-link[data-video]").forEach { btn ->
             val videoId = btn.attr("data-video")
             val sourceName = btn.text().trim() + " (Rapidrame)"
@@ -149,16 +144,15 @@ class Hdfc : MainAPI() {
             val apiResp = app.get(
                 "$mainUrl/video/$videoId/",
                 headers = mapOf("X-Requested-With" to "fetch"),
-                referer = data,
-                interceptor = cfInterceptor
+                referer = data
             ).text
 
             val iframe = Regex("""data-src=["']([^"']+)""").find(apiResp)?.groupValues?.get(1)
                 ?: return@forEach
 
-            val iframeDoc = app.get(iframe, referer = data, interceptor = cfInterceptor).document
+            val iframeDoc = app.get(iframe, referer = data).document
 
-            // --- Subtitles ---
+            // ---- subtitles ----
             iframeDoc.select("track[kind=captions]").forEach { track ->
                 val lang = when (track.attr("srclang")) {
                     "tr" -> "Türkçe"
@@ -171,19 +165,21 @@ class Hdfc : MainAPI() {
                 subtitleCallback(SubtitleFile(lang, subUrl))
             }
 
-            // --- JW Player JS (unpacked) ---
-            val script = iframeDoc.selectFirst("script:containsData(playerInstance)")?.data() ?: return@forEach
+            // ---- JW-Player JS (packed) ----
+            val script = iframeDoc.selectFirst("script:containsData(playerInstance)")?.data()
+                ?: return@forEach
             val unpacked = getAndUnpack(script)
 
             Regex("""file\s*:\s*["']([^"']+)["']""").find(unpacked)?.groupValues?.get(1)?.let { hlsUrl ->
-                callback.invoke(
+                callback(
                     newExtractorLink {
-                        this.name = sourceName
-                        this.url = hlsUrl
-                        this.referer = iframe
-                        this.type = ExtractorLinkType.M3U8
-                        this.quality = Qualities.Unknown.value
-                        this.headers = mapOf("Origin" to mainUrl)
+                        source = name
+                        name = sourceName
+                        url = hlsUrl
+                        referer = iframe
+                        type = ExtractorLinkType.M3U8
+                        quality = Qualities.Unknown.value
+                        headers = mapOf("Origin" to mainUrl)
                     }
                 )
             }
@@ -192,7 +188,9 @@ class Hdfc : MainAPI() {
         return true
     }
 
-    // JSON Models
+    // --------------------------------------------------------------------- //
+    //  JSON data classes
+    // --------------------------------------------------------------------- //
     data class Results(@JsonProperty("results") val results: List<String>)
     data class HDFC(@JsonProperty("html") val html: String)
 }
