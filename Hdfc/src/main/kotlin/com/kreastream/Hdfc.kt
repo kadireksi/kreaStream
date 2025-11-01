@@ -809,14 +809,6 @@ private fun base64Decode(encoded: String): String {
         }
     }
 
-    private fun base64Decode(encoded: String): String {
-        return try {
-            String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
-        } catch (e: Exception) {
-            ""
-        }
-    }
-
     // Data classes for JSON parsing
     data class Results(
         @JsonProperty("results") val results: List<String> = arrayListOf()
