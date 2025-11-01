@@ -172,7 +172,7 @@ class Hdfc : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    private inline fun <reified T> Response.tryParseJson(): T? {
+    private inline fun <reified T> okhttp3.Response.tryParseJson(): T? {
         return try {
             val mapper = jacksonObjectMapper().apply {
                 registerModule(KotlinModule())
