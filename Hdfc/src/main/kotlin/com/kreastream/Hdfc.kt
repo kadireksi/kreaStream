@@ -392,89 +392,58 @@ class Hdfc : MainAPI() {
         }
     }
 
-private suspend fun extractVideoFromClosePlayer(
-    iframeDoc: org.jsoup.nodes.Document,
-    iframeUrl: String,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-) {
-    var foundVideo = false
-    
-    // Method 1: Extract the exact title format from the iframe page
-    val titleElement = iframeDoc.selectFirst("title")
-    val exactTitle = titleElement?.text()?.substringBefore(".mp4")?.trim()
-    
-    // Extract video ID from iframe URL
-    val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
-    
-    if (exactTitle != null && videoId.isNotEmpty()) {
-        // Keep the exact title format - don't remove "mp4" from the middle
-        val normalizedTitle = exactTitle
-            .lowercase()
-            .replace(" ", "")
-            // Don't remove any characters except spaces - keep "mp4" in the title
-        
-        // The exact URL pattern based on browser downloader result
-        val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
-        
-        callback(newExtractorLink(
-            name = "Close Player (Exact)",
-            url = exactUrl,
-            source = "Close"
-        ))
-        foundVideo = true
-        
-        // Also try other server numbers and domain patterns
-        val servers = listOf("srv10", "srv11", "srv12")
-        val domains = listOf("1332", "1241", "1331", "1333")
-        
-        servers.forEach { server ->
-            domains.forEach { domain ->
-                val patterns = listOf(
-                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt",
-                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/master.txt",
-                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId/master.m3u8"
-                )
-                
-                patterns.forEach { patternUrl ->
-                    if (patternUrl != exactUrl) {
-                        callback(newExtractorLink(
-                            name = "Close Player",
-                            url = patternUrl,
-                            source = "Close"
-                        ))
-                    }
+    private suspend fun extractVideoFromClosePlayer(
+        iframeDoc: org.jsoup.nodes.Document,
+        iframeUrl: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        var found = false
+
+        // ────── 1. Try the *exact* pattern you saw in the browser ──────
+        val titleEl = iframeDoc.selectFirst("title")
+        val rawTitle = titleEl?.text()?.substringBefore(".mp4")?.trim() ?: ""
+        val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
+
+        if (rawTitle.isNotEmpty() && videoId.isNotEmpty()) {
+            val slug = rawTitle.lowercase()
+                .replace(" ", "")
+                .replace(Regex("[^a-z0-9-]"), "")
+
+            // exact URL that the browser-downloader prints
+            val exact = "https://srv10.cdnimages1332.sbs/hls/${slug}-${videoId}.mp4/txt/master.txt"
+            callback(newExtractorLink(name = "Close (Exact)", url = exact, source = "Close"))
+            found = true
+        }
+
+        // ────── 2. De-obfuscate the packed script (the real source) ──────
+        iframeDoc.select("script").forEach { script ->
+            val data = script.data()
+            if (data.contains("eval(function(p,a,c,k,e,d)")) {
+                try {
+                    val cleanJs = JsPackerUnpacker.unpack(data)
+                    // The player builds the URL with something like:
+                    //   src: { src: decrypt([...]), type: 'application/x-mpegURL' }
+                    //   → look for a string that ends with .m3u8 / .txt / master
+                    Regex("""["']https?://[^"']+?\.(m3u8|txt|mp4)(?:[^"']*)?["']""")
+                        .findAll(cleanJs)
+                        .map { it.value.removeSurrounding("\"").removeSurrounding("'") }
+                        .filter { it.contains("cdnimages") && !it.contains("playmix.uno") }
+                        .forEach { url ->
+                            callback(newExtractorLink(name = "Close (Unpacked)", url = url, source = "Close"))
+                            found = true
+                        }
+                } catch (e: Exception) {
+                    // ignore malformed packed blocks
                 }
             }
         }
-    }
 
-    // Method 2: Look for URLs in obfuscated scripts
-    if (!foundVideo) {
-        val scripts = iframeDoc.select("script")
-        scripts.forEach { script ->
-            val scriptContent = script.data()
-            if (scriptContent.isNotEmpty() && scriptContent.contains("eval(function(p,a,c,k,e,d)")) {
-                val realUrls = extractRealUrlsFromObfuscatedScript(scriptContent, exactTitle, videoId)
-                realUrls.forEach { url ->
-                    if (url.contains("cdnimages") && !url.contains("hls8.playmix.uno")) {
-                        callback(newExtractorLink(
-                            name = "Close Player (Script)",
-                            url = url,
-                            source = "Close"
-                        ))
-                        foundVideo = true
-                    }
-                }
-            }
+        // ────── 3. Fallback – let the generic extractor try the iframe URL ──────
+        if (!found) {
+            loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback, callback)
         }
     }
-
-    // Method 3: Use loadExtractor as fallback
-    if (!foundVideo) {
-        loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback, callback)
-    }
-}
 
 /**
  * Extract real video URLs from the obfuscated JavaScript
@@ -830,6 +799,94 @@ private fun base64Decode(encoded: String): String {
         }
     }
 
+
+    // ------------------------------------------------------------
+    //  Dean-Edwards-Packer unpacker – 100% Kotlin, no external deps
+    // ------------------------------------------------------------
+    private object JsPackerUnpacker {
+        /** Unpacks a string that was produced by the classic packer. */
+        fun unpack(packed: String): String {
+            // 1. extract the four arguments: code, base, count, dictionary
+            val regex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\),0,\{\}\)\)""")
+            val m = regex.find(packed) ?: throw IllegalArgumentException("Not a packed script")
+            val (code, baseStr, cntStr, dictStr) = m.destructured
+            val base = baseStr.toInt()
+            val dictionary = dictStr.split('|')
+
+            // 2. decode the packed payload (base-62 numbers + escaped chars)
+            fun decode(s: String): String = buildString {
+                var i = 0
+                while (i < s.length) {
+                    when (s[i]) {
+                        '\\' -> {
+                            i++
+                            when (s[i]) {
+                                'b' -> append('\b')
+                                'f' -> append('\u000C')
+                                'n' -> append('\n')
+                                'r' -> append('\r')
+                                't' -> append('\t')
+                                '\'' -> append('\'')
+                                '\\' -> append('\\')
+                                'x' -> {
+                                    i++
+                                    val hex = s.substring(i, i + 2)
+                                    append(hex.toInt(16).toChar())
+                                    i += 2
+                                }
+                                'u' -> {
+                                    i++
+                                    val hex = s.substring(i, i + 4)
+                                    append(hex.toInt(16).toChar())
+                                    i += 4
+                                }
+                                else -> append(s[i])
+                            }
+                            i++
+                        }
+                        else -> {
+                            var num = 0
+                            var start = i
+                            while (i < s.length && s[i].let { it.isLetterOrDigit() || it in "_$" }) {
+                                val d = when (val ch = s[i]) {
+                                    in '0'..'9' -> ch - '0'
+                                    in 'a'..'z' -> ch - 'a' + 10
+                                    in 'A'..'Z' -> ch - 'A' + 10
+                                    else -> break
+                                }
+                                num = num * base + d
+                                i++
+                            }
+                            // if the number is followed by '(' it is a recursive call → decode inner part
+                            if (i < s.length && s[i] == '(') {
+                                var depth = 1
+                                var p = i + 1
+                                while (depth > 0 && p < s.length) {
+                                    when (s[p]) { '(' -> depth++; ')' -> depth--; }
+                                    p++
+                                }
+                                append(decode(s.substring(i + 1, p - 1)))
+                                i = p
+                            } else {
+                                append(dictionary.getOrNull(num) ?: num.toString(base))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. first pass – replace dictionary words
+            var js = decode(code)
+
+            // 4. remove the helper boiler-plate that the packer injects
+            js = js.replace(Regex("""while\s*\(\s*c\s*--\s*\)\s*\{[^}]*\}"""), "")
+                .replace(Regex("""if\s*\(!''.replace\([^)]*\)\)\s*\{[^}]*\}"""), "")
+                .replace(Regex("""k=\[function\(e\)\{return d\[e\]\}\];e=function\(\)\{return'\\w+'};c=1"""), "")
+
+            return js
+        }
+    }
+
     // Data classes for JSON parsing
     data class Results(
         @JsonProperty("results") val results: List<String> = arrayListOf()
@@ -858,4 +915,5 @@ private fun base64Decode(encoded: String): String {
         @JsonProperty("file") val file: String? = null,
         @JsonProperty("type") val type: String? = null
     )
+
 }
