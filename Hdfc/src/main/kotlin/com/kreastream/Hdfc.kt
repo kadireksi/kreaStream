@@ -369,20 +369,13 @@ class Hdfc : MainAPI() {
                 val videoUrl = match.value
                 Log.d("HDFC", "Found video URL: $videoUrl")
                 
-                // Create basic extractor link without unsupported parameters
+                // Create basic extractor link
                 callback.invoke(
                     newExtractorLink(
                         name = "Close Player",
-                        source = "Close", 
                         url = videoUrl,
-                        quality = Qualities.Unknown.value
-                    ).apply {
-                        // Set headers for the extractor
-                        this.headers = mapOf(
-                            "Referer" to mainUrl,
-                            "User-Agent" to standardHeaders["User-Agent"] ?: ""
-                        )
-                    }
+                        source = "Close"
+                    )
                 )
             }
         } catch (e: Exception) {
@@ -443,16 +436,9 @@ class Hdfc : MainAPI() {
                             callback.invoke(
                                 newExtractorLink(
                                     name = "Rapidrame Player",
-                                    source = "Rapidrame",
                                     url = fileUrl,
-                                    quality = Qualities.Unknown.value
-                                ).apply {
-                                    // Set headers for the extractor
-                                    this.headers = mapOf(
-                                        "Referer" to mainUrl,
-                                        "User-Agent" to standardHeaders["User-Agent"] ?: ""
-                                    )
-                                }
+                                    source = "Rapidrame"
+                                )
                             )
                         }
                     }
@@ -522,16 +508,9 @@ class Hdfc : MainAPI() {
                     callback.invoke(
                         newExtractorLink(
                             name = source,
-                            source = source,
                             url = url,
-                            quality = Qualities.Unknown.value
-                        ).apply {
-                            // Set headers for the extractor
-                            this.headers = mapOf(
-                                "Referer" to mainUrl,
-                                "User-Agent" to standardHeaders["User-Agent"] ?: ""
-                            )
-                        }
+                            source = source
+                        )
                     )
                 }
             }
@@ -544,16 +523,9 @@ class Hdfc : MainAPI() {
                     callback.invoke(
                         newExtractorLink(
                             name = source,
-                            source = source,
                             url = url,
-                            quality = Qualities.Unknown.value
-                        ).apply {
-                            // Set headers for the extractor
-                            this.headers = mapOf(
-                                "Referer" to mainUrl,
-                                "User-Agent" to standardHeaders["User-Agent"] ?: ""
-                            )
-                        }
+                            source = source
+                        )
                     )
                 }
             }
