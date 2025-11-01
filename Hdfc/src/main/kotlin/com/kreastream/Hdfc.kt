@@ -1,818 +1,230 @@
-package com.kreastream
-
-import android.util.Log
-import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
-import com.lagradost.cloudstream3.Actor
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.Score
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import okhttp3.Interceptor
-import okhttp3.Response
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
-
-class Hdfc : MainAPI() {
-    override var mainUrl = "https://www.hdfilmcehennemi.la"
-    override var name = "HDFC"
-    override val hasMainPage = true
-    override var lang = "tr"
-    override val hasQuickSearch = true
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
-
-    // CloudFlare bypass
-    override var sequentialMainPage = true
-    override var sequentialMainPageDelay = 50L
-    override var sequentialMainPageScrollDelay = 50L
-
-    // CloudFlare handling
-    private val interceptor by lazy { CloudflareInterceptor() }
-
-    class CloudflareInterceptor : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
-            val response = chain.proceed(request)
-            val doc = Jsoup.parse(response.peekBody(1024 * 1024).string())
-
-            if (doc.text().contains("Just a moment")) {
-                Log.w("HDFC", "Cloudflare protection detected")
-            }
-
-            return response
-        }
-    }
-
-    // ObjectMapper for JSON parsing
-    private val objectMapper = jacksonObjectMapper().apply {
-        registerModule(KotlinModule.Builder().build())
-        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    }
-
-    // Standard headers for requests
-    private val standardHeaders = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0",
-        "Accept" to "*/*",
-        "X-Requested-With" to "fetch"
-    )
-
-    // Main page categories
-    override val mainPage = mainPageOf(
-        "${mainUrl}/load/page/1/home/" to "Yeni Eklenen Filmler",
-        "${mainUrl}/load/page/1/categories/nette-ilk-filmler/" to "Nette İlk Filmler",
-        "${mainUrl}/load/page/1/home-series/" to "Yeni Eklenen Diziler",
-        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/" to "Tavsiye Filmler",
-        "${mainUrl}/load/page/1/imdb7/" to "IMDB 7+ Filmler",
-        "${mainUrl}/load/page/1/mostLiked/" to "En Çok Beğenilenler",
-        "${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/" to "Aile Filmleri",
-        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/" to "Aksiyon Filmleri",
-        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/" to "Animasyon Filmleri",
-        "${mainUrl}/load/page/1/genres/belgesel-filmlerini-izle-1/" to "Belgesel Filmleri",
-        "${mainUrl}/load/page/1/genres/bilim-kurgu-filmlerini-izleyin-3/" to "Bilim Kurgu Filmleri",
-        "${mainUrl}/load/page/1/genres/komedi-filmlerini-izleyin-1/" to "Komedi Filmleri",
-        "${mainUrl}/load/page/1/genres/korku-filmlerini-izle-4/" to "Korku Filmleri",
-        "${mainUrl}/load/page/1/genres/romantik-filmleri-izle-2/" to "Romantik Filmleri"
-    )
-
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // Update page number in URL
-        val url = if (page == 1) {
-            request.data
-                .replace("/load/page/1/genres/", "/tur/")
-                .replace("/load/page/1/categories/", "/category/")
-                .replace("/load/page/1/imdb7/", "/imdb-7-puan-uzeri-filmler/")
-        } else {
-            request.data
-                .replace("/page/1/", "/page/${page}/")
-        }
-
-        // Send API request
-        val response = app.get(url, headers = standardHeaders, referer = mainUrl)
-
-        // Return empty list if response is not successful
-        if (response.text.contains("Sayfa Bulunamadı")) {
-            Log.d("HDFC", "Sayfa bulunamadı: $url")
-            return newHomePageResponse(request.name, emptyList())
-        }
-
-        try {
-            // Parse JSON response
-            val hdfc: HDFC = objectMapper.readValue(response.text)
-            val document = Jsoup.parse(hdfc.html)
-
-            Log.d("HDFC", "Kategori ${request.name} için ${document.select("a").size} sonuç bulundu")
-
-            // Convert film/series cards to SearchResponse list
-            val results = document.select("a").mapNotNull { it.toSearchResult() }
-
-            return newHomePageResponse(request.name, results)
-        } catch (e: Exception) {
-            Log.e("HDFC", "JSON parse hatası (${request.name}): ${e.message}")
-            return newHomePageResponse(request.name, emptyList())
-        }
-    }
-
-    private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.attr("title")
-            .takeIf { it.isNotEmpty() }
-            ?.trim()
-            ?: this.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: return null
-
-        val href = fixUrlNull(this.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(
-            this.selectFirst("img[data-src], img[src]")?.attr("data-src")
-                ?: this.selectFirst("img")?.attr("src")
-        )
-
-        // Year
-        val yearText = this.selectFirst(".poster-meta span")?.text()?.trim()
-        val year = yearText?.toIntOrNull()
-
-        // IMDb Score
-        val scoreText = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
-        val score = scoreText?.toFloatOrNull()
-
-        // Dub/Sub info
-        val dubSubText = this.selectFirst(".poster-lang span")?.text()?.trim()
-
-        // Determine which labels to show
-        val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
-        val hasSub = dubSubText?.contains("Altyazı", ignoreCase = true) == true
-
-        val tvType = if (this.attr("href").contains("/dizi/", ignoreCase = true)
-            || this.attr("href").contains("/series", ignoreCase = true)
-            || this.attr("href").contains("home-series", ignoreCase = true)
-        ) TvType.TvSeries else TvType.Movie
-
-        return newMovieSearchResponse(title, href, tvType) {
-            this.posterUrl = posterUrl
-            this.year = year
-        }
-    }
-
-    override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
-
-    override suspend fun search(query: String): List<SearchResponse> {
-        val response = app.get(
-            "${mainUrl}/search?q=${query}",
-            headers = mapOf("X-Requested-With" to "fetch")
-        ).parsedSafe<Results>() ?: return emptyList()
-
-        val searchResults = mutableListOf<SearchResponse>()
-
-        response.results.forEach { resultHtml ->
-            val document = Jsoup.parse(resultHtml)
-
-            val title = document.selectFirst("h4.title")?.text() ?: return@forEach
-            val href = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
-            val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src"))
-                ?: fixUrlNull(document.selectFirst("img")?.attr("data-src"))
-
-            searchResults.add(
-                newMovieSearchResponse(title, href, TvType.Movie) {
-                    this.posterUrl = posterUrl?.replace("/thumb/", "/list/")
-                }
-            )
-        }
-
-        return searchResults
-    }
-
-    override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
-
-        val title = document.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle")
-            ?: return null
-
-        val poster = fixUrlNull(
-            document.selectFirst("img.lazyload, img[data-src]")?.attr("data-src")
-                ?: document.selectFirst("img[src]")?.attr("src")
-        )
-
-        // Year
-        val yearText = document.selectFirst(".poster-meta span")?.text()?.trim()
-        val year = yearText?.toIntOrNull()
-
-        // IMDb Score
-        val scoreText = document.selectFirst(".imdb, .popover-rating p")?.text()
-            ?.substringBefore("(")?.trim()
-        val score = scoreText?.toFloatOrNull()
-
-        // Description
-        val description = document.selectFirst(".popover-description, article.post-info-content > p")
-            ?.text()?.replace("Özet", "")?.trim()
-
-        // Genres
-        val genresText = document.selectFirst(".popover-meta span:matchesOwn(Türler)")
-            ?.parent()?.ownText()?.trim()
-        val tags = genresText?.split(",")?.map { it.trim() } ?: emptyList()
-
-        // Determine type (Movie or Series)
-        val typeText = document.selectFirst(".popover-meta span:matchesOwn(Kategori)")
-            ?.parent()?.ownText()?.lowercase()
-        val tvType = when {
-            typeText?.contains("dizi") == true -> TvType.TvSeries
-            else -> TvType.Movie
-        }
-
-        // Actors
-        val actors = document.select("div.post-info-cast a").map {
-            val name = it.selectFirst("strong")?.text() ?: it.text()
-            val image = fixUrlNull(it.selectFirst("img")?.attr("data-src"))
-            Actor(name, image)
-        }
-
-        // Recommendations
-        val recommendations = document.select("div.section-slider-container div.slider-slide").mapNotNull {
-            val recName = it.selectFirst("a")?.attr("title") ?: return@mapNotNull null
-            val recHref = fixUrlNull(it.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
-            val recPosterUrl = fixUrlNull(it.selectFirst("img")?.attr("data-src"))
-                ?: fixUrlNull(it.selectFirst("img")?.attr("src"))
-
-            newTvSeriesSearchResponse(recName, recHref, TvType.TvSeries) {
-                this.posterUrl = recPosterUrl
-            }
-        }
-
-        // Trailer
-        val trailer = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")
-            ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
-
-        // Construct final response
-        return if (tvType == TvType.TvSeries) {
-            val episodes = document.select("div.seasons-tab-content a").mapNotNull {
-                val epName = it.selectFirst("h4")?.text()?.trim() ?: return@mapNotNull null
-                val epHref = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
-                val epEpisode = Regex("""(\d+)\. ?Bölüm""").find(epName)?.groupValues?.get(1)?.toIntOrNull()
-                val epSeason = Regex("""(\d+)\. ?Sezon""").find(epName)?.groupValues?.get(1)?.toIntOrNull() ?: 1
-
-                newEpisode(epHref) {
-                    this.name = epName
-                    this.season = epSeason
-                    this.episode = epEpisode
-                }
-            }
-
-            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
-                this.year = year
-                this.plot = description
-                this.tags = tags
-                this.score = Score.from10(score)
-                this.recommendations = recommendations
-                addActors(actors)
-                addTrailer(trailer)
-            }
-        } else {
-            newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = poster
-                this.year = year
-                this.plot = description
-                this.tags = tags
-                this.score = Score.from10(score)
-                this.recommendations = recommendations
-                addActors(actors)
-                addTrailer(trailer)
-            }
-        }
-    }
-
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
-        
-        Log.d("HDFC", "Starting loadLinks for: $data")
-        
-        // Extract the main iframe source - FIXED: Look for both player types
-        val closePlayerSrc = document.selectFirst(".close")?.attr("data-src")
-        val rapidramePlayerSrc = document.selectFirst(".rapidrame")?.attr("data-src")
-        
-        Log.d("HDFC", "Close player src: $closePlayerSrc")
-        Log.d("HDFC", "Rapidrame player src: $rapidramePlayerSrc")
-
-        // Process Close Player if available
-        if (!closePlayerSrc.isNullOrEmpty()) {
-            val iframeSrc = fixUrlNull(closePlayerSrc)
-            if (iframeSrc != null) {
-                Log.d("HDFC", "Processing Close player: $iframeSrc")
-                handleClosePlayer(iframeSrc, subtitleCallback, callback)
-            }
-        }
-
-        // Process Rapidrame Player if available  
-        if (!rapidramePlayerSrc.isNullOrEmpty()) {
-            val iframeSrc = fixUrlNull(rapidramePlayerSrc)
-            if (iframeSrc != null) {
-                Log.d("HDFC", "Processing Rapidrame player: $iframeSrc")
-                handleRapidramePlayer(iframeSrc, subtitleCallback, callback)
-            }
-        }
-
-        // If no players found, try alternative methods
-        if (closePlayerSrc.isNullOrEmpty() && rapidramePlayerSrc.isNullOrEmpty()) {
-            Log.d("HDFC", "No player iframes found, trying direct extraction")
-            extractDirectVideoSources(document, callback)
-        }
-
-        // Also process alternative links from the main page
-        Log.d("HDFC", "Processing alternative links")
-        processAlternativeLinks(document, data, subtitleCallback, callback)
-
-        return true
-    }
-
-    private suspend fun handleClosePlayer(
-        iframeUrl: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        try {
-            Log.d("HDFC", "Loading Close player iframe: $iframeUrl")
-            val iframeDoc = app.get(iframeUrl, referer = mainUrl).document
-
-            // Extract subtitles
-            iframeDoc.select("track[kind=captions]")
-                .filter { it.attr("srclang") != "forced" }
-                .forEach { track ->
-                    val lang = track.attr("srclang").let {
-                        when (it) {
-                            "tr" -> "Türkçe"
-                            "en" -> "İngilizce"
-                            "fr" -> "Fransızca"
-                            "pt" -> "Portekizce"
-                            else -> it
-                        }
-                    }
-                    val subUrl = fixUrlNull(track.attr("src"))
-                    if (!subUrl.isNullOrEmpty()) {
-                        Log.d("HDFC", "Found subtitle: $lang - $subUrl")
-                        subtitleCallback(SubtitleFile(lang, subUrl))
-                    }
-                }
-
-            // Extract video source - FIXED: Better extraction methods
-            extractVideoFromClosePlayer(iframeDoc, iframeUrl, subtitleCallback, callback)
+private suspend fun extractVideoFromClosePlayer(
+    iframeDoc: org.jsoup.nodes.Document,
+    iframeUrl: String,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+) {
+    Log.d("HDFC", "Extracting video from Close player")
+    
+    // Method 1: Extract from obfuscated JavaScript (MAIN FIX)
+    val scripts = iframeDoc.select("script")
+    var foundVideo = false
+    
+    scripts.forEach { script ->
+        val scriptContent = script.data()
+        if (scriptContent.isNotEmpty() && scriptContent.contains("eval(function(p,a,c,k,e,d)")) {
+            Log.d("HDFC", "Found obfuscated script, attempting to extract real video URL")
             
-        } catch (e: Exception) {
-            Log.e("HDFC", "Error handling Close player: ${e.message}")
-        }
-    }
-
-    private suspend fun extractVideoFromClosePlayer(
-        iframeDoc: org.jsoup.nodes.Document,
-        iframeUrl: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        Log.d("HDFC", "Extracting video from Close player")
-        
-        // Method 1: Look for JSON-LD schema with contentUrl (NEW)
-        val jsonLdScript = iframeDoc.select("script[type='application/ld+json']").firstOrNull()
-        if (jsonLdScript != null) {
-            try {
-                val jsonLdText = jsonLdScript.data()
-                Log.d("HDFC", "Found JSON-LD schema: $jsonLdText")
-                
-                val contentUrlRegex = Regex(""""contentUrl"\s*:\s*"([^"]+)"""")
-                val contentUrlMatch = contentUrlRegex.find(jsonLdText)
-                if (contentUrlMatch != null) {
-                    val videoUrl = contentUrlMatch.groupValues[1]
-                    Log.d("HDFC", "Found contentUrl in JSON-LD: $videoUrl")
-                    
-                    if (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4")) {
+            // Extract the packed JavaScript code
+            val packedScript = extractPackedScript(scriptContent)
+            if (packedScript != null) {
+                // Try to decode the packed script to find video URLs
+                val decodedUrls = decodePackedScript(packedScript)
+                decodedUrls.forEach { videoUrl ->
+                    if (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4") || videoUrl.contains("master.")) {
+                        Log.d("HDFC", "Found real video URL from obfuscated script: $videoUrl")
                         callback.invoke(
                             newExtractorLink(
-                                name = "Close Player (JSON-LD)",
+                                name = "Close Player (Real)",
                                 url = videoUrl,
                                 source = "Close"
                             )
                         )
-                        return
+                        foundVideo = true
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("HDFC", "Error parsing JSON-LD: ${e.message}")
             }
         }
+    }
 
-        // Method 2: Look for master.m3u8 or master.txt in scripts (IMPROVED)
-        val scripts = iframeDoc.select("script")
-        var foundVideo = false
-        
+    // Method 2: Look for base64 encoded URLs in the obfuscated script
+    if (!foundVideo) {
         scripts.forEach { script ->
             val scriptContent = script.data()
             if (scriptContent.isNotEmpty()) {
-                // Look for master.m3u8 or master.txt URLs
-                val masterUrls = Regex("""https?://[^\s"']+/(master\.(m3u8|txt))[^\s"']*""").findAll(scriptContent)
-                masterUrls.forEach { match ->
-                    val videoUrl = match.value
-                    Log.d("HDFC", "Found master URL in script: $videoUrl")
-                    
-                    callback.invoke(
-                        newExtractorLink(
-                            name = "Close Player (HLS)",
-                            url = videoUrl,
-                            source = "Close"
-                        )
-                    )
-                    foundVideo = true
-                }
-
-                // Look for base64 encoded URLs (IMPROVED)
-                val base64Regex = Regex("""["']([A-Za-z0-9+/=]{20,})["']""")
-                val base64Matches = base64Regex.findAll(scriptContent)
+                // Look for base64 encoded video URLs in the obfuscated script
+                val base64Patterns = listOf(
+                    Regex("""file_link\s*=\s*["']([A-Za-z0-9+/=]+)["']"""),
+                    Regex("""["']([A-Za-z0-9+/=]{20,})["']""")
+                )
                 
-                base64Matches.forEach { match ->
-                    val base64Data = match.groupValues[1]
-                    try {
-                        val decodedUrl = base64Decode(base64Data)
-                        if (decodedUrl.isNotEmpty() && (decodedUrl.contains(".m3u8") || decodedUrl.contains(".mp4"))) {
-                            Log.d("HDFC", "Found base64 decoded URL: $decodedUrl")
+                base64Patterns.forEach { pattern ->
+                    val matches = pattern.findAll(scriptContent)
+                    matches.forEach { match ->
+                        val base64Data = match.groupValues[1]
+                        try {
+                            val decodedUrl = base64Decode(base64Data)
+                            if (decodedUrl.isNotEmpty() && (decodedUrl.contains(".m3u8") || decodedUrl.contains(".mp4"))) {
+                                Log.d("HDFC", "Found base64 decoded URL: $decodedUrl")
+                                callback.invoke(
+                                    newExtractorLink(
+                                        name = "Close Player (Base64)",
+                                        url = decodedUrl,
+                                        source = "Close"
+                                    )
+                                )
+                                foundVideo = true
+                            }
+                        } catch (e: Exception) {
+                            Log.e("HDFC", "Error decoding base64: ${e.message}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Method 3: Look for direct URLs in script content
+    if (!foundVideo) {
+        scripts.forEach { script ->
+            val scriptContent = script.data()
+            if (scriptContent.isNotEmpty()) {
+                // Look for direct m3u8/master.txt URLs
+                val urlPatterns = listOf(
+                    Regex("""https?://[^\s"']+\.m3u8[^\s"']*"""),
+                    Regex("""https?://[^\s"']+/master\.(m3u8|txt)[^\s"']*"""),
+                    Regex("""https?://[^\s"']+\.mp4[^\s"']*""")
+                )
+                
+                urlPatterns.forEach { pattern ->
+                    val matches = pattern.findAll(scriptContent)
+                    matches.forEach { match ->
+                        val videoUrl = match.value
+                        if (!videoUrl.contains("hls8.playmix.uno")) { // Skip the fake URL
+                            Log.d("HDFC", "Found direct video URL in script: $videoUrl")
                             callback.invoke(
                                 newExtractorLink(
-                                    name = "Close Player (Base64)",
-                                    url = decodedUrl,
+                                    name = "Close Player (Direct)",
+                                    url = videoUrl,
                                     source = "Close"
                                 )
                             )
                             foundVideo = true
                         }
-                    } catch (e: Exception) {
-                        // Ignore base64 decode errors
                     }
                 }
             }
         }
+    }
 
-        // Method 3: Look for video elements (FALLBACK)
-        if (!foundVideo) {
-            val videoElements = iframeDoc.select("video")
-            videoElements.forEach { video ->
-                val src = video.attr("src")
-                if (src.isNotEmpty()) {
-                    Log.d("HDFC", "Found video element src: $src")
+    // Method 4: Try to extract from the iframe URL pattern
+    if (!foundVideo) {
+        try {
+            // Extract the video ID from iframe URL
+            val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
+            if (videoId.isNotEmpty() && videoId != iframeUrl) {
+                // Try common CDN patterns with the actual video ID
+                val cdnPatterns = listOf(
+                    "https://srv10.cdnimages1241.sbs/hls/",
+                    "https://srv11.cdnimages1241.sbs/hls/", 
+                    "https://srv12.cdnimages1241.sbs/hls/",
+                    "https://cdn.hdfilmcehennemi.mobi/hls/"
+                )
+                
+                cdnPatterns.forEach { cdnBase ->
+                    val potentialUrl = "$cdnBase$videoId/master.m3u8"
+                    Log.d("HDFC", "Trying CDN pattern: $potentialUrl")
+                    // We'll let the extractor try this URL
                     callback.invoke(
                         newExtractorLink(
-                            name = "Close Player (Video)",
-                            url = fixUrlNull(src) ?: src,
+                            name = "Close Player (CDN Pattern)",
+                            url = potentialUrl,
                             source = "Close"
                         )
                     )
-                    foundVideo = true
+                }
+                foundVideo = true
+            }
+        } catch (e: Exception) {
+            Log.e("HDFC", "Error extracting from iframe pattern: ${e.message}")
+        }
+    }
+
+    // Method 5: Use loadExtractor as last resort
+    if (!foundVideo) {
+        Log.d("HDFC", "No direct video found, trying loadExtractor")
+        loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback) { link ->
+            callback.invoke(link)
+        }
+    }
+}
+
+/**
+ * Extract the packed JavaScript code from the eval function
+ */
+private fun extractPackedScript(scriptContent: String): String? {
+    return try {
+        // Look for the packed code inside eval(function(p,a,c,k,e,d){...})
+        val packedRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{[^}]+\}\((.*?)\)\)""", RegexOption.DOT_MATCHES_ALL)
+        val match = packedRegex.find(scriptContent)
+        match?.groupValues?.get(1)
+    } catch (e: Exception) {
+        Log.e("HDFC", "Error extracting packed script: ${e.message}")
+        null
+    }
+}
+
+/**
+ * Simple decoding of common packed JavaScript patterns to find URLs
+ */
+private fun decodePackedScript(packedScript: String): List<String> {
+    val urls = mutableListOf<String>()
+    
+    try {
+        // Method 1: Look for URL patterns in the packed script
+        val urlPatterns = listOf(
+            Regex("""https?://[^,"']+\.(m3u8|mp4|txt)"""),
+            Regex("""(srv\d+\.cdnimages\d+\.sbs[^,"']*)"""),
+            Regex("""(hls\d+\.playmix\.uno[^,"']*)"""),
+            Regex("""(rapidrame\.com[^,"']*)""")
+        )
+        
+        urlPatterns.forEach { pattern ->
+            val matches = pattern.findAll(packedScript)
+            matches.forEach { match ->
+                var url = match.value
+                // Ensure it's a full URL
+                if (!url.startsWith("http")) {
+                    url = "https://$url"
+                }
+                if (url.contains(".m3u8") || url.contains(".mp4") || url.contains("master.")) {
+                    urls.add(url)
                 }
             }
         }
-
-        // Method 4: Use loadExtractor as last resort
-        if (!foundVideo) {
-            Log.d("HDFC", "No direct video found, trying loadExtractor")
-            loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback) { link ->
-                callback.invoke(link)
-            }
-        }
-    }
-
-    private suspend fun handleRapidramePlayer(
-        iframeUrl: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        try {
-            Log.d("HDFC", "Loading Rapidrame player iframe: $iframeUrl")
-            val iframeDoc = app.get(iframeUrl, referer = "$mainUrl/").document
-            
-            // Extract subtitles from JSON config
-            extractSubtitlesFromRapidrame(iframeDoc, subtitleCallback)
-            
-            // Extract video sources
-            extractVideoFromRapidrame(iframeDoc, iframeUrl, subtitleCallback, callback)
-            
-        } catch (e: Exception) {
-            Log.e("HDFC", "Error handling Rapidrame player: ${e.message}")
-        }
-    }
-
-    private suspend fun extractSubtitlesFromRapidrame(
-        iframeDoc: org.jsoup.nodes.Document,
-        subtitleCallback: (SubtitleFile) -> Unit
-    ) {
-        val scriptContent = iframeDoc.toString()
-        val tracksRegex = Regex("""tracks\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
-        val tracksMatch = tracksRegex.find(scriptContent)
         
-        if (tracksMatch != null) {
-            val tracksJson = "[${tracksMatch.groupValues[1]}]"
+        // Method 2: Look for base64 patterns in packed script
+        val base64Regex = Regex("""["']([A-Za-z0-9+/=]{20,})["']""")
+        val base64Matches = base64Regex.findAll(packedScript)
+        
+        base64Matches.forEach { match ->
+            val base64Data = match.groupValues[1]
             try {
-                Log.d("HDFC", "Found subtitle tracks JSON: $tracksJson")
-                val subtitles: List<SubtitleTrack> = objectMapper.readValue(tracksJson)
-                subtitles.forEach { track ->
-                    val lang = when (track.language) {
-                        "en" -> "İngilizce"
-                        "tr" -> if (track.label?.contains("Forced") == true) "Forced" else "Türkçe"
-                        else -> track.language ?: "Unknown"
-                    }
-                    if (lang != "Forced") {
-                        val subUrl = if (track.file?.startsWith("/") == true) {
-                            "$mainUrl${track.file}"
-                        } else {
-                            track.file
-                        }
-                        subUrl?.let {
-                            Log.d("HDFC", "Found subtitle: $lang - $it")
-                            subtitleCallback(SubtitleFile(lang, it))
-                        }
+                val decoded = base64Decode(base64Data)
+                if (decoded.contains("http") && (decoded.contains(".m3u8") || decoded.contains(".mp4"))) {
+                    // Extract URL from decoded string
+                    val urlMatch = Regex("""https?://[^\s"']+""").find(decoded)
+                    urlMatch?.value?.let { url ->
+                        urls.add(url)
                     }
                 }
             } catch (e: Exception) {
-                Log.e("HDFC", "Error parsing subtitle tracks: ${e.message}")
+                // Ignore base64 decode errors
             }
         }
-    }
-
-    private suspend fun extractVideoFromRapidrame(
-        iframeDoc: org.jsoup.nodes.Document,
-        iframeUrl: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        Log.d("HDFC", "Extracting video from Rapidrame player")
-        val scriptContent = iframeDoc.toString()
-        var foundVideo = false
         
-        // Method 1: Extract master.m3u8 from scripts (NEW)
-        val masterM3u8Regex = Regex("""https?://[^\s"']+\.rapidrame\.com[^\s"']*master\.m3u8[^\s"']*""")
-        val masterMatch = masterM3u8Regex.find(scriptContent)
-        
-        if (masterMatch != null) {
-            val videoUrl = masterMatch.value
-            Log.d("HDFC", "Found Rapidrame master.m3u8: $videoUrl")
-            callback.invoke(
-                newExtractorLink(
-                    name = "Rapidrame Player (HLS)",
-                    url = videoUrl,
-                    source = "Rapidrame"
-                )
-            )
-            foundVideo = true
-        }
-
-        // Method 2: Extract from JWPlayer sources (IMPROVED)
-        if (!foundVideo) {
-            val sourceRegex = Regex("""sources\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
-            val sourceMatch = sourceRegex.find(scriptContent)
-            
-            if (sourceMatch != null) {
-                val sourcesJson = "[${sourceMatch.groupValues[1]}]"
-                try {
-                    Log.d("HDFC", "Found video sources JSON: $sourcesJson")
-                    val sources: List<VideoSource> = objectMapper.readValue(sourcesJson)
-                    sources.forEach { source ->
-                        source.file?.let { fileUrl ->
-                            Log.d("HDFC", "Found Rapidrame video: $fileUrl")
-                            callback.invoke(
-                                newExtractorLink(
-                                    name = "Rapidrame Player",
-                                    url = fileUrl,
-                                    source = "Rapidrame"
-                                )
-                            )
-                            foundVideo = true
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("HDFC", "Error parsing video sources: ${e.message}")
-                }
-            }
-        }
-
-        // Method 3: Look for m3u8 URLs in scripts
-        if (!foundVideo) {
-            val scripts = iframeDoc.select("script")
-            scripts.forEach { script ->
-                val scriptData = script.data()
-                if (scriptData.isNotEmpty()) {
-                    val m3u8Urls = Regex("""https?://[^\s"']+\.m3u8[^\s"']*""").findAll(scriptData)
-                    m3u8Urls.forEach { match ->
-                        val videoUrl = match.value
-                        if (videoUrl.contains("rapidrame") || videoUrl.contains("hls")) {
-                            Log.d("HDFC", "Found Rapidrame m3u8: $videoUrl")
-                            callback.invoke(
-                                newExtractorLink(
-                                    name = "Rapidrame Player (HLS)",
-                                    url = videoUrl,
-                                    source = "Rapidrame"
-                                )
-                            )
-                            foundVideo = true
-                        }
-                    }
-                }
-            }
-        }
-
-        // Method 4: Use loadExtractor as fallback
-        if (!foundVideo) {
-            Log.d("HDFC", "No direct video found in Rapidrame, trying loadExtractor")
-            loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback) { link ->
-                callback.invoke(link)
-            }
-        }
+    } catch (e: Exception) {
+        Log.e("HDFC", "Error decoding packed script: ${e.message}")
     }
+    
+    return urls.distinct()
+}
 
-    private suspend fun extractDirectVideoSources(
-        document: org.jsoup.nodes.Document,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        Log.d("HDFC", "Trying direct video extraction from page")
-        
-        // Look for video elements directly in the page
-        val videoElements = document.select("video")
-        videoElements.forEach { video ->
-            val src = video.attr("src")
-            if (src.isNotEmpty()) {
-                Log.d("HDFC", "Found direct video element: $src")
-                callback.invoke(
-                    newExtractorLink(
-                        name = "Direct Video",
-                        url = fixUrlNull(src) ?: src,
-                        source = "Direct"
-                    )
-                )
-            }
-        }
+private fun base64Decode(encoded: String): String {
+    return try {
+        String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
+    } catch (e: Exception) {
+        Log.e("HDFC", "Base64 decode error: ${e.message}")
+        ""
     }
-
-    private suspend fun processAlternativeLinks(
-        document: org.jsoup.nodes.Document,
-        data: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val alternativeLinks = document.select("div.alternative-links")
-        Log.d("HDFC", "Found ${alternativeLinks.size} alternative link containers")
-        
-        alternativeLinks.map { element ->
-            element to element.attr("data-lang").uppercase()
-        }.forEach { (element, langCode) ->
-            val buttons = element.select("button.alternative-link")
-            Log.d("HDFC", "Found ${buttons.size} buttons for lang: $langCode")
-            
-            buttons.map { button ->
-                button.text().replace("(HDrip Xbet)", "").trim() + " $langCode" to button.attr("data-video")
-            }.forEach { (source, videoID) ->
-                try {
-                    Log.d("HDFC", "Processing alternative link: $source -> $videoID")
-                    val apiResponse = app.get(
-                        "${mainUrl}/video/$videoID/",
-                        headers = mapOf(
-                            "Content-Type" to "application/json",
-                            "X-Requested-With" to "fetch"
-                        ),
-                        referer = data
-                    ).text
-
-                    var iframe = Regex("""data-src=\\"([^"]+)""").find(apiResponse)?.groupValues?.get(1)
-                        ?.replace("\\", "") ?: return@forEach
-
-                    if (iframe.contains("?rapidrame_id=")) {
-                        iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
-                    }
-
-                    Log.d("HDFC", "Alternative link iframe: $iframe")
-                    
-                    // Load the iframe and extract video
-                    loadVideoFromIframe(source, iframe, data, subtitleCallback, callback)
-                } catch (e: Exception) {
-                    Log.e("HDFC", "Error processing alternative link $source: ${e.message}")
-                }
-            }
-        }
-    }
-
-    private suspend fun loadVideoFromIframe(
-        source: String,
-        iframeUrl: String,
-        referer: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        try {
-            Log.d("HDFC", "Loading video from iframe: $iframeUrl")
-            val iframeDoc = app.get(iframeUrl, referer = referer).document
-            
-            // Look for video sources in the iframe
-            val videoSources = iframeDoc.select("source[src]")
-            videoSources.forEach { sourceElement ->
-                val videoUrl = fixUrlNull(sourceElement.attr("src"))
-                videoUrl?.let { url ->
-                    Log.d("HDFC", "Found video source in iframe: $url")
-                    callback.invoke(
-                        newExtractorLink(
-                            name = source,
-                            url = url,
-                            source = source
-                        )
-                    )
-                }
-            }
-
-            // Also check for video elements
-            val videoElements = iframeDoc.select("video[src]")
-            videoElements.forEach { videoElement ->
-                val videoUrl = fixUrlNull(videoElement.attr("src"))
-                videoUrl?.let { url ->
-                    Log.d("HDFC", "Found video element in iframe: $url")
-                    callback.invoke(
-                        newExtractorLink(
-                            name = source,
-                            url = url,
-                            source = source
-                        )
-                    )
-                }
-            }
-            
-            // If no direct video found, try to extract from scripts
-            if (videoSources.isEmpty() && videoElements.isEmpty()) {
-                if (iframeUrl.contains("hdfilmcehennemi.mobi")) {
-                    extractVideoFromClosePlayer(iframeDoc, iframeUrl, subtitleCallback, callback)
-                } else if (iframeUrl.contains("rplayer")) {
-                    extractVideoFromRapidrame(iframeDoc, iframeUrl, subtitleCallback, callback)
-                } else {
-                    // Try loadExtractor as last resort
-                    Log.d("HDFC", "No direct video found in iframe, trying loadExtractor")
-                    loadExtractor(iframeUrl, referer, subtitleCallback) { link ->
-                        callback.invoke(link)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("HDFC", "Error loading video from iframe: ${e.message}")
-        }
-    }
-
-    private fun base64Decode(encoded: String): String {
-        return try {
-            String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
-        } catch (e: Exception) {
-            Log.e("HDFC", "Base64 decode error: ${e.message}")
-            ""
-        }
-    }
-
-    // Data classes for JSON parsing
-    data class Results(
-        @JsonProperty("results") val results: List<String> = arrayListOf()
-    )
-
-    data class HDFC(
-        @JsonProperty("html") val html: String,
-        @JsonProperty("meta") val meta: Meta
-    )
-
-    data class Meta(
-        @JsonProperty("title") val title: String,
-        @JsonProperty("canonical") val canonical: Boolean,
-        @JsonProperty("keywords") val keywords: Boolean
-    )
-
-    data class SubtitleTrack(
-        @JsonProperty("file") val file: String? = null,
-        @JsonProperty("label") val label: String? = null,
-        @JsonProperty("language") val language: String? = null,
-        @JsonProperty("kind") val kind: String? = null,
-        @JsonProperty("default") val default: Boolean? = null
-    )
-
-    data class VideoSource(
-        @JsonProperty("file") val file: String? = null,
-        @JsonProperty("type") val type: String? = null
-    )
 }
