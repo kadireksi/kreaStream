@@ -66,12 +66,33 @@ class HDFilmCehennemi : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data.replace("/page/1/", "/page/$page/")
-        val html = app.get(url).text
-        val json = mapper.readValue<HDFC>(html)
-        val doc = Jsoup.parse(json.html)
 
+        // Critical headers to bypass CloudFlare
+        val headers = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "Accept" to "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to mainUrl + "/"
+        )
+
+        val response = app.get(url, headers = headers, referer = mainUrl, timeout = 30)
+
+        // If response is HTML → blocked
+        if (response.text.startsWith("<")) {
+            throw ErrorLoadingException("Blocked by CloudFlare or site down. Try changing mainUrl to .nl or .date")
+        }
+
+        val json = try {
+            mapper.readValue<HDFC>(response.text)
+        } catch (e: Exception) {
+            throw ErrorLoadingException("Invalid JSON response: ${e.message}")
+        }
+
+        val doc = Jsoup.parse(json.html)
         val items = doc.select("a").mapNotNull { it.toSearchResponse() }
-        return newHomePageResponse(request.name, items)
+
+        return newHomePageResponse(request.name, items, hasNextPage = page < 10)
     }
 
     private fun Element.toSearchResponse(): SearchResponse? {
