@@ -36,6 +36,22 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.io.IOException
 
+private inline fun <reified T> okhttp3.Response.tryParseJson(): T? {
+    return try {
+        val mapper = jacksonObjectMapper().apply {
+            registerModule(KotlinModule())
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        }
+        body?.string()?.let { mapper.readValue(it, T::class.java) }
+    } catch (e: IOException) {
+        e.printStackTrace()
+        null
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
     override var name = "HDFC"
@@ -172,21 +188,6 @@ class Hdfc : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    private inline fun <reified T> okhttp3.Response.tryParseJson(): T? {
-        return try {
-            val mapper = jacksonObjectMapper().apply {
-                registerModule(KotlinModule())
-                configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            }
-            body?.string()?.let { mapper.readValue(it, T::class.java) }
-        } catch (e: IOException) {
-            e.printStackTrace()
-            null
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
 
     override suspend fun search(query: String): List<SearchResponse> {
         val response = app.get(
