@@ -370,7 +370,7 @@ class Hdfc : MainAPI() {
                 }
 
             // Extract video source using multiple methods
-            extractVideoFromClosePlayer(iframeDoc, callback)
+            extractVideoFromClosePlayer(iframeDoc, subtitleCallback, callback)
             
         } catch (e: Exception) {
             Log.e("HDFC", "Error handling Close player: ${e.message}")
@@ -379,6 +379,7 @@ class Hdfc : MainAPI() {
 
     private suspend fun extractVideoFromClosePlayer(
         iframeDoc: org.jsoup.nodes.Document,
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
         Log.d("HDFC", "Extracting video from Close player")
@@ -526,7 +527,7 @@ class Hdfc : MainAPI() {
             extractSubtitlesFromRapidrame(iframeDoc, subtitleCallback)
             
             // Extract video sources
-            extractVideoFromRapidrame(iframeDoc, callback)
+            extractVideoFromRapidrame(iframeDoc, subtitleCallback, callback)
             
         } catch (e: Exception) {
             Log.e("HDFC", "Error handling Rapidrame player: ${e.message}")
@@ -572,6 +573,7 @@ class Hdfc : MainAPI() {
 
     private suspend fun extractVideoFromRapidrame(
         iframeDoc: org.jsoup.nodes.Document,
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
         Log.d("HDFC", "Extracting video from Rapidrame player")
@@ -630,7 +632,7 @@ class Hdfc : MainAPI() {
         if (sourceMatch == null) {
             Log.d("HDFC", "No direct video found in Rapidrame, trying loadExtractor")
             val iframeUrl = iframeDoc.location()
-            loadExtractor(iframeUrl, "$mainUrl/", {}) { link ->
+            loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback) { link ->
                 callback.invoke(link)
             }
         }
@@ -698,7 +700,7 @@ class Hdfc : MainAPI() {
                     Log.d("HDFC", "Alternative link iframe: $iframe")
                     
                     // Load the iframe and extract video
-                    loadVideoFromIframe(source, iframe, data, callback)
+                    loadVideoFromIframe(source, iframe, data, subtitleCallback, callback)
                 } catch (e: Exception) {
                     Log.e("HDFC", "Error processing alternative link $source: ${e.message}")
                 }
@@ -710,6 +712,7 @@ class Hdfc : MainAPI() {
         source: String,
         iframeUrl: String,
         referer: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
         try {
@@ -751,13 +754,13 @@ class Hdfc : MainAPI() {
             // If no direct video found, try to extract from scripts
             if (videoSources.isEmpty() && videoElements.isEmpty()) {
                 if (iframeUrl.contains("hdfilmcehennemi.mobi")) {
-                    extractVideoFromClosePlayer(iframeDoc, callback)
+                    extractVideoFromClosePlayer(iframeDoc, subtitleCallback, callback)
                 } else if (iframeUrl.contains("rplayer")) {
-                    extractVideoFromRapidrame(iframeDoc, callback)
+                    extractVideoFromRapidrame(iframeDoc, subtitleCallback, callback)
                 } else {
                     // Try loadExtractor as last resort
                     Log.d("HDFC", "No direct video found in iframe, trying loadExtractor")
-                    loadExtractor(iframeUrl, referer, {}) { link ->
+                    loadExtractor(iframeUrl, referer, subtitleCallback) { link ->
                         callback.invoke(link)
                     }
                 }
