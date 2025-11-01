@@ -31,6 +31,7 @@ import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.ErrorLoadingException
 import com.lagradost.cloudstream3.utils.Qualities
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -67,26 +68,23 @@ class HDFilmCehennemi : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data.replace("/page/1/", "/page/$page/")
 
-        // Critical headers to bypass CloudFlare
         val headers = mapOf(
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept" to "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
             "X-Requested-With" to "XMLHttpRequest",
             "Referer" to mainUrl + "/"
         )
 
         val response = app.get(url, headers = headers, referer = mainUrl, timeout = 30)
 
-        // If response is HTML → blocked
         if (response.text.startsWith("<")) {
-            throw ErrorLoadingException("Blocked by CloudFlare or site down. Try changing mainUrl to .nl or .date")
+            throw ErrorLoadingException("Site blocked. Try changing mainUrl to .nl or .date")
         }
 
         val json = try {
             mapper.readValue<HDFC>(response.text)
         } catch (e: Exception) {
-            throw ErrorLoadingException("Invalid JSON response: ${e.message}")
+            throw ErrorLoadingException("Failed to parse JSON: ${e.message}")
         }
 
         val doc = Jsoup.parse(json.html)
