@@ -17,13 +17,17 @@ class Hdfilmcehennemi : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
+    // --------------------------------------------------------------------- //
     // JSON mapper
+    // --------------------------------------------------------------------- //
     private val mapper = com.fasterxml.jackson.databind.ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     }
 
+    // --------------------------------------------------------------------- //
     // MAIN PAGE
+    // --------------------------------------------------------------------- //
     override val mainPage = mainPageOf(
         "$mainUrl/load/page/1/home/" to "Yeni Filmler",
         "$mainUrl/load/page/1/home-series/" to "Yeni Diziler",
@@ -54,7 +58,9 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
+    // --------------------------------------------------------------------- //
     // SEARCH
+    // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val resp = app.get("$mainUrl/search?q=$query").parsedSafe<Results>() ?: return emptyList()
         return resp.results.mapNotNull { html ->
@@ -66,7 +72,9 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
+    // --------------------------------------------------------------------- //
     // LOAD (detail)
+    // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
         val doc = app.get(url).document
 
@@ -108,7 +116,9 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
+    // --------------------------------------------------------------------- //
     // LINK EXTRACTION – newExtractorLink DSL
+    // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -164,7 +174,7 @@ class Hdfilmcehennemi : MainAPI() {
                 subtitleCallback(SubtitleFile(lang, subUrl))
             }
 
-            // JW Player JS
+            // JW Player JS (packed)
             val script = iframeDoc.selectFirst("script:containsData(playerInstance)")?.data()
                 ?: return@forEach
             val unpacked = getAndUnpack(script)
@@ -187,7 +197,9 @@ class Hdfilmcehennemi : MainAPI() {
         return true
     }
 
+    // --------------------------------------------------------------------- //
     // JSON MODELS
+    // --------------------------------------------------------------------- //
     data class Results(@JsonProperty("results") val results: List<String>)
     data class HDFC(@JsonProperty("html") val html: String)
 }
