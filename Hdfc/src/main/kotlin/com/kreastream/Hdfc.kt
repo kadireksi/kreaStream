@@ -31,6 +31,7 @@ import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import okhttp3.Interceptor
+import okhttp3.Response
 import com.lagradost.nicehttp.NiceResponse
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
