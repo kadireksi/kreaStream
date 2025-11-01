@@ -134,13 +134,15 @@ class Hdfilmcehennemi : MainAPI() {
             val master = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/master.txt"
 
             callback(
-                newExtractorLink {
-                    source = name
-                    name = "Close (1080p)"
+                newExtractorLink (
+                    source = fileName,
+                    name = "Close (1080p)",
                     url = master
-                    referer = mainUrl
-                    type = ExtractorLinkType.M3U8
-                    quality = Qualities.Unknown.value
+                ){
+                    this.referer = mainUrl
+                    this.type = ExtractorLinkType.M3U8
+                    this.quality = Qualities.Unknown.value
+                    this.headers = mapOf("Origin" to mainUrl)
                 }
             )
         }
@@ -181,14 +183,15 @@ class Hdfilmcehennemi : MainAPI() {
 
             Regex("""file\s*:\s*["']([^"']+)["']""").find(unpacked)?.groupValues?.get(1)?.let { hlsUrl ->
                 callback(
-                    newExtractorLink {
-                        source = name
-                        name = sourceName
+                    newExtractorLink (
+                        source = fileName,
+                        name = sourceName,
                         url = hlsUrl
-                        referer = iframe
-                        type = ExtractorLinkType.M3U8
-                        quality = Qualities.Unknown.value
-                        headers = mapOf("Origin" to mainUrl)
+                    ){
+                        this.referer = iframe
+                        this.type = ExtractorLinkType.M3U8
+                        this.quality = Qualities.Unknown.value
+                        this.headers = mapOf("Origin" to mainUrl)
                     }
                 )
             }
