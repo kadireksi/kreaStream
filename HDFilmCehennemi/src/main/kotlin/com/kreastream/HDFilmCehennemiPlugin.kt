@@ -1,9 +1,12 @@
 package com.kreastream
 
-import com.lagradost.cloudstream3.APIHolder
-import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
+import android.content.Context
 
-class HdfilmcehennemiPlugin : APIHolder() {
-    override val mainApi: MainAPI = Hdfilmcehennemi()
-    override val name = "HDFilmCehennemi"
+@CloudstreamPlugin
+class HDFilmCehennemiPlugin: Plugin() {
+    override fun load(context: Context) {
+        registerMainAPI(HDFilmCehennemi())
+    }
 }
