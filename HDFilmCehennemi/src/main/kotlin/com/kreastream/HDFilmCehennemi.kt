@@ -166,7 +166,6 @@ class HDFilmCehennemi : MainAPI() {
                     url = master
                 ){
                     this.referer = mainUrl
-                    this.type = ExtractorLinkType.M3U8
                     this.quality = Qualities.Unknown.value
                     this.headers = mapOf("Origin" to mainUrl)
                 }
@@ -215,7 +214,6 @@ class HDFilmCehennemi : MainAPI() {
                         url = hlsUrl
                     ){
                         this.referer = iframe
-                        this.type = ExtractorLinkType.M3U8
                         this.quality = Qualities.Unknown.value
                         this.headers = mapOf("Origin" to mainUrl)
                     }
