@@ -408,13 +408,13 @@ private suspend fun extractVideoFromClosePlayer(
     val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
     
     if (exactTitle != null && videoId.isNotEmpty()) {
-        // Construct the exact URL pattern based on browser downloader result
+        // Keep the exact title format - don't remove "mp4" from the middle
         val normalizedTitle = exactTitle
             .lowercase()
             .replace(" ", "")
-            .replace("[^a-z0-9-]".toRegex(), "")
+            // Don't remove any characters except spaces - keep "mp4" in the title
         
-        // Try the exact pattern from browser downloader
+        // The exact URL pattern based on browser downloader result
         val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
         
         callback(newExtractorLink(
@@ -424,22 +424,22 @@ private suspend fun extractVideoFromClosePlayer(
         ))
         foundVideo = true
         
-        // Also try other server numbers and patterns
-        val servers = listOf("srv10", "srv11", "srv12", "srv13")
-        val domains = listOf("cdnimages1332.sbs", "cdnimages1241.sbs", "cdnimages1331.sbs")
+        // Also try other server numbers and domain patterns
+        val servers = listOf("srv10", "srv11", "srv12")
+        val domains = listOf("1332", "1241", "1331", "1333")
         
         servers.forEach { server ->
             domains.forEach { domain ->
                 val patterns = listOf(
-                    "https://$server.$domain/hls/$normalizedTitle-$videoId.mp4/txt/master.txt",
-                    "https://$server.$domain/hls/$normalizedTitle-$videoId.mp4/master.txt",
-                    "https://$server.$domain/hls/$normalizedTitle-$videoId/master.m3u8"
+                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt",
+                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/master.txt",
+                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId/master.m3u8"
                 )
                 
                 patterns.forEach { patternUrl ->
-                    if (patternUrl != exactUrl) { // Don't duplicate the exact URL
+                    if (patternUrl != exactUrl) {
                         callback(newExtractorLink(
-                            name = "Close Player (Pattern)",
+                            name = "Close Player",
                             url = patternUrl,
                             source = "Close"
                         ))
@@ -449,17 +449,17 @@ private suspend fun extractVideoFromClosePlayer(
         }
     }
 
-    // Method 2: Look for base64 encoded real URLs in obfuscated scripts
+    // Method 2: Look for URLs in obfuscated scripts
     if (!foundVideo) {
         val scripts = iframeDoc.select("script")
         scripts.forEach { script ->
             val scriptContent = script.data()
             if (scriptContent.isNotEmpty() && scriptContent.contains("eval(function(p,a,c,k,e,d)")) {
-                val realUrls = extractRealUrlsFromObfuscatedScript(scriptContent)
+                val realUrls = extractRealUrlsFromObfuscatedScript(scriptContent, exactTitle, videoId)
                 realUrls.forEach { url ->
                     if (url.contains("cdnimages") && !url.contains("hls8.playmix.uno")) {
                         callback(newExtractorLink(
-                            name = "Close Player (Obfuscated)",
+                            name = "Close Player (Script)",
                             url = url,
                             source = "Close"
                         ))
@@ -479,48 +479,44 @@ private suspend fun extractVideoFromClosePlayer(
 /**
  * Extract real video URLs from the obfuscated JavaScript
  */
-private fun extractRealUrlsFromObfuscatedScript(scriptContent: String): List<String> {
+private fun extractRealUrlsFromObfuscatedScript(
+    scriptContent: String, 
+    exactTitle: String?, 
+    videoId: String
+): List<String> {
     val urls = mutableListOf<String>()
     
     try {
+        // If we have the exact title and video ID, construct the most likely URL first
+        if (exactTitle != null) {
+            val normalizedTitle = exactTitle
+                .lowercase()
+                .replace(" ", "")
+            
+            // This should be the exact match
+            val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
+            urls.add(exactUrl)
+        }
+        
         // Look for CDN domains in the obfuscated script
         val cdnPatterns = listOf(
             Regex("""cdnimages\d+\.sbs"""),
-            Regex("""srv\d+\.cdnimages\d+\.sbs"""),
-            Regex("""https?://srv\d+\.cdnimages\d+\.sbs[^"']*""")
+            Regex("""srv\d+\.cdnimages\d+\.sbs""")
         )
         
         cdnPatterns.forEach { pattern ->
             val matches = pattern.findAll(scriptContent)
             matches.forEach { match ->
-                var url = match.value
-                if (!url.startsWith("http")) {
-                    // Construct full URL from domain pattern
-                    url = "https://$url/hls/"
+                val domain = match.value
+                if (exactTitle != null) {
+                    val normalizedTitle = exactTitle
+                        .lowercase()
+                        .replace(" ", "")
+                    
+                    // Construct URLs using the found domain
+                    urls.add("https://$domain/hls/$normalizedTitle-$videoId.mp4/txt/master.txt")
+                    urls.add("https://$domain/hls/$normalizedTitle-$videoId.mp4/master.txt")
                 }
-                if (url.contains("cdnimages")) {
-                    urls.add(url)
-                }
-            }
-        }
-        
-        // Look for base64 encoded real URLs
-        val base64Regex = Regex("""["']([A-Za-z0-9+/=]{30,})["']""")
-        val base64Matches = base64Regex.findAll(scriptContent)
-        
-        base64Matches.forEach { match ->
-            val base64Data = match.groupValues[1]
-            try {
-                val decoded = base64Decode(base64Data)
-                if (decoded.contains("cdnimages") && decoded.contains(".m3u8")) {
-                    // Extract the URL part
-                    val urlMatch = Regex("""https?://[^\s"']+""").find(decoded)
-                    urlMatch?.value?.let { url ->
-                        urls.add(url)
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore base64 decode errors
             }
         }
         
