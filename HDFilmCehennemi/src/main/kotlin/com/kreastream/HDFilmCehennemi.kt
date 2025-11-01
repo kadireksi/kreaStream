@@ -1,39 +1,13 @@
 package com.kreastream
 
-import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.lagradost.cloudstream3.Actor
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.Score
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import okhttp3.Interceptor
-import okhttp3.Response
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import java.net.URI
 
 class Hdfilmcehennemi : MainAPI() {
     override var name = "HDFilmCehennemi"
@@ -43,7 +17,9 @@ class Hdfilmcehennemi : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // Jackson JSON mapper
+    // --------------------------------------------------------------------- //
+    // JSON mapper
+    // --------------------------------------------------------------------- //
     private val mapper = com.fasterxml.jackson.databind.ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -71,8 +47,8 @@ class Hdfilmcehennemi : MainAPI() {
 
     private fun Element.toSearchResponse(): SearchResponse? {
         val title = attr("title").ifEmpty { selectFirst("strong.poster-title")?.text() }?.trim() ?: return null
-        val href = fixUrl(attr("href")) ?: return null
-        val poster = fixUrl(selectFirst("img")?.attr("data-src") ?: selectFirst("img")?.attr("src")) ?: return null
+        val href = fixUrlNull(attr("href")) ?: return null
+        val poster = fixUrlNull(selectFirst("img")?.attr("data-src") ?: selectFirst("img")?.attr("src")) ?: return null
         val year = selectFirst(".poster-meta span")?.text()?.toIntOrNull()
         val tvType = if (href.contains("/dizi/") || href.contains("/series")) TvType.TvSeries else TvType.Movie
 
@@ -90,8 +66,8 @@ class Hdfilmcehennemi : MainAPI() {
         return resp.results.mapNotNull { html ->
             val doc = Jsoup.parse(html)
             val title = doc.selectFirst("h4.title")?.text() ?: return@mapNotNull null
-            val href = fixUrl(doc.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
-            val poster = fixUrl(doc.selectFirst("img")?.attr("src")) ?: return@mapNotNull null
+            val href = fixUrlNull(doc.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
+            val poster = fixUrlNull(doc.selectFirst("img")?.attr("src")) ?: return@mapNotNull null
             newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = poster }
         }
     }
@@ -104,7 +80,7 @@ class Hdfilmcehennemi : MainAPI() {
 
         val title = doc.selectFirst("strong.poster-title")?.text()
             ?: doc.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
-        val poster = fixUrl(doc.selectFirst("img.lazyload")?.attr("data-src")
+        val poster = fixUrlNull(doc.selectFirst("img.lazyload")?.attr("data-src")
             ?: doc.selectFirst("img")?.attr("src")) ?: return null
         val year = doc.selectFirst(".poster-meta span")?.text()?.toIntOrNull()
         val plot = doc.selectFirst(".popover-description, article.post-info-content > p")?.text()?.trim()
@@ -115,18 +91,28 @@ class Hdfilmcehennemi : MainAPI() {
         if (isSeries) {
             val episodes = doc.select("div.seasons-tab-content a").mapNotNull {
                 val name = it.selectFirst("h4")?.text() ?: return@mapNotNull null
-                val href = fixUrl(it.attr("href")) ?: return@mapNotNull null
+                val href = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
                 val season = Regex("""(\d+)\. Sezon""").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 1
                 val episode = Regex("""(\d+)\. Bölüm""").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                newEpisode(href) { this.name = name; this.season = season; this.episode = episode }
+                newEpisode(href) {
+                    this.name = name
+                    this.season = season
+                    this.episode = episode
+                }
             }
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster; this.year = year; this.plot = plot; this.tags = tags
+                this.posterUrl = poster
+                this.year = year
+                this.plot = plot
+                this.tags = tags
             }
         }
 
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            this.posterUrl = poster; this.year = year; this.plot = plot; this.tags = tags
+            this.posterUrl = poster
+            this.year = year
+            this.plot = plot
+            this.tags = tags
         }
     }
 
