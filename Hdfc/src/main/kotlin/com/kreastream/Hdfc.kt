@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import okhttp3.Response
+import java.io.IOException
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.Actor
 import com.lagradost.cloudstream3.HomePageResponse
@@ -30,6 +33,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.parseHtmlToElement
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
@@ -171,6 +175,22 @@ class Hdfc : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
+    private inline fun <reified T> Response.tryParseJson(): T? {
+        return try {
+            val mapper = jacksonObjectMapper().apply {
+                registerModule(KotlinModule())
+                configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            }
+            body?.string()?.let { mapper.readValue(it, T::class.java) }
+        } catch (e: IOException) {
+            e.printStackTrace()
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     override suspend fun search(query: String): List<SearchResponse> {
         val response = app.get(
             "${mainUrl}/search?q=${query}",
@@ -182,10 +202,10 @@ class Hdfc : MainAPI() {
         response.results.forEach { resultHtml ->
             val document = Jsoup.parse(resultHtml)
 
-            val title = document.selectFirst("h4.title")?.text() ?: return@forEach
-            val href = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
-            val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src"))
-                ?: fixUrlNull(document.selectFirst("img")?.attr("data-src"))
+            val title = document.select("h4.title").first()?.text() ?: return@forEach
+            val href = fixUrlNull(document.select("a").first()?.attr("href")) ?: return@forEach
+            val posterUrl = fixUrlNull(document.select("img").first()?.attr("src"))
+                ?: fixUrlNull(document.select("img").first()?.attr("data-src"))
 
             searchResults.add(
                 newMovieSearchResponse(title, href, TvType.Movie) {
