@@ -31,18 +31,18 @@ import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import okhttp3.Interceptor
-import okhttp3.Response
+import com.lagradost.nicehttp.NiceResponse
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.io.IOException
 
-private inline fun <reified T> parseJsonResponse(response: okhttp3.Response): T? {
+private inline fun <reified T> parseJsonResponse(response: NiceResponse): T? {
     return try {
         val mapper = jacksonObjectMapper().apply {
             registerModule(KotlinModule())
             configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         }
-        response.body?.string()?.let { mapper.readValue(it, T::class.java) }
+        response.text?.let { mapper.readValue(it, T::class.java) }
     } catch (e: IOException) {
         e.printStackTrace()
         null
