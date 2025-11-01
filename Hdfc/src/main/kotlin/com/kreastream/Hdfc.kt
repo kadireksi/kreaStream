@@ -411,8 +411,7 @@ class Hdfc : MainAPI() {
                             newExtractorLink(
                                 name = "Close Player (JSON-LD)",
                                 url = videoUrl,
-                                source = "Close",
-                                quality = "1080p"
+                                source = "Close"
                             )
                         )
                         return
@@ -440,8 +439,7 @@ class Hdfc : MainAPI() {
                         newExtractorLink(
                             name = "Close Player (HLS)",
                             url = videoUrl,
-                            source = "Close",
-                            quality = "1080p"
+                            source = "Close"
                         )
                     )
                     foundVideo = true
@@ -461,8 +459,7 @@ class Hdfc : MainAPI() {
                                 newExtractorLink(
                                     name = "Close Player (Base64)",
                                     url = decodedUrl,
-                                    source = "Close",
-                                    quality = "1080p"
+                                    source = "Close"
                                 )
                             )
                             foundVideo = true
@@ -580,8 +577,7 @@ class Hdfc : MainAPI() {
                 newExtractorLink(
                     name = "Rapidrame Player (HLS)",
                     url = videoUrl,
-                    source = "Rapidrame",
-                    quality = "1080p"
+                    source = "Rapidrame"
                 )
             )
             foundVideo = true
