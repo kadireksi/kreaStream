@@ -310,27 +310,34 @@ class Hdfc : MainAPI() {
         
         Log.d("HDFC", "Starting loadLinks for: $data")
         
-        // Extract the main iframe source
-        val iframeSrc = fixUrlNull(
-            document.selectFirst(".close")?.attr("data-src")
-                ?: document.selectFirst(".rapidrame")?.attr("data-src")
-        )
+        // Extract the main iframe source - FIXED: Look for both player types
+        val closePlayerSrc = document.selectFirst(".close")?.attr("data-src")
+        val rapidramePlayerSrc = document.selectFirst(".rapidrame")?.attr("data-src")
+        
+        Log.d("HDFC", "Close player src: $closePlayerSrc")
+        Log.d("HDFC", "Rapidrame player src: $rapidramePlayerSrc")
 
-        Log.d("HDFC", "Found iframe source: $iframeSrc")
-
-        if (iframeSrc != null) {
-            if (iframeSrc.contains("hdfilmcehennemi.mobi")) {
-                // Handle Close player
-                Log.d("HDFC", "Processing Close player")
+        // Process Close Player if available
+        if (!closePlayerSrc.isNullOrEmpty()) {
+            val iframeSrc = fixUrlNull(closePlayerSrc)
+            if (iframeSrc != null) {
+                Log.d("HDFC", "Processing Close player: $iframeSrc")
                 handleClosePlayer(iframeSrc, subtitleCallback, callback)
-            } else if (iframeSrc.contains("rplayer")) {
-                // Handle Rapidrame player
-                Log.d("HDFC", "Processing Rapidrame player")
+            }
+        }
+
+        // Process Rapidrame Player if available  
+        if (!rapidramePlayerSrc.isNullOrEmpty()) {
+            val iframeSrc = fixUrlNull(rapidramePlayerSrc)
+            if (iframeSrc != null) {
+                Log.d("HDFC", "Processing Rapidrame player: $iframeSrc")
                 handleRapidramePlayer(iframeSrc, subtitleCallback, callback)
             }
-        } else {
-            Log.d("HDFC", "No iframe source found, trying direct extraction")
-            // Try direct extraction from the page
+        }
+
+        // If no players found, try alternative methods
+        if (closePlayerSrc.isNullOrEmpty() && rapidramePlayerSrc.isNullOrEmpty()) {
+            Log.d("HDFC", "No player iframes found, trying direct extraction")
             extractDirectVideoSources(document, callback)
         }
 
@@ -349,7 +356,6 @@ class Hdfc : MainAPI() {
         try {
             Log.d("HDFC", "Loading Close player iframe: $iframeUrl")
             val iframeDoc = app.get(iframeUrl, referer = mainUrl).document
-            val baseUri = iframeDoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
 
             // Extract subtitles
             iframeDoc.select("track[kind=captions]")
@@ -359,18 +365,20 @@ class Hdfc : MainAPI() {
                         when (it) {
                             "tr" -> "Türkçe"
                             "en" -> "İngilizce"
+                            "fr" -> "Fransızca"
+                            "pt" -> "Portekizce"
                             else -> it
                         }
                     }
-                    val subUrl = track.attr("src").let { src ->
-                        if (src.startsWith("http")) src else "$baseUri/$src".replace("//", "/")
+                    val subUrl = fixUrlNull(track.attr("src"))
+                    if (!subUrl.isNullOrEmpty()) {
+                        Log.d("HDFC", "Found subtitle: $lang - $subUrl")
+                        subtitleCallback(SubtitleFile(lang, subUrl))
                     }
-                    Log.d("HDFC", "Found subtitle: $lang - $subUrl")
-                    subtitleCallback(SubtitleFile(lang, subUrl))
                 }
 
-            // Extract video source using multiple methods
-            extractVideoFromClosePlayer(iframeDoc, subtitleCallback, callback)
+            // Extract video source - FIXED: Better extraction methods
+            extractVideoFromClosePlayer(iframeDoc, iframeUrl, subtitleCallback, callback)
             
         } catch (e: Exception) {
             Log.e("HDFC", "Error handling Close player: ${e.message}")
@@ -379,135 +387,115 @@ class Hdfc : MainAPI() {
 
     private suspend fun extractVideoFromClosePlayer(
         iframeDoc: org.jsoup.nodes.Document,
+        iframeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
         Log.d("HDFC", "Extracting video from Close player")
         
-        // Method 1: Look for video URLs in script tags
+        // Method 1: Look for JSON-LD schema with contentUrl (NEW)
+        val jsonLdScript = iframeDoc.select("script[type='application/ld+json']").firstOrNull()
+        if (jsonLdScript != null) {
+            try {
+                val jsonLdText = jsonLdScript.data()
+                Log.d("HDFC", "Found JSON-LD schema: $jsonLdText")
+                
+                val contentUrlRegex = Regex(""""contentUrl"\s*:\s*"([^"]+)"""")
+                val contentUrlMatch = contentUrlRegex.find(jsonLdText)
+                if (contentUrlMatch != null) {
+                    val videoUrl = contentUrlMatch.groupValues[1]
+                    Log.d("HDFC", "Found contentUrl in JSON-LD: $videoUrl")
+                    
+                    if (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4")) {
+                        callback.invoke(
+                            newExtractorLink(
+                                name = "Close Player (JSON-LD)",
+                                url = videoUrl,
+                                source = "Close",
+                                quality = "1080p"
+                            )
+                        )
+                        return
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HDFC", "Error parsing JSON-LD: ${e.message}")
+            }
+        }
+
+        // Method 2: Look for master.m3u8 or master.txt in scripts (IMPROVED)
         val scripts = iframeDoc.select("script")
-        Log.d("HDFC", "Found ${scripts.size} script tags")
+        var foundVideo = false
         
         scripts.forEach { script ->
             val scriptContent = script.data()
             if (scriptContent.isNotEmpty()) {
-                Log.d("HDFC", "Checking script content: ${scriptContent.length} chars")
-                
-                // Look for base64 encoded video URLs
-                val base64Regex = Regex("""file_link\s*=\s*["']([^"']+)["']""")
-                val base64Match = base64Regex.find(scriptContent)
-                if (base64Match != null) {
-                    val base64Data = base64Match.groupValues[1]
-                    Log.d("HDFC", "Found base64 data: $base64Data")
-                    try {
-                        val decodedUrl = base64Decode(base64Data)
-                        Log.d("HDFC", "Decoded URL: $decodedUrl")
-                        if (decodedUrl.isNotEmpty()) {
-                            callback.invoke(
-                                newExtractorLink(
-                                    name = "Close Player",
-                                    url = decodedUrl,
-                                    source = "Close"
-                                )
-                            )
-                            return
-                        }
-                    } catch (e: Exception) {
-                        Log.e("HDFC", "Error decoding base64: ${e.message}")
-                    }
-                }
-                
-                // Look for m3u8 URLs
-                val m3u8Urls = Regex("""https?://[^\s"']+\.m3u8[^\s"']*""").findAll(scriptContent)
-                m3u8Urls.forEach { match ->
+                // Look for master.m3u8 or master.txt URLs
+                val masterUrls = Regex("""https?://[^\s"']+/(master\.(m3u8|txt))[^\s"']*""").findAll(scriptContent)
+                masterUrls.forEach { match ->
                     val videoUrl = match.value
-                    Log.d("HDFC", "Found m3u8 URL in script: $videoUrl")
+                    Log.d("HDFC", "Found master URL in script: $videoUrl")
+                    
                     callback.invoke(
                         newExtractorLink(
                             name = "Close Player (HLS)",
                             url = videoUrl,
-                            source = "Close"
+                            source = "Close",
+                            quality = "1080p"
                         )
                     )
+                    foundVideo = true
                 }
+
+                // Look for base64 encoded URLs (IMPROVED)
+                val base64Regex = Regex("""["']([A-Za-z0-9+/=]{20,})["']""")
+                val base64Matches = base64Regex.findAll(scriptContent)
                 
-                // Look for mp4 URLs
-                val mp4Urls = Regex("""https?://[^\s"']+\.mp4[^\s"']*""").findAll(scriptContent)
-                mp4Urls.forEach { match ->
-                    val videoUrl = match.value
-                    Log.d("HDFC", "Found mp4 URL in script: $videoUrl")
-                    callback.invoke(
-                        newExtractorLink(
-                            name = "Close Player (MP4)",
-                            url = videoUrl,
-                            source = "Close"
-                        )
-                    )
-                }
-                
-                // Look for JSON sources
-                val sourcesRegex = Regex("""sources\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
-                val sourcesMatch = sourcesRegex.find(scriptContent)
-                if (sourcesMatch != null) {
+                base64Matches.forEach { match ->
+                    val base64Data = match.groupValues[1]
                     try {
-                        val sourcesJson = "[${sourcesMatch.groupValues[1]}]"
-                        Log.d("HDFC", "Found JSON sources: $sourcesJson")
-                        val sources: List<VideoSource> = objectMapper.readValue(sourcesJson)
-                        sources.forEach { source ->
-                            source.file?.let { fileUrl ->
-                                Log.d("HDFC", "Found video source in JSON: $fileUrl")
-                                callback.invoke(
-                                    newExtractorLink(
-                                        name = "Close Player",
-                                        url = fileUrl,
-                                        source = "Close"
-                                    )
+                        val decodedUrl = base64Decode(base64Data)
+                        if (decodedUrl.isNotEmpty() && (decodedUrl.contains(".m3u8") || decodedUrl.contains(".mp4"))) {
+                            Log.d("HDFC", "Found base64 decoded URL: $decodedUrl")
+                            callback.invoke(
+                                newExtractorLink(
+                                    name = "Close Player (Base64)",
+                                    url = decodedUrl,
+                                    source = "Close",
+                                    quality = "1080p"
                                 )
-                            }
+                            )
+                            foundVideo = true
                         }
                     } catch (e: Exception) {
-                        Log.e("HDFC", "Error parsing JSON sources: ${e.message}")
+                        // Ignore base64 decode errors
                     }
                 }
             }
         }
 
-        // Method 2: Look for video elements
-        val videoElements = iframeDoc.select("video")
-        Log.d("HDFC", "Found ${videoElements.size} video elements")
-        videoElements.forEach { video ->
-            val src = video.attr("src")
-            if (src.isNotEmpty()) {
-                Log.d("HDFC", "Found video element src: $src")
-                callback.invoke(
-                    newExtractorLink(
-                        name = "Close Player (Video)",
-                        url = fixUrlNull(src) ?: src,
-                        source = "Close"
-                    )
-                )
-            }
-            
-            // Check for source tags inside video
-            video.select("source").forEach { source ->
-                val sourceSrc = source.attr("src")
-                if (sourceSrc.isNotEmpty()) {
-                    Log.d("HDFC", "Found source tag src: $sourceSrc")
+        // Method 3: Look for video elements (FALLBACK)
+        if (!foundVideo) {
+            val videoElements = iframeDoc.select("video")
+            videoElements.forEach { video ->
+                val src = video.attr("src")
+                if (src.isNotEmpty()) {
+                    Log.d("HDFC", "Found video element src: $src")
                     callback.invoke(
                         newExtractorLink(
-                            name = "Close Player (Source)",
-                            url = fixUrlNull(sourceSrc) ?: sourceSrc,
+                            name = "Close Player (Video)",
+                            url = fixUrlNull(src) ?: src,
                             source = "Close"
                         )
                     )
+                    foundVideo = true
                 }
             }
         }
 
-        // Method 3: Try to use loadExtractor for the iframe URL itself
-        if (scripts.isEmpty() && videoElements.isEmpty()) {
+        // Method 4: Use loadExtractor as last resort
+        if (!foundVideo) {
             Log.d("HDFC", "No direct video found, trying loadExtractor")
-            val iframeUrl = iframeDoc.location()
             loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback) { link ->
                 callback.invoke(link)
             }
@@ -527,7 +515,7 @@ class Hdfc : MainAPI() {
             extractSubtitlesFromRapidrame(iframeDoc, subtitleCallback)
             
             // Extract video sources
-            extractVideoFromRapidrame(iframeDoc, subtitleCallback, callback)
+            extractVideoFromRapidrame(iframeDoc, iframeUrl, subtitleCallback, callback)
             
         } catch (e: Exception) {
             Log.e("HDFC", "Error handling Rapidrame player: ${e.message}")
@@ -573,65 +561,89 @@ class Hdfc : MainAPI() {
 
     private suspend fun extractVideoFromRapidrame(
         iframeDoc: org.jsoup.nodes.Document,
+        iframeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
         Log.d("HDFC", "Extracting video from Rapidrame player")
         val scriptContent = iframeDoc.toString()
+        var foundVideo = false
         
-        // Method 1: Extract from JSON sources
-        val sourceRegex = Regex("""sources\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
-        val sourceMatch = sourceRegex.find(scriptContent)
+        // Method 1: Extract master.m3u8 from scripts (NEW)
+        val masterM3u8Regex = Regex("""https?://[^\s"']+\.rapidrame\.com[^\s"']*master\.m3u8[^\s"']*""")
+        val masterMatch = masterM3u8Regex.find(scriptContent)
         
-        if (sourceMatch != null) {
-            val sourcesJson = "[${sourceMatch.groupValues[1]}]"
-            try {
-                Log.d("HDFC", "Found video sources JSON: $sourcesJson")
-                val sources: List<VideoSource> = objectMapper.readValue(sourcesJson)
-                sources.forEach { source ->
-                    source.file?.let { fileUrl ->
-                        Log.d("HDFC", "Found Rapidrame video: $fileUrl")
-                        callback.invoke(
-                            newExtractorLink(
-                                name = "Rapidrame Player",
-                                url = fileUrl,
-                                source = "Rapidrame"
+        if (masterMatch != null) {
+            val videoUrl = masterMatch.value
+            Log.d("HDFC", "Found Rapidrame master.m3u8: $videoUrl")
+            callback.invoke(
+                newExtractorLink(
+                    name = "Rapidrame Player (HLS)",
+                    url = videoUrl,
+                    source = "Rapidrame",
+                    quality = "1080p"
+                )
+            )
+            foundVideo = true
+        }
+
+        // Method 2: Extract from JWPlayer sources (IMPROVED)
+        if (!foundVideo) {
+            val sourceRegex = Regex("""sources\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
+            val sourceMatch = sourceRegex.find(scriptContent)
+            
+            if (sourceMatch != null) {
+                val sourcesJson = "[${sourceMatch.groupValues[1]}]"
+                try {
+                    Log.d("HDFC", "Found video sources JSON: $sourcesJson")
+                    val sources: List<VideoSource> = objectMapper.readValue(sourcesJson)
+                    sources.forEach { source ->
+                        source.file?.let { fileUrl ->
+                            Log.d("HDFC", "Found Rapidrame video: $fileUrl")
+                            callback.invoke(
+                                newExtractorLink(
+                                    name = "Rapidrame Player",
+                                    url = fileUrl,
+                                    source = "Rapidrame"
+                                )
                             )
-                        )
+                            foundVideo = true
+                        }
                     }
+                } catch (e: Exception) {
+                    Log.e("HDFC", "Error parsing video sources: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.e("HDFC", "Error parsing video sources: ${e.message}")
             }
         }
 
-        // Method 2: Look for direct video URLs in scripts
-        val scripts = iframeDoc.select("script")
-        scripts.forEach { script ->
-            val scriptData = script.data()
-            if (scriptData.isNotEmpty()) {
-                // Look for m3u8 URLs
-                val m3u8Urls = Regex("""https?://[^\s"']+\.m3u8[^\s"']*""").findAll(scriptData)
-                m3u8Urls.forEach { match ->
-                    val videoUrl = match.value
-                    if (videoUrl.contains("rapidrame") || videoUrl.contains("hls")) {
-                        Log.d("HDFC", "Found Rapidrame m3u8: $videoUrl")
-                        callback.invoke(
-                            newExtractorLink(
-                                name = "Rapidrame Player (HLS)",
-                                url = videoUrl,
-                                source = "Rapidrame"
+        // Method 3: Look for m3u8 URLs in scripts
+        if (!foundVideo) {
+            val scripts = iframeDoc.select("script")
+            scripts.forEach { script ->
+                val scriptData = script.data()
+                if (scriptData.isNotEmpty()) {
+                    val m3u8Urls = Regex("""https?://[^\s"']+\.m3u8[^\s"']*""").findAll(scriptData)
+                    m3u8Urls.forEach { match ->
+                        val videoUrl = match.value
+                        if (videoUrl.contains("rapidrame") || videoUrl.contains("hls")) {
+                            Log.d("HDFC", "Found Rapidrame m3u8: $videoUrl")
+                            callback.invoke(
+                                newExtractorLink(
+                                    name = "Rapidrame Player (HLS)",
+                                    url = videoUrl,
+                                    source = "Rapidrame"
+                                )
                             )
-                        )
+                            foundVideo = true
+                        }
                     }
                 }
             }
         }
 
-        // Method 3: Try loadExtractor as fallback
-        if (sourceMatch == null) {
+        // Method 4: Use loadExtractor as fallback
+        if (!foundVideo) {
             Log.d("HDFC", "No direct video found in Rapidrame, trying loadExtractor")
-            val iframeUrl = iframeDoc.location()
             loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback) { link ->
                 callback.invoke(link)
             }
@@ -754,9 +766,9 @@ class Hdfc : MainAPI() {
             // If no direct video found, try to extract from scripts
             if (videoSources.isEmpty() && videoElements.isEmpty()) {
                 if (iframeUrl.contains("hdfilmcehennemi.mobi")) {
-                    extractVideoFromClosePlayer(iframeDoc, subtitleCallback, callback)
+                    extractVideoFromClosePlayer(iframeDoc, iframeUrl, subtitleCallback, callback)
                 } else if (iframeUrl.contains("rplayer")) {
-                    extractVideoFromRapidrame(iframeDoc, subtitleCallback, callback)
+                    extractVideoFromRapidrame(iframeDoc, iframeUrl, subtitleCallback, callback)
                 } else {
                     // Try loadExtractor as last resort
                     Log.d("HDFC", "No direct video found in iframe, trying loadExtractor")
