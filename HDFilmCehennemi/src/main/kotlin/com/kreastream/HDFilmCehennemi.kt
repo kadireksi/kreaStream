@@ -17,17 +17,13 @@ class Hdfilmcehennemi : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // --------------------------------------------------------------------- //
     // JSON mapper
-    // --------------------------------------------------------------------- //
     private val mapper = com.fasterxml.jackson.databind.ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     }
 
-    // --------------------------------------------------------------------- //
     // MAIN PAGE
-    // --------------------------------------------------------------------- //
     override val mainPage = mainPageOf(
         "$mainUrl/load/page/1/home/" to "Yeni Filmler",
         "$mainUrl/load/page/1/home-series/" to "Yeni Diziler",
@@ -58,9 +54,7 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
     // SEARCH
-    // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val resp = app.get("$mainUrl/search?q=$query").parsedSafe<Results>() ?: return emptyList()
         return resp.results.mapNotNull { html ->
@@ -72,9 +66,7 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
     // LOAD (detail)
-    // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
         val doc = app.get(url).document
 
@@ -116,9 +108,7 @@ class Hdfilmcehennemi : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    // LINK EXTRACTION – newExtractorLink DSL ONLY
-    // --------------------------------------------------------------------- //
+    // LINK EXTRACTION – newExtractorLink DSL
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -128,7 +118,7 @@ class Hdfilmcehennemi : MainAPI() {
 
         val doc = app.get(data).document
 
-        // === 1. CLOSE CDN – from poster filename ===
+        // 1. CLOSE CDN – from poster filename
         doc.selectFirst("img.poster-lazy, img.lazyload")?.attr("data-src")?.let { posterUrl ->
             val fileName = posterUrl.substringAfterLast("/")
             val master = "https://srv10.cdnimages1241.sbs/hls/$fileName/txt/master.txt"
@@ -145,7 +135,7 @@ class Hdfilmcehennemi : MainAPI() {
             )
         }
 
-        // === 2. RAPIDRAME JW-PLAYER (tokenised) ===
+        // 2. RAPIDRAME JW-PLAYER
         doc.select("button.alternative-link[data-video]").forEach { btn ->
             val videoId = btn.attr("data-video")
             val sourceName = btn.text().trim() + " (Rapidrame)"
@@ -161,7 +151,7 @@ class Hdfilmcehennemi : MainAPI() {
 
             val iframeDoc = app.get(iframe, referer = data).document
 
-            // --- Subtitles ---
+            // Subtitles
             iframeDoc.select("track[kind=captions]").forEach { track ->
                 val lang = when (track.attr("srclang")) {
                     "tr" -> "Türkçe"
@@ -174,7 +164,7 @@ class Hdfilmcehennemi : MainAPI() {
                 subtitleCallback(SubtitleFile(lang, subUrl))
             }
 
-            // --- JW Player JS (unpacked) ---
+            // JW Player JS
             val script = iframeDoc.selectFirst("script:containsData(playerInstance)")?.data()
                 ?: return@forEach
             val unpacked = getAndUnpack(script)
@@ -197,9 +187,7 @@ class Hdfilmcehennemi : MainAPI() {
         return true
     }
 
-    // --------------------------------------------------------------------- //
     // JSON MODELS
-    // --------------------------------------------------------------------- //
     data class Results(@JsonProperty("results") val results: List<String>)
     data class HDFC(@JsonProperty("html") val html: String)
 }
