@@ -36,13 +36,13 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.io.IOException
 
-private inline fun <reified T> okhttp3.Response.tryParseJson(): T? {
+private inline fun <reified T> parseJsonResponse(response: okhttp3.Response): T? {
     return try {
         val mapper = jacksonObjectMapper().apply {
             registerModule(KotlinModule())
             configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         }
-        body?.string()?.let { mapper.readValue(it, T::class.java) }
+        response.body?.string()?.let { mapper.readValue(it, T::class.java) }
     } catch (e: IOException) {
         e.printStackTrace()
         null
@@ -190,10 +190,12 @@ class Hdfc : MainAPI() {
 
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val response = app.get(
-            "${mainUrl}/search?q=${query}",
-            headers = mapOf("X-Requested-With" to "fetch")
-        ).tryParseJson<Results>() ?: return emptyList()
+        val response = parseJsonResponse<Results>(
+            app.get(
+                "${mainUrl}/search?q=${query}",
+                headers = mapOf("X-Requested-With" to "fetch")
+            )
+        ) ?: return emptyList()
 
         val searchResults = mutableListOf<SearchResponse>()
 
