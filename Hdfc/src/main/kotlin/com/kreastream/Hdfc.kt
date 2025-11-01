@@ -4,9 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import okhttp3.Response
-import java.io.IOException
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.Actor
 import com.lagradost.cloudstream3.HomePageResponse
@@ -33,11 +30,11 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.utils.parseHtmlToElement
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import java.io.IOException
 
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
