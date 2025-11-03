@@ -412,8 +412,7 @@ class Hdfc : MainAPI() {
         // Keep the exact title format - don't remove "mp4" from the middle
         val normalizedTitle = exactTitle
             .lowercase()
-            .replace(" ", "")
-            .add("mp4")
+            .replace(" ", "") + "mp4"
             // Don't remove any characters except spaces - keep "mp4" in the title
         
         // The exact URL pattern based on browser downloader result
