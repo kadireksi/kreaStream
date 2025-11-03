@@ -418,9 +418,10 @@ private suspend fun extractVideoFromClosePlayer(
             newExtractorLink(
                 name = "Close Player (HLS)",
                 url = masterUrl,
-                source = "Close",
-                referer = iframeUrl,  // REQUIRED
-                headers = mapOf(
+                source = "Close")
+                {
+                this.referer = iframeUrl
+                this.headers = mapOf(
                     "Origin" to "https://closeplayer.hdfilmcehennemi.mobi",
                     "Accept" to "*/*"
                 )
@@ -444,9 +445,11 @@ private suspend fun extractVideoFromClosePlayer(
                                 newExtractorLink(
                                     name = "Close (Unpacked)",
                                     url = url,
-                                    source = "Close",
-                                    referer = iframeUrl,
-                                    headers = mapOf("Origin" to "https://closeplayer.hdfilmcehennemi.mobi")
+                                    source = "Close")
+                                    {
+                                    this.referer = iframeUrl
+                                    this.headers = mapOf("Origin" to "https://closeplayer.hdfilmcehennemi.mobi")
+                                    }
                                 )
                             )
                             foundVideo = true
