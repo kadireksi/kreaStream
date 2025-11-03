@@ -403,6 +403,7 @@ class Hdfc : MainAPI() {
     // Method 1: Extract the exact title format from the iframe page
     val titleElement = iframeDoc.selectFirst("title")
     val exactTitle = titleElement?.text()?.substringBefore(".mp4")?.trim()
+    val exactTitle = exactTitle + "mp4"
     
     // Extract video ID from iframe URL
     val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
@@ -415,7 +416,7 @@ class Hdfc : MainAPI() {
             // Don't remove any characters except spaces - keep "mp4" in the title
         
         // The exact URL pattern based on browser downloader result
-        val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitlem"."mp4-$videoId.mp4/txt/master.txt"
+        val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
         
         callback(newExtractorLink(
             name = "Close Player (Exact)",
