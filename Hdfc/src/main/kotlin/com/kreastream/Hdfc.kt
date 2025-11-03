@@ -417,11 +417,12 @@ class Hdfc : MainAPI() {
                                 newExtractorLink(
                                     name = "Close Player (Direct)",
                                     url = videoUrl,
-                                    source = "Close",
-                                    referer = iframeUrl,
-                                    quality = Qualities.Unknown.value,
-                                    isM3u8 = videoUrl.contains(".m3u8")
-                                )
+                                    source = "Close"
+                                ){
+                                    this.referer = iframeUrl,
+                                    this.quality = Qualities.Unknown.value,
+                                    this.isM3u8 = videoUrl.contains(".m3u8")
+                                }
                             )
                             foundVideo = true
                         }
@@ -441,11 +442,12 @@ class Hdfc : MainAPI() {
                         newExtractorLink(
                             name = "Close Player (Data Source)",
                             url = fixUrlNull(videoUrl) ?: videoUrl,
-                            source = "Close", 
-                            referer = iframeUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = videoUrl.contains(".m3u8")
-                        )
+                            source = "Close"
+                        ){
+                            this.referer = iframeUrl,
+                            this.quality = Qualities.Unknown.value,
+                            this.isM3u8 = videoUrl.contains(".m3u8")
+                        }
                     )
                     foundVideo = true
                 }
@@ -471,11 +473,12 @@ class Hdfc : MainAPI() {
                             newExtractorLink(
                                 name = "Close Player (Pattern)",
                                 url = videoUrl,
-                                source = "Close",
-                                referer = iframeUrl,
-                                quality = Qualities.Unknown.value,
-                                isM3u8 = videoUrl.contains(".m3u8")
-                            )
+                                source = "Close"
+                            ){
+                                this.referer = iframeUrl,
+                                this.quality = Qualities.Unknown.value,
+                                this.isM3u8 = videoUrl.contains(".m3u8")
+                            }
                         )
                         foundVideo = true
                     }
@@ -565,11 +568,12 @@ class Hdfc : MainAPI() {
                                         newExtractorLink(
                                             name = "Close Player (Unpacked)",
                                             url = videoUrl,
-                                            source = "Close",
-                                            referer = iframeUrl,
-                                            quality = Qualities.Unknown.value,
-                                            isM3u8 = videoUrl.contains(".m3u8")
-                                        )
+                                            source = "Close"
+                                        ){
+                                            this.referer = iframeUrl,
+                                            this.quality = Qualities.Unknown.value,
+                                            this.isM3u8 = videoUrl.contains(".m3u8")
+                                        }
                                     )
                                     foundVideo = true
                                 }
@@ -626,11 +630,12 @@ class Hdfc : MainAPI() {
             callback(newExtractorLink(
                 name = "Rapidrame Player (HLS)",
                 url = videoUrl,
-                source = "Rapidrame",
-                referer = iframeUrl,
-                quality = Qualities.Unknown.value,
-                isM3u8 = true
-            ))
+                source = "Rapidrame"
+            ){
+                this.referer = iframeUrl,
+                this.quality = Qualities.Unknown.value,
+                this.isM3u8 = true
+            })
             foundVideo = true
         }
 
@@ -644,11 +649,12 @@ class Hdfc : MainAPI() {
                 callback(newExtractorLink(
                     name = "Rapidrame Player (MP4)",
                     url = videoUrl,
-                    source = "Rapidrame",
-                    referer = iframeUrl,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = false
-                ))
+                    source = "Rapidrame"
+                ){
+                    this.referer = iframeUrl,
+                    this.quality = Qualities.Unknown.value,
+                    this.isM3u8 = false
+                })
                 foundVideo = true
             }
         }
@@ -661,11 +667,12 @@ class Hdfc : MainAPI() {
                     callback(newExtractorLink(
                         name = "Rapidrame Player (Direct)",
                         url = fixUrlNull(src) ?: src,
-                        source = "Rapidrame",
-                        referer = iframeUrl,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = src.contains(".m3u8")
-                    ))
+                        source = "Rapidrame"
+                    ){
+                        this.referer = iframeUrl,
+                        this.quality = Qualities.Unknown.value,
+                        this.isM3u8 = src.contains(".m3u8")
+                    })
                     foundVideo = true
                 }
             }
@@ -689,9 +696,10 @@ class Hdfc : MainAPI() {
                 callback(newExtractorLink(
                     name = "Direct Video",
                     url = fixUrlNull(src) ?: src,
-                    source = "Direct",
-                    quality = Qualities.Unknown.value
-                ))
+                    source = "Direct"
+                ){
+                    this.quality = Qualities.Unknown.value
+                })
             }
         }
 
@@ -702,10 +710,11 @@ class Hdfc : MainAPI() {
                 callback(newExtractorLink(
                     name = "Direct Video Source",
                     url = fixUrlNull(src) ?: src,
-                    source = "Direct",
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
-                ))
+                    source = "Direct"
+                ){
+                    this.quality = Qualities.Unknown.value,
+                    this.isM3u8 = src.contains(".m3u8")
+                })
             }
         }
     }
@@ -770,10 +779,11 @@ class Hdfc : MainAPI() {
                     callback(newExtractorLink(
                         name = source,
                         url = url,
-                        source = source,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = url.contains(".m3u8")
-                    ))
+                        source = source
+                    ){
+                        this.quality = Qualities.Unknown.value,
+                        this.isM3u8 = url.contains(".m3u8")
+                    })
                 }
             }
 
@@ -785,10 +795,11 @@ class Hdfc : MainAPI() {
                     callback(newExtractorLink(
                         name = source,
                         url = url,
-                        source = source,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = url.contains(".m3u8")
-                    ))
+                        source = source
+                    ){
+                        this.quality = Qualities.Unknown.value,
+                        this.isM3u8 = url.contains(".m3u8")
+                    })
                 }
             }
             
