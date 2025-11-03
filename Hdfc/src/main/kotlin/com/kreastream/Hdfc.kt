@@ -495,7 +495,7 @@ private fun extractRealUrlsFromObfuscatedScript(
                 .replace(" ", "")
             
             // This should be the exact match
-            val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle"."mp4-$videoId.mp4/txt/master.txt"
+            val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
             //urls.add(exactUrl)
         }
         
@@ -515,7 +515,7 @@ private fun extractRealUrlsFromObfuscatedScript(
                         .replace(" ", "")
                     
                     // Construct URLs using the found domain
-                    urls.add("https://$domain/hls/$normalizedTitle"."mp4-$videoId.mp4/txt/master.txt")
+                    urls.add("https://$domain/hls/$normalizedTitle-$videoId.mp4/txt/master.txt")
                     //urls.add("https://$domain/hls/$normalizedTitle"."mp4-$videoId.mp4/master.txt")
                 }
             }
