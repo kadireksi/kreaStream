@@ -423,10 +423,14 @@ class Hdfc : MainAPI() {
                                 isM3u8 = videoUrl.contains(".m3u8")
                             }
                             callback(extractorLink)
-                                }
-                            )
                             foundVideo = true
                         }
+                    }
+                } catch (e: Exception) {
+                    // Continue to next method
+                }
+            }
+        }
                     }
                 } catch (e: Exception) {
                     // Continue to next method
@@ -518,18 +522,16 @@ class Hdfc : MainAPI() {
                             ), allowRedirects = false)
                             
                             if (testResponse.status in 200..299) {
-                                callback(
-                                    newExtractorLink(
-name = "Close Player (Dynamic)",
-                                        url = testUrl,
-                                        source = "Close"
-                                    ) {
-                                        referer = iframeUrl
-                                        quality = Qualities.Unknown.value
-                                        isM3u8 = testUrl.contains(".m3u8")
-                                    }
-                                    )
-                                )
+                                val link = newExtractorLink(
+                                    name = "Close Player (Dynamic)",
+                                    url = testUrl,
+                                    source = "Close"
+                                ) {
+                                    referer = iframeUrl
+                                    quality = Qualities.Unknown.value
+                                    isM3u8 = testUrl.contains(".m3u8")
+                                }
+                                callback(link)
                                 foundVideo = true
                                 return@forEach
                             }
@@ -567,17 +569,16 @@ name = "Close Player (Dynamic)",
                                 }
                                 
                                 if (videoUrl.isNotEmpty() && (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4"))) {
-                                    callback(
-newExtractorLink(
-                                            name = "Close Player (Unpacked)",
-                                            url = videoUrl,
-                                            source = "Close"
-                                        ) {
-                                            referer = iframeUrl
-                                            quality = Qualities.Unknown.value
-                                            isM3u8 = videoUrl.contains(".m3u8")
-                                        }
-                                    )
+                                    val link = newExtractorLink(
+                                        name = "Close Player (Unpacked)",
+                                        url = videoUrl,
+                                        source = "Close"
+                                    ) {
+                                        referer = iframeUrl
+                                        quality = Qualities.Unknown.value
+                                        isM3u8 = videoUrl.contains(".m3u8")
+                                    }
+                                    callback(link)
                                     foundVideo = true
                                 }
                             }
