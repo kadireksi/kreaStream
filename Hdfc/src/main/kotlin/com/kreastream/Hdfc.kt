@@ -346,7 +346,7 @@ class Hdfc : MainAPI() {
     ) {
         try {
             val iframeDoc = app.get(iframeUrl, referer = mainUrl, headers = mapOf(
-                "User-Agent" to standardHeaders["User-Agent"],
+                "User-Agent" to (standardHeaders["User-Agent"] as? String ?: ""),
                 "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language" to "en-US,en;q=0.5",
                 "Accept-Encoding" to "gzip, deflate, br",
@@ -419,9 +419,9 @@ class Hdfc : MainAPI() {
                                     url = videoUrl,
                                     source = "Close"
                                 ){
-                                    this.referer = iframeUrl,
-                                    this.quality = Qualities.Unknown.value,
-                                    this.isM3u8 = videoUrl.contains(".m3u8")
+                                    this.referer = iframeUrl;
+                                    this.quality = Qualities.Unknown.value;
+                                    this.isM3u8 = videoUrl.contains(".m3u8");
                                 }
                             )
                             foundVideo = true
@@ -444,9 +444,9 @@ class Hdfc : MainAPI() {
                             url = fixUrlNull(videoUrl) ?: videoUrl,
                             source = "Close"
                         ){
-                            this.referer = iframeUrl,
-                            this.quality = Qualities.Unknown.value,
-                            this.isM3u8 = videoUrl.contains(".m3u8")
+                            this.referer = iframeUrl;
+                            this.quality = Qualities.Unknown.value;
+                            this.isM3u8 = videoUrl.contains(".m3u8");
                         }
                     )
                     foundVideo = true
@@ -475,9 +475,9 @@ class Hdfc : MainAPI() {
                                 url = videoUrl,
                                 source = "Close"
                             ){
-                                this.referer = iframeUrl,
-                                this.quality = Qualities.Unknown.value,
-                                this.isM3u8 = videoUrl.contains(".m3u8")
+                                this.referer = iframeUrl;
+                                this.quality = Qualities.Unknown.value;
+                                this.isM3u8 = videoUrl.contains(".m3u8");
                             }
                         )
                         foundVideo = true
@@ -570,9 +570,9 @@ class Hdfc : MainAPI() {
                                             url = videoUrl,
                                             source = "Close"
                                         ){
-                                            this.referer = iframeUrl,
-                                            this.quality = Qualities.Unknown.value,
-                                            this.isM3u8 = videoUrl.contains(".m3u8")
+                                            this.referer = iframeUrl;
+                                            this.quality = Qualities.Unknown.value;
+                                            this.isM3u8 = videoUrl.contains(".m3u8");
                                         }
                                     )
                                     foundVideo = true
@@ -632,9 +632,9 @@ class Hdfc : MainAPI() {
                 url = videoUrl,
                 source = "Rapidrame"
             ){
-                this.referer = iframeUrl,
-                this.quality = Qualities.Unknown.value,
-                this.isM3u8 = true
+                this.referer = iframeUrl;
+                this.quality = Qualities.Unknown.value;
+                this.isM3u8 = true;
             })
             foundVideo = true
         }
@@ -651,9 +651,9 @@ class Hdfc : MainAPI() {
                     url = videoUrl,
                     source = "Rapidrame"
                 ){
-                    this.referer = iframeUrl,
-                    this.quality = Qualities.Unknown.value,
-                    this.isM3u8 = false
+                    this.referer = iframeUrl;
+                    this.quality = Qualities.Unknown.value;
+                    this.isM3u8 = false;
                 })
                 foundVideo = true
             }
@@ -669,9 +669,9 @@ class Hdfc : MainAPI() {
                         url = fixUrlNull(src) ?: src,
                         source = "Rapidrame"
                     ){
-                        this.referer = iframeUrl,
-                        this.quality = Qualities.Unknown.value,
-                        this.isM3u8 = src.contains(".m3u8")
+                        this.referer = iframeUrl;
+                        this.quality = Qualities.Unknown.value;
+                        this.isM3u8 = src.contains(".m3u8");
                     })
                     foundVideo = true
                 }
@@ -698,7 +698,7 @@ class Hdfc : MainAPI() {
                     url = fixUrlNull(src) ?: src,
                     source = "Direct"
                 ){
-                    this.quality = Qualities.Unknown.value
+                    this.quality = Qualities.Unknown.value;
                 })
             }
         }
@@ -712,8 +712,8 @@ class Hdfc : MainAPI() {
                     url = fixUrlNull(src) ?: src,
                     source = "Direct"
                 ){
-                    this.quality = Qualities.Unknown.value,
-                    this.isM3u8 = src.contains(".m3u8")
+                    this.quality = Qualities.Unknown.value;
+                    this.isM3u8 = src.contains(".m3u8");
                 })
             }
         }
@@ -781,8 +781,8 @@ class Hdfc : MainAPI() {
                         url = url,
                         source = source
                     ){
-                        this.quality = Qualities.Unknown.value,
-                        this.isM3u8 = url.contains(".m3u8")
+                        this.quality = Qualities.Unknown.value;
+                        this.isM3u8 = url.contains(".m3u8");
                     })
                 }
             }
@@ -797,8 +797,8 @@ class Hdfc : MainAPI() {
                         url = url,
                         source = source
                     ){
-                        this.quality = Qualities.Unknown.value,
-                        this.isM3u8 = url.contains(".m3u8")
+                        this.quality = Qualities.Unknown.value;
+                        this.isM3u8 = url.contains(".m3u8");
                     })
                 }
             }
