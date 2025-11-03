@@ -111,7 +111,7 @@ class Hdfc : MainAPI() {
         "${mainUrl}/load/page/1/genres/bilim-kurgu-filmlerini-izleyin-3/" to "Bilim Kurgu Filmleri",
         "${mainUrl}/load/page/1/genres/komedi-filmlerini-izleyin-1/" to "Komedi Filmleri",
         "${mainUrl}/load/page/1/genres/korku-filmlerini-izle-4/" to "Korku Filmleri",
-        "${mainUrl}/load/page/1/genres/romantik-filmleri-izle-2/" to "Romantik Filmleri"
+        "${mainUrl}/load/page/1/genres/romantik-filmleri-izle-2/" to "Romantik Filmler"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -136,7 +136,7 @@ class Hdfc : MainAPI() {
 
         try {
             // Parse JSON response
-            val hdfc: HDFC = objectMapper.readValue(response.text)
+            val hdfc: Hdfc = objectMapper.readValue(response.text)
             val document = Jsoup.parse(hdfc.html)
 
             // Convert film/series cards to SearchResponse list
