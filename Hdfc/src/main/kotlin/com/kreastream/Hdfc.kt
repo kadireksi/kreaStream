@@ -323,13 +323,7 @@ class Hdfc : MainAPI() {
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-        // Auto-add headers to any cdnimages1332.sbs link
-        callback.invoke += { link ->
-            if (link.url.contains("cdnimages1332.sbs")) {
-                link.referer = iframeUrl
-                link.headers["Origin"] = "https://closeplayer.hdfilmcehennemi.mobi"
-            }
-        }
+
     ): Boolean {
         val document = app.get(data).document
         
