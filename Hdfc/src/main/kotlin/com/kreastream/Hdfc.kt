@@ -423,9 +423,9 @@ class Hdfc : MainAPI() {
             url = exactUrl,
             source = "Close"
         ){
-            this.referer = mainUrl
+            this.referer = iframeUrl
             this.quality = Qualities.Unknown.value
-            this.headers = mapOf("Origin" to mainUrl)
+            this.headers = mapOf("Origin" to iframeUrl)
         }
         )
         foundVideo = true    
@@ -444,7 +444,12 @@ class Hdfc : MainAPI() {
                             name = "Close Player (Script)",
                             url = url,
                             source = "Close"
-                        ))
+                            ){
+                                this.referer = iframeUrl
+                                this.quality = Qualities.Unknown.value
+                                this.headers = mapOf("Origin" to iframeUrl)
+                            }
+                        )
                         foundVideo = true
                     }
                 }
