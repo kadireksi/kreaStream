@@ -421,7 +421,7 @@ class Hdfc : MainAPI() {
                                 ){
                                     this.referer = iframeUrl;
                                     this.quality = Qualities.Unknown.value;
-                                    this.isM3u8 = videoUrl.contains(".m3u8");
+                                    this.isM3u8 = videoUrl.contains(".m3u8")
                                 }
                             )
                             foundVideo = true
@@ -446,7 +446,7 @@ class Hdfc : MainAPI() {
                         ){
                             this.referer = iframeUrl;
                             this.quality = Qualities.Unknown.value;
-                            this.isM3u8 = videoUrl.contains(".m3u8");
+                            this.isM3u8 = videoUrl.contains(".m3u8")
                         }
                     )
                     foundVideo = true
@@ -477,7 +477,7 @@ class Hdfc : MainAPI() {
                             ){
                                 this.referer = iframeUrl;
                                 this.quality = Qualities.Unknown.value;
-                                this.isM3u8 = videoUrl.contains(".m3u8");
+                                this.isM3u8 = videoUrl.contains(".m3u8")
                             }
                         )
                         foundVideo = true
@@ -572,7 +572,7 @@ class Hdfc : MainAPI() {
                                         ){
                                             this.referer = iframeUrl;
                                             this.quality = Qualities.Unknown.value;
-                                            this.isM3u8 = videoUrl.contains(".m3u8");
+                                            this.isM3u8 = videoUrl.contains(".m3u8")
                                         }
                                     )
                                     foundVideo = true
@@ -634,7 +634,7 @@ class Hdfc : MainAPI() {
             ){
                 this.referer = iframeUrl;
                 this.quality = Qualities.Unknown.value;
-                this.isM3u8 = true;
+                this.isM3u8 = true
             })
             foundVideo = true
         }
@@ -653,7 +653,7 @@ class Hdfc : MainAPI() {
                 ){
                     this.referer = iframeUrl;
                     this.quality = Qualities.Unknown.value;
-                    this.isM3u8 = false;
+                    this.isM3u8 = false
                 })
                 foundVideo = true
             }
@@ -671,7 +671,7 @@ class Hdfc : MainAPI() {
                     ){
                         this.referer = iframeUrl;
                         this.quality = Qualities.Unknown.value;
-                        this.isM3u8 = src.contains(".m3u8");
+                        this.isM3u8 = src.contains(".m3u8")
                     })
                     foundVideo = true
                 }
@@ -713,7 +713,7 @@ class Hdfc : MainAPI() {
                     source = "Direct"
                 ){
                     this.quality = Qualities.Unknown.value;
-                    this.isM3u8 = src.contains(".m3u8");
+                    this.isM3u8 = src.contains(".m3u8")
                 })
             }
         }
@@ -782,7 +782,7 @@ class Hdfc : MainAPI() {
                         source = source
                     ){
                         this.quality = Qualities.Unknown.value;
-                        this.isM3u8 = url.contains(".m3u8");
+                        this.isM3u8 = url.contains(".m3u8")
                     })
                 }
             }
@@ -798,7 +798,7 @@ class Hdfc : MainAPI() {
                         source = source
                     ){
                         this.quality = Qualities.Unknown.value;
-                        this.isM3u8 = url.contains(".m3u8");
+                        this.isM3u8 = url.contains(".m3u8")
                     })
                 }
             }
