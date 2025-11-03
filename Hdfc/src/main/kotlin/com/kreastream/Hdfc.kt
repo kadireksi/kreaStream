@@ -415,7 +415,7 @@ class Hdfc : MainAPI() {
             // Don't remove any characters except spaces - keep "mp4" in the title
         
         // The exact URL pattern based on browser downloader result
-        val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitlemp4-$videoId.mp4/txt/master.txt"
+        val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitlem"."mp4-$videoId.mp4/txt/master.txt"
         
         callback(newExtractorLink(
             name = "Close Player (Exact)",
@@ -431,7 +431,7 @@ class Hdfc : MainAPI() {
         servers.forEach { server ->
             domains.forEach { domain ->
                 val patterns = listOf(
-                    //"https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt",
+                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt",
                     //"https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/master.txt",
                     //"https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId/master.m3u8"
                 )
