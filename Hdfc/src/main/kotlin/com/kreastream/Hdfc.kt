@@ -413,15 +413,16 @@ class Hdfc : MainAPI() {
                         
                         urlRegex.findAll(sourcesText).forEach { urlMatch ->
                             val videoUrl = urlMatch.value
-                            callback(
-                                newExtractorLink(
-                                    name = "Close Player (Direct)",
-                                    url = videoUrl,
-                                    source = "Close"
-                                ){
-                                    this.referer = iframeUrl;
-                                    this.quality = Qualities.Unknown.value;
-                                    this.isM3u8 = videoUrl.contains(".m3u8")
+                            val extractorLink = newExtractorLink(
+                                name = "Close Player (Direct)",
+                                url = videoUrl,
+                                source = "Close"
+                            ) {
+                                referer = iframeUrl
+                                quality = Qualities.Unknown.value
+                                isM3u8 = videoUrl.contains(".m3u8")
+                            }
+                            callback(extractorLink)
                                 }
                             )
                             foundVideo = true
@@ -519,12 +520,14 @@ class Hdfc : MainAPI() {
                             if (testResponse.status in 200..299) {
                                 callback(
                                     newExtractorLink(
-                                        name = "Close Player (Dynamic)",
+name = "Close Player (Dynamic)",
                                         url = testUrl,
-                                        source = "Close",
-                                        referer = iframeUrl,
-                                        quality = Qualities.Unknown.value,
+                                        source = "Close"
+                                    ) {
+                                        referer = iframeUrl
+                                        quality = Qualities.Unknown.value
                                         isM3u8 = testUrl.contains(".m3u8")
+                                    }
                                     )
                                 )
                                 foundVideo = true
@@ -565,14 +568,14 @@ class Hdfc : MainAPI() {
                                 
                                 if (videoUrl.isNotEmpty() && (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4"))) {
                                     callback(
-                                        newExtractorLink(
+newExtractorLink(
                                             name = "Close Player (Unpacked)",
                                             url = videoUrl,
                                             source = "Close"
-                                        ){
-                                            this.referer = iframeUrl;
-                                            this.quality = Qualities.Unknown.value;
-                                            this.isM3u8 = videoUrl.contains(".m3u8")
+                                        ) {
+                                            referer = iframeUrl
+                                            quality = Qualities.Unknown.value
+                                            isM3u8 = videoUrl.contains(".m3u8")
                                         }
                                     )
                                     foundVideo = true
@@ -631,10 +634,10 @@ class Hdfc : MainAPI() {
                 name = "Rapidrame Player (HLS)",
                 url = videoUrl,
                 source = "Rapidrame"
-            ){
-                this.referer = iframeUrl;
-                this.quality = Qualities.Unknown.value;
-                this.isM3u8 = true
+            ) {
+                referer = iframeUrl
+                quality = Qualities.Unknown.value
+                isM3u8 = true
             })
             foundVideo = true
         }
@@ -646,14 +649,14 @@ class Hdfc : MainAPI() {
             
             if (mp4Match != null) {
                 val videoUrl = mp4Match.value
-                callback(newExtractorLink(
+callback(newExtractorLink(
                     name = "Rapidrame Player (MP4)",
                     url = videoUrl,
                     source = "Rapidrame"
-                ){
-                    this.referer = iframeUrl;
-                    this.quality = Qualities.Unknown.value;
-                    this.isM3u8 = false
+                ) {
+                    referer = iframeUrl
+                    quality = Qualities.Unknown.value
+                    isM3u8 = false
                 })
                 foundVideo = true
             }
@@ -664,14 +667,14 @@ class Hdfc : MainAPI() {
             iframeDoc.select("video, source").forEach { element ->
                 val src = element.attr("src")
                 if (src.isNotEmpty() && (src.contains(".m3u8") || src.contains(".mp4"))) {
-                    callback(newExtractorLink(
+callback(newExtractorLink(
                         name = "Rapidrame Player (Direct)",
                         url = fixUrlNull(src) ?: src,
                         source = "Rapidrame"
-                    ){
-                        this.referer = iframeUrl;
-                        this.quality = Qualities.Unknown.value;
-                        this.isM3u8 = src.contains(".m3u8")
+                    ) {
+                        referer = iframeUrl
+                        quality = Qualities.Unknown.value
+                        isM3u8 = src.contains(".m3u8")
                     })
                     foundVideo = true
                 }
@@ -693,12 +696,12 @@ class Hdfc : MainAPI() {
         videoElements.forEach { video ->
             val src = video.attr("src")
             if (src.isNotEmpty()) {
-                callback(newExtractorLink(
+callback(newExtractorLink(
                     name = "Direct Video",
                     url = fixUrlNull(src) ?: src,
                     source = "Direct"
-                ){
-                    this.quality = Qualities.Unknown.value;
+                ) {
+                    quality = Qualities.Unknown.value
                 })
             }
         }
@@ -707,13 +710,13 @@ class Hdfc : MainAPI() {
         document.select("video source").forEach { source ->
             val src = source.attr("src")
             if (src.isNotEmpty()) {
-                callback(newExtractorLink(
+callback(newExtractorLink(
                     name = "Direct Video Source",
                     url = fixUrlNull(src) ?: src,
                     source = "Direct"
-                ){
-                    this.quality = Qualities.Unknown.value;
-                    this.isM3u8 = src.contains(".m3u8")
+                ) {
+                    quality = Qualities.Unknown.value
+                    isM3u8 = src.contains(".m3u8")
                 })
             }
         }
@@ -776,13 +779,13 @@ class Hdfc : MainAPI() {
             videoSources.forEach { sourceElement ->
                 val videoUrl = fixUrlNull(sourceElement.attr("src"))
                 videoUrl?.let { url ->
-                    callback(newExtractorLink(
+callback(newExtractorLink(
                         name = source,
                         url = url,
                         source = source
-                    ){
-                        this.quality = Qualities.Unknown.value;
-                        this.isM3u8 = url.contains(".m3u8")
+                    ) {
+                        quality = Qualities.Unknown.value
+                        isM3u8 = url.contains(".m3u8")
                     })
                 }
             }
@@ -792,13 +795,13 @@ class Hdfc : MainAPI() {
             videoElements.forEach { videoElement ->
                 val videoUrl = fixUrlNull(videoElement.attr("src"))
                 videoUrl?.let { url ->
-                    callback(newExtractorLink(
+callback(newExtractorLink(
                         name = source,
                         url = url,
                         source = source
-                    ){
-                        this.quality = Qualities.Unknown.value;
-                        this.isM3u8 = url.contains(".m3u8")
+                    ) {
+                        quality = Qualities.Unknown.value
+                        isM3u8 = url.contains(".m3u8")
                     })
                 }
             }
