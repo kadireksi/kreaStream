@@ -66,23 +66,6 @@ class Hdfc : MainAPI() {
     override var sequentialMainPageDelay = 50L
     override var sequentialMainPageScrollDelay = 50L
 
-    // CloudFlare handling
-    private val interceptor by lazy { CloudflareInterceptor() }
-
-    class CloudflareInterceptor : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
-            val response = chain.proceed(request)
-            val doc = Jsoup.parse(response.peekBody(1024 * 1024).string())
-
-            if (doc.text().contains("Just a moment")) {
-                // Cloudflare protection detected
-            }
-
-            return response
-        }
-    }
-
     // ObjectMapper for JSON parsing
     private val objectMapper = jacksonObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
@@ -111,7 +94,7 @@ class Hdfc : MainAPI() {
         "${mainUrl}/load/page/1/genres/bilim-kurgu-filmlerini-izleyin-3/" to "Bilim Kurgu Filmleri",
         "${mainUrl}/load/page/1/genres/komedi-filmlerini-izleyin-1/" to "Komedi Filmleri",
         "${mainUrl}/load/page/1/genres/korku-filmlerini-izle-4/" to "Korku Filmleri",
-        "${mainUrl}/load/page/1/genres/romantik-filmleri-izle-2/" to "Romantik Filmler"
+        "${mainUrl}/load/page/1/genres/romantik-filmleri-izle-2/" to "Romantik Filmleri"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -136,7 +119,7 @@ class Hdfc : MainAPI() {
 
         try {
             // Parse JSON response
-            val hdfc: Hdfc = objectMapper.readValue(response.text)
+            val hdfc: HDFC = objectMapper.readValue(response.text)
             val document = Jsoup.parse(hdfc.html)
 
             // Convert film/series cards to SearchResponse list
@@ -188,7 +171,6 @@ class Hdfc : MainAPI() {
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
-
 
     override suspend fun search(query: String): List<SearchResponse> {
         val response = parseJsonResponse<Results>(
@@ -323,11 +305,10 @@ class Hdfc : MainAPI() {
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-
     ): Boolean {
         val document = app.get(data).document
         
-        // Extract the main iframe source
+        // Extract the main iframe sources
         val closePlayerSrc = document.selectFirst(".close")?.attr("data-src")
         val rapidramePlayerSrc = document.selectFirst(".rapidrame")?.attr("data-src")
 
@@ -364,10 +345,18 @@ class Hdfc : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ) {
         try {
-            val iframeDoc = app.get(iframeUrl, referer = mainUrl).document
+            val iframeDoc = app.get(iframeUrl, referer = mainUrl, headers = mapOf(
+                "User-Agent" to standardHeaders["User-Agent"],
+                "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language" to "en-US,en;q=0.5",
+                "Accept-Encoding" to "gzip, deflate, br",
+                "DNT" to "1",
+                "Connection" to "keep-alive",
+                "Upgrade-Insecure-Requests" to "1"
+            )).document
 
             // Extract subtitles
-            iframeDoc.select("track[kind=captions]")
+            iframeDoc.select("track[kind=subtitles], track[kind=captions]")
                 .filter { it.attr("srclang") != "forced" }
                 .forEach { track ->
                     val lang = track.attr("srclang").let {
@@ -376,6 +365,11 @@ class Hdfc : MainAPI() {
                             "en" -> "İngilizce"
                             "fr" -> "Fransızca"
                             "pt" -> "Portekizce"
+                            "es" -> "İspanyolca"
+                            "de" -> "Almanca"
+                            "it" -> "İtalyanca"
+                            "ru" -> "Rusça"
+                            "ar" -> "Arapça"
                             else -> it
                         }
                     }
@@ -385,100 +379,232 @@ class Hdfc : MainAPI() {
                     }
                 }
 
-            // Extract video source
+            // Extract video source with enhanced methods
             extractVideoFromClosePlayer(iframeDoc, iframeUrl, subtitleCallback, callback)
             
         } catch (e: Exception) {
-            // Error handling
+            // If direct extraction fails, try loadExtractor as last resort
+            loadExtractor(iframeUrl, mainUrl, subtitleCallback, callback)
         }
     }
 
-private suspend fun extractVideoFromClosePlayer(
-    iframeDoc: org.jsoup.nodes.Document,
-    iframeUrl: String,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-) {
-    var foundVideo = false
+    private suspend fun extractVideoFromClosePlayer(
+        iframeDoc: org.jsoup.nodes.Document,
+        iframeUrl: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        var foundVideo = false
 
-    // === 1. EXACT URL FROM TITLE + VIDEO ID ===
-    val titleElement = iframeDoc.selectFirst("title")
-    val rawTitle = titleElement?.text()?.substringBefore(".mp4")?.trim() ?: ""
-    val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
-
-    if (rawTitle.isNotEmpty() && videoId.isNotEmpty()) {
-        val slug = rawTitle
-            .lowercase()
-            .replace(" ", "")
-            .replace(Regex("[^a-z0-9-]"), "")
-
-        val masterUrl = "https://srv10.cdnimages1332.sbs/hls/${slug}mp4-$videoId.mp4/txt/master.txt"
-
-        callback(
-            newExtractorLink(
-                name = "Close Player (HLS)",
-                url = masterUrl,
-                source = "Close")
-                {
-                this.referer = iframeUrl
-                this.headers = mapOf(
-                    "Origin" to "https://closeplayer.hdfilmcehennemi.mobi",
-                    "Accept" to "*/*"
-                )
-            )
-        )
-        foundVideo = true
-    }
-
-    // === 2. UNPACK OBFUSCATED SCRIPT (Fallback) ===
-    if (!foundVideo) {
+        // === METHOD 1: Extract from video.js configuration ===
         iframeDoc.select("script").forEach { script ->
-            val content = script.data()
-            if (content.contains("eval(function(p,a,c,k,e,d)")) {
+            val scriptContent = script.data() ?: script.html()
+            
+            // Look for video.js configuration with sources
+            if (scriptContent.contains("videojs") || scriptContent.contains("sources")) {
                 try {
-                    val unpacked = JsPackerUnpacker.unpack(content)
-                    Regex("""https?://[^\s"']+cdnimages\d+\.sbs[^\s"']*master\.txt""")
-                        .findAll(unpacked)
-                        .map { it.value }
-                        .forEach { url ->
+                    // Extract JSON-like configuration
+                    val sourcesRegex = Regex("""sources\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
+                    val match = sourcesRegex.find(scriptContent)
+                    
+                    if (match != null) {
+                        val sourcesText = match.groupValues[1]
+                        val urlRegex = Regex("""(https?://[^\s"']+\.(?:m3u8|mp4)[^\s"']*)""")
+                        
+                        urlRegex.findAll(sourcesText).forEach { urlMatch ->
+                            val videoUrl = urlMatch.value
                             callback(
                                 newExtractorLink(
-                                    name = "Close (Unpacked)",
-                                    url = url,
-                                    source = "Close")
-                                    {
-                                    this.referer = iframeUrl
-                                    this.headers = mapOf("Origin" to "https://closeplayer.hdfilmcehennemi.mobi")
-                                    }
+                                    name = "Close Player (Direct)",
+                                    url = videoUrl,
+                                    source = "Close",
+                                    referer = iframeUrl,
+                                    quality = Qualities.Unknown.value,
+                                    isM3u8 = videoUrl.contains(".m3u8")
                                 )
                             )
                             foundVideo = true
                         }
+                    }
                 } catch (e: Exception) {
-                    // ignore
+                    // Continue to next method
                 }
             }
         }
+
+        // === METHOD 2: Extract from data attributes ===
+        if (!foundVideo) {
+            iframeDoc.select("video, [data-src]").forEach { element ->
+                val videoUrl = element.attr("data-src") ?: element.attr("src")
+                if (videoUrl.isNotEmpty() && (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4"))) {
+                    callback(
+                        newExtractorLink(
+                            name = "Close Player (Data Source)",
+                            url = fixUrlNull(videoUrl) ?: videoUrl,
+                            source = "Close", 
+                            referer = iframeUrl,
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = videoUrl.contains(".m3u8")
+                        )
+                    )
+                    foundVideo = true
+                }
+            }
+        }
+
+        // === METHOD 3: Improved URL pattern detection ===
+        if (!foundVideo) {
+            val possiblePatterns = listOf(
+                Regex("""https?://[^"'\s]*?cdn[^"'\s]*?\.(?:m3u8|mp4|master\.txt)"""),
+                Regex("""https?://[^"'\s]*?srv[^"'\s]*?\.(?:m3u8|mp4|master\.txt)"""),
+                Regex("""https?://[^"'\s]*?stream[^"'\s]*?\.(?:m3u8|mp4|master\.txt)"""),
+                Regex("""file\s*:\s*["'](https?://[^"']+\.(?:m3u8|mp4))["']"""),
+                Regex("""src\s*:\s*["'](https?://[^"']+\.(?:m3u8|mp4))["']""")
+            )
+            
+            val pageContent = iframeDoc.toString()
+            possiblePatterns.forEach { pattern ->
+                pattern.findAll(pageContent).forEach { match ->
+                    val videoUrl = match.value.replace("file:", "").replace("src:", "").trim().trim('"', '\'')
+                    if (videoUrl.isNotEmpty() && (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4"))) {
+                        callback(
+                            newExtractorLink(
+                                name = "Close Player (Pattern)",
+                                url = videoUrl,
+                                source = "Close",
+                                referer = iframeUrl,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = videoUrl.contains(".m3u8")
+                            )
+                        )
+                        foundVideo = true
+                    }
+                }
+            }
+        }
+
+        // === METHOD 4: Dynamic URL construction with better patterns ===
+        if (!foundVideo) {
+            try {
+                // Extract video ID from URL
+                val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
+                if (videoId.isNotEmpty()) {
+                    val baseDomains = listOf(
+                        "https://srv10.cdnimages1332.sbs",
+                        "https://srv9.cdnimages1332.sbs", 
+                        "https://srv8.cdnimages1332.sbs",
+                        "https://srv7.cdnimages1332.sbs"
+                    )
+                    
+                    val urlPatterns = baseDomains.flatMap { base ->
+                        listOf(
+                            "$base/hls/$videoId/master.txt",
+                            "$base/hls/$videoId/master.m3u8",
+                            "$base/video/$videoId/master.m3u8",
+                            "$base/stream/$videoId/master.txt"
+                        )
+                    }
+                    
+                    urlPatterns.forEach { testUrl ->
+                        // Test if URL is accessible
+                        try {
+                            val testResponse = app.get(testUrl, headers = mapOf(
+                                "Referer" to iframeUrl,
+                                "Origin" to "https://closeplayer.hdfilmcehennemi.mobi"
+                            ), allowRedirects = false)
+                            
+                            if (testResponse.status in 200..299) {
+                                callback(
+                                    newExtractorLink(
+                                        name = "Close Player (Dynamic)",
+                                        url = testUrl,
+                                        source = "Close",
+                                        referer = iframeUrl,
+                                        quality = Qualities.Unknown.value,
+                                        isM3u8 = testUrl.contains(".m3u8")
+                                    )
+                                )
+                                foundVideo = true
+                                return@forEach
+                            }
+                        } catch (e: Exception) {
+                            // Continue to next pattern
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore errors in dynamic construction
+            }
+        }
+
+        // === METHOD 5: Enhanced script unpacking ===
+        if (!foundVideo) {
+            iframeDoc.select("script").forEach { script ->
+                val content = script.data() ?: script.html()
+                if (content.contains("eval(function(p,a,c,k,e,d)")) {
+                    try {
+                        val unpacked = JsPackerUnpacker.unpack(content)
+                        
+                        // Look for various video URL patterns in unpacked script
+                        val videoPatterns = listOf(
+                            Regex("""https?://[^\s"']*?\.m3u8[^\s"']*"""),
+                            Regex("""https?://[^\s"']*?\.mp4[^\s"']*"""),
+                            Regex("""https?://[^\s"']*?master\.txt[^\s"']*"""),
+                            Regex("""file\s*:\s*["'](https?://[^"']+)["']""")
+                        )
+                        
+                        videoPatterns.forEach { pattern ->
+                            pattern.findAll(unpacked).forEach { match ->
+                                var videoUrl = match.value
+                                if (videoUrl.startsWith("file:")) {
+                                    videoUrl = match.groupValues[1]
+                                }
+                                
+                                if (videoUrl.isNotEmpty() && (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4"))) {
+                                    callback(
+                                        newExtractorLink(
+                                            name = "Close Player (Unpacked)",
+                                            url = videoUrl,
+                                            source = "Close",
+                                            referer = iframeUrl,
+                                            quality = Qualities.Unknown.value,
+                                            isM3u8 = videoUrl.contains(".m3u8")
+                                        )
+                                    )
+                                    foundVideo = true
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Ignore unpacking errors
+                    }
+                }
+            }
+        }
+
+        // === FINAL FALLBACK: Use loadExtractor ===
+        if (!foundVideo) {
+            loadExtractor(iframeUrl, mainUrl, subtitleCallback, callback)
+        }
     }
 
-    // === 3. Fallback to loadExtractor ===
-    if (!foundVideo) {
-        loadExtractor(iframeUrl, mainUrl, subtitleCallback, callback)
-    }
-}
     private suspend fun handleRapidramePlayer(
         iframeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
         try {
-            val iframeDoc = app.get(iframeUrl, referer = "$mainUrl/").document
+            val iframeDoc = app.get(iframeUrl, referer = "$mainUrl/", headers = mapOf(
+                "User-Agent" to standardHeaders["User-Agent"],
+                "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            )).document
             
             // Extract video sources
             extractVideoFromRapidrame(iframeDoc, iframeUrl, subtitleCallback, callback)
             
         } catch (e: Exception) {
-            // Error handling
+            // Error handling - fallback to loadExtractor
+            loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback, callback)
         }
     }
 
@@ -500,12 +626,52 @@ private suspend fun extractVideoFromClosePlayer(
             callback(newExtractorLink(
                 name = "Rapidrame Player (HLS)",
                 url = videoUrl,
-                source = "Rapidrame"
+                source = "Rapidrame",
+                referer = iframeUrl,
+                quality = Qualities.Unknown.value,
+                isM3u8 = true
             ))
             foundVideo = true
         }
 
-        // Method 2: Use loadExtractor as fallback
+        // Method 2: Look for MP4 sources
+        if (!foundVideo) {
+            val mp4Regex = Regex("""https?://[^\s"']+\.rapidrame\.com[^\s"']*\.mp4[^\s"']*""")
+            val mp4Match = mp4Regex.find(scriptContent)
+            
+            if (mp4Match != null) {
+                val videoUrl = mp4Match.value
+                callback(newExtractorLink(
+                    name = "Rapidrame Player (MP4)",
+                    url = videoUrl,
+                    source = "Rapidrame",
+                    referer = iframeUrl,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = false
+                ))
+                foundVideo = true
+            }
+        }
+
+        // Method 3: Extract from data attributes
+        if (!foundVideo) {
+            iframeDoc.select("video, source").forEach { element ->
+                val src = element.attr("src")
+                if (src.isNotEmpty() && (src.contains(".m3u8") || src.contains(".mp4"))) {
+                    callback(newExtractorLink(
+                        name = "Rapidrame Player (Direct)",
+                        url = fixUrlNull(src) ?: src,
+                        source = "Rapidrame",
+                        referer = iframeUrl,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = src.contains(".m3u8")
+                    ))
+                    foundVideo = true
+                }
+            }
+        }
+
+        // Method 4: Use loadExtractor as fallback
         if (!foundVideo) {
             loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback, callback)
         }
@@ -523,7 +689,22 @@ private suspend fun extractVideoFromClosePlayer(
                 callback(newExtractorLink(
                     name = "Direct Video",
                     url = fixUrlNull(src) ?: src,
-                    source = "Direct"
+                    source = "Direct",
+                    quality = Qualities.Unknown.value
+                ))
+            }
+        }
+
+        // Also check for source elements inside video tags
+        document.select("video source").forEach { source ->
+            val src = source.attr("src")
+            if (src.isNotEmpty()) {
+                callback(newExtractorLink(
+                    name = "Direct Video Source",
+                    url = fixUrlNull(src) ?: src,
+                    source = "Direct",
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = src.contains(".m3u8")
                 ))
             }
         }
@@ -579,7 +760,7 @@ private suspend fun extractVideoFromClosePlayer(
         callback: (ExtractorLink) -> Unit
     ) {
         try {
-            val iframeDoc = app.get(iframeUrl, referer = referer).document
+            val iframeDoc = app.get(iframeUrl, referer = referer, headers = standardHeaders).document
             
             // Look for video sources in the iframe
             val videoSources = iframeDoc.select("source[src]")
@@ -589,7 +770,9 @@ private suspend fun extractVideoFromClosePlayer(
                     callback(newExtractorLink(
                         name = source,
                         url = url,
-                        source = source
+                        source = source,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = url.contains(".m3u8")
                     ))
                 }
             }
@@ -602,16 +785,18 @@ private suspend fun extractVideoFromClosePlayer(
                     callback(newExtractorLink(
                         name = source,
                         url = url,
-                        source = source
+                        source = source,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = url.contains(".m3u8")
                     ))
                 }
             }
             
-            // If no direct video found, try to extract from scripts
+            // If no direct video found, try to extract from scripts based on player type
             if (videoSources.isEmpty() && videoElements.isEmpty()) {
-                if (iframeUrl.contains("hdfilmcehennemi.mobi")) {
+                if (iframeUrl.contains("hdfilmcehennemi.mobi") || iframeUrl.contains("close")) {
                     extractVideoFromClosePlayer(iframeDoc, iframeUrl, subtitleCallback, callback)
-                } else if (iframeUrl.contains("rplayer")) {
+                } else if (iframeUrl.contains("rplayer") || iframeUrl.contains("rapidrame")) {
                     extractVideoFromRapidrame(iframeDoc, iframeUrl, subtitleCallback, callback)
                 } else {
                     // Try loadExtractor as last resort
@@ -622,7 +807,6 @@ private suspend fun extractVideoFromClosePlayer(
             // Error loading video from iframe
         }
     }
-
 
     // ------------------------------------------------------------
     //  Dean-Edwards-Packer unpacker – 100% Kotlin, no external deps
@@ -739,5 +923,4 @@ private suspend fun extractVideoFromClosePlayer(
         @JsonProperty("file") val file: String? = null,
         @JsonProperty("type") val type: String? = null
     )
-
 }
