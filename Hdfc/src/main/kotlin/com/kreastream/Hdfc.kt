@@ -422,32 +422,13 @@ class Hdfc : MainAPI() {
             name = "Close Player (Exact)",
             url = exactUrl,
             source = "Close"
-        ))
-        foundVideo = true
-        
-        // Also try other server numbers and domain patterns
-        val servers = listOf("srv10", "srv11", "srv12")
-        val domains = listOf("1332", "1241", "1331", "1333")
-        
-        servers.forEach { server ->
-            domains.forEach { domain ->
-                val patterns = listOf(
-                    "https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt",
-                    //"https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId.mp4/master.txt",
-                    //"https://$server.cdnimages$domain.sbs/hls/$normalizedTitle-$videoId/master.m3u8"
-                )
-                
-                patterns.forEach { patternUrl ->
-                    if (patternUrl != exactUrl) {
-                        callback(newExtractorLink(
-                            name = "Close Player",
-                            url = patternUrl,
-                            source = "Close"
-                        ))
-                    }
-                }
-            }
+        ){
+            this.quality = "1080p"
+            this.headers = mapOf("Referer" to mainUrl)
+            this.isM3u8 = true
         }
+        )
+        foundVideo = true    
     }
 
     // Method 2: Look for URLs in obfuscated scripts
@@ -492,7 +473,7 @@ private fun extractRealUrlsFromObfuscatedScript(
         if (exactTitle != null) {
             val normalizedTitle = exactTitle
                 .lowercase()
-                .replace(" ", "")
+                .replace(" ", "") + "mp4"
             
             // This should be the exact match
             val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
@@ -526,49 +507,6 @@ private fun extractRealUrlsFromObfuscatedScript(
     }
     
     return urls.distinct()
-}
-
-/**
- * Alternative approach: Try to find the video URL by making test requests
- */
-private suspend fun findRealUrlByTesting(
-    iframeDoc: org.jsoup.nodes.Document,
-    iframeUrl: String,
-    callback: (ExtractorLink) -> Unit
-) {
-    val titleElement = iframeDoc.selectFirst("title")
-    val exactTitle = titleElement?.text()?.substringBefore(".mp4")?.trim()
-    val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
-    
-    if (exactTitle != null && videoId.isNotEmpty()) {
-        val normalizedTitle = exactTitle
-            .lowercase()
-            .replace(" ", "")
-            .replace("[^a-z0-9-]".toRegex(), "")
-        
-        // Test different server and domain combinations
-        val servers = listOf("srv10", "srv11", "srv12")
-        val domains = listOf("1332", "1241", "1331", "1333")
-        val paths = listOf(
-            "/hls/$normalizedTitle-$videoId.mp4/txt/master.txt",
-            "/hls/$normalizedTitle-$videoId.mp4/master.txt",
-            "/hls2/$normalizedTitle-$videoId/master.m3u8"
-        )
-        
-        servers.forEach { server ->
-            domains.forEach { domain ->
-                paths.forEach { path ->
-                    val testUrl = "https://$server.cdnimages$domain.sbs$path"
-                    // We'll let the extractor test this URL
-                    callback(newExtractorLink(
-                        name = "Close Player (Test)",
-                        url = testUrl,
-                        source = "Close"
-                    ))
-                }
-            }
-        }
-    }
 }
 
 /**
