@@ -441,19 +441,19 @@ class Hdfc : MainAPI() {
         // === METHOD 2: Extract from data attributes ===
         if (!foundVideo) {
             iframeDoc.select("video, [data-src]").forEach { element ->
-                val videoUrl = element.attr("data-src") ?: element.attr("src")
+                val videoUrl = element.attr("data-src").ifEmpty { element.attr("src") }
                 if (videoUrl.isNotEmpty() && (videoUrl.contains(".m3u8") || videoUrl.contains(".mp4"))) {
-                    callback(
-                        newExtractorLink(
-                            name = "Close Player (Data Source)",
-                            url = fixUrlNull(videoUrl) ?: videoUrl,
-                            source = "Close"
-                        ){
-                            this.referer = iframeUrl;
-                            this.quality = Qualities.Unknown.value;
-                            this.isM3u8 = videoUrl.contains(".m3u8")
-                        }
-                    )
+                    val fixedUrl = fixUrlNull(videoUrl) ?: videoUrl
+                    val extractorLink = newExtractorLink(
+                        name = "Close Player (Data Source)",
+                        url = fixedUrl,
+                        source = "Close"
+                    ) {
+                        referer = iframeUrl
+                        quality = Qualities.Unknown.value
+                        isM3u8 = videoUrl.contains(".m3u8")
+                    }
+                    callback(extractorLink)
                     foundVideo = true
                 }
             }
@@ -773,21 +773,24 @@ callback(newExtractorLink(
         callback: (ExtractorLink) -> Unit
     ) {
         try {
-            val iframeDoc = app.get(iframeUrl, referer = referer, headers = standardHeaders).document
+            val response = app.get(iframeUrl, referer = referer, headers = standardHeaders)
+            val iframeDoc = response.document
             
             // Look for video sources in the iframe
             val videoSources = iframeDoc.select("source[src]")
             videoSources.forEach { sourceElement ->
                 val videoUrl = fixUrlNull(sourceElement.attr("src"))
                 videoUrl?.let { url ->
-callback(newExtractorLink(
+                    val extractorLink = newExtractorLink(
                         name = source,
                         url = url,
                         source = source
                     ) {
+                        this.referer = iframeUrl
                         quality = Qualities.Unknown.value
                         isM3u8 = url.contains(".m3u8")
-                    })
+                    }
+                    callback(extractorLink)
                 }
             }
 
@@ -796,14 +799,16 @@ callback(newExtractorLink(
             videoElements.forEach { videoElement ->
                 val videoUrl = fixUrlNull(videoElement.attr("src"))
                 videoUrl?.let { url ->
-callback(newExtractorLink(
+                    val extractorLink = newExtractorLink(
                         name = source,
                         url = url,
                         source = source
                     ) {
+                        this.referer = iframeUrl
                         quality = Qualities.Unknown.value
                         isM3u8 = url.contains(".m3u8")
-                    })
+                    }
+                    callback(extractorLink)
                 }
             }
             
