@@ -392,77 +392,58 @@ class Hdfc : MainAPI() {
         }
     }
 
- private suspend fun extractVideoFromClosePlayer(
+private suspend fun extractVideoFromClosePlayer(
     iframeDoc: org.jsoup.nodes.Document,
     iframeUrl: String,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ) {
-    var foundVideo = false
-    
-    // Method 1: Extract the exact title format from the iframe page
-    val titleElement = iframeDoc.selectFirst("title")
-    val exactTitle = titleElement?.text()?.substringBefore(".mp4")?.trim()
-    //val exactTitle = exactTitle + "mp4"
-    
-    // Extract video ID from iframe URL
+    var found = false
+
+    // ────── 1. Try the *exact* pattern you saw in the browser ──────
+    val titleEl = iframeDoc.selectFirst("title")
+    val rawTitle = titleEl?.text()?.substringBefore(".mp4")?.trim() ?: ""
     val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
-    
-    if (exactTitle != null && videoId.isNotEmpty()) {
-        // Keep the exact title format - don't remove "mp4" from the middle
-        val normalizedTitle = exactTitle
-            .lowercase()
-            .replace(" ", "") + "mp4"
-            // Don't remove any characters except spaces - keep "mp4" in the title
-        
-        // The exact URL pattern based on browser downloader result
-        val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
-        
-        callback(newExtractorLink(
-            name = "Close Player (Exact)",
-            url = exactUrl,
-            source = "Close"
-        ){
-            this.referer = iframeUrl
-            this.quality = Qualities.Unknown.value
-            this.headers = mapOf("Origin" to iframeUrl)
-        }
-        )
-        foundVideo = true    
+
+    if (rawTitle.isNotEmpty() && videoId.isNotEmpty()) {
+        val slug = rawTitle.lowercase()
+            .replace(" ", "")
+            .replace(Regex("[^a-z0-9-]"), "")
+
+        // exact URL that the browser-downloader prints
+        val exact = "https://srv10.cdnimages1332.sbs/hls/${slug}-${videoId}.mp4/txt/master.txt"
+        callback(newExtractorLink(name = "Close (Exact)", url = exact, source = "Close"))
+        found = true
     }
 
-    // Method 2: Look for URLs in obfuscated scripts
-    if (!foundVideo) {
-        val scripts = iframeDoc.select("script")
-        scripts.forEach { script ->
-            val scriptContent = script.data()
-            if (scriptContent.isNotEmpty() && scriptContent.contains("eval(function(p,a,c,k,e,d)")) {
-                val realUrls = extractRealUrlsFromObfuscatedScript(scriptContent, exactTitle, videoId)
-                realUrls.forEach { url ->
-                    if (url.contains("cdnimages") && !url.contains("hls8.playmix.uno")) {
-                        callback(newExtractorLink(
-                            name = "Close Player (Script)",
-                            url = url,
-                            source = "Close"
-                            ){
-                                this.referer = iframeUrl
-                                this.quality = Qualities.Unknown.value
-                                this.headers = mapOf("Origin" to iframeUrl)
-                            }
-                        )
-                        foundVideo = true
+    // ────── 2. De-obfuscate the packed script (the real source) ──────
+    iframeDoc.select("script").forEach { script ->
+        val data = script.data()
+        if (data.contains("eval(function(p,a,c,k,e,d)")) {
+            try {
+                val cleanJs = JsPackerUnpacker.unpack(data)
+                // The player builds the URL with something like:
+                //   src: { src: decrypt([...]), type: 'application/x-mpegURL' }
+                //   → look for a string that ends with .m3u8 / .txt / master
+                Regex("""["']https?://[^"']+?\.(m3u8|txt|mp4)(?:[^"']*)?["']""")
+                    .findAll(cleanJs)
+                    .map { it.value.removeSurrounding("\"").removeSurrounding("'") }
+                    .filter { it.contains("cdnimages") && !it.contains("playmix.uno") }
+                    .forEach { url ->
+                        callback(newExtractorLink(name = "Close (Unpacked)", url = url, source = "Close"))
+                        found = true
                     }
-                }
+            } catch (e: Exception) {
+                // ignore malformed packed blocks
             }
         }
     }
 
-    // Method 3: Use loadExtractor as fallback
-    if (!foundVideo) {
+    // ────── 3. Fallback – let the generic extractor try the iframe URL ──────
+    if (!found) {
         loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback, callback)
     }
 }
-
 /**
  * Extract real video URLs from the obfuscated JavaScript
  */
