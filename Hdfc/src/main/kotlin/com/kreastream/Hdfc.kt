@@ -423,9 +423,9 @@ class Hdfc : MainAPI() {
             url = exactUrl,
             source = "Close"
         ){
-            this.quality = "1080p"
-            this.headers = mapOf("Referer" to mainUrl)
-            this.isM3u8 = true
+            this.referer = mainUrl
+            this.quality = Qualities.Unknown.value
+            this.headers = mapOf("Origin" to mainUrl)
         }
         )
         foundVideo = true    
