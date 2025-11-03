@@ -398,206 +398,70 @@ private suspend fun extractVideoFromClosePlayer(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ) {
-    var found = false
+    var foundVideo = false
 
-    // ────── 1. Try the *exact* pattern you saw in the browser ──────
-    val titleEl = iframeDoc.selectFirst("title")
-    val rawTitle = titleEl?.text()?.substringBefore(".mp4")?.trim() ?: ""
+    // === 1. EXACT URL FROM TITLE + VIDEO ID ===
+    val titleElement = iframeDoc.selectFirst("title")
+    val rawTitle = titleElement?.text()?.substringBefore(".mp4")?.trim() ?: ""
     val videoId = iframeUrl.substringAfter("/embed/").substringBefore("/")
 
     if (rawTitle.isNotEmpty() && videoId.isNotEmpty()) {
-        val slug = rawTitle.lowercase()
+        val slug = rawTitle
+            .lowercase()
             .replace(" ", "")
             .replace(Regex("[^a-z0-9-]"), "")
 
-        // exact URL that the browser-downloader prints
-        val exact = "https://srv10.cdnimages1332.sbs/hls/${slug}-${videoId}.mp4/txt/master.txt"
-        callback(newExtractorLink(name = "Close (Exact)", url = exact, source = "Close"))
-        found = true
-    }
+        val masterUrl = "https://srv10.cdnimages1332.sbs/hls/${slug}mp4-$videoId.mp4/txt/master.txt"
 
-    // ────── 2. De-obfuscate the packed script (the real source) ──────
-    iframeDoc.select("script").forEach { script ->
-        val data = script.data()
-        if (data.contains("eval(function(p,a,c,k,e,d)")) {
-            try {
-                val cleanJs = JsPackerUnpacker.unpack(data)
-                // The player builds the URL with something like:
-                //   src: { src: decrypt([...]), type: 'application/x-mpegURL' }
-                //   → look for a string that ends with .m3u8 / .txt / master
-                Regex("""["']https?://[^"']+?\.(m3u8|txt|mp4)(?:[^"']*)?["']""")
-                    .findAll(cleanJs)
-                    .map { it.value.removeSurrounding("\"").removeSurrounding("'") }
-                    .filter { it.contains("cdnimages") && !it.contains("playmix.uno") }
-                    .forEach { url ->
-                        callback(newExtractorLink(name = "Close (Unpacked)", url = url, source = "Close"))
-                        found = true
-                    }
-            } catch (e: Exception) {
-                // ignore malformed packed blocks
-            }
-        }
-    }
-
-    // ────── 3. Fallback – let the generic extractor try the iframe URL ──────
-    if (!found) {
-        loadExtractor(iframeUrl, "$mainUrl/", subtitleCallback, callback)
-    }
-}
-/**
- * Extract real video URLs from the obfuscated JavaScript
- */
-private fun extractRealUrlsFromObfuscatedScript(
-    scriptContent: String, 
-    exactTitle: String?, 
-    videoId: String
-): List<String> {
-    val urls = mutableListOf<String>()
-    
-    try {
-        // If we have the exact title and video ID, construct the most likely URL first
-        if (exactTitle != null) {
-            val normalizedTitle = exactTitle
-                .lowercase()
-                .replace(" ", "") + "mp4"
-            
-            // This should be the exact match
-            val exactUrl = "https://srv10.cdnimages1332.sbs/hls/$normalizedTitle-$videoId.mp4/txt/master.txt"
-            //urls.add(exactUrl)
-        }
-        
-        // Look for CDN domains in the obfuscated script
-        val cdnPatterns = listOf(
-            Regex("""cdnimages\d+\.sbs"""),
-            Regex("""srv\d+\.cdnimages\d+\.sbs""")
-        )
-        
-        cdnPatterns.forEach { pattern ->
-            val matches = pattern.findAll(scriptContent)
-            matches.forEach { match ->
-                val domain = match.value
-                if (exactTitle != null) {
-                    val normalizedTitle = exactTitle
-                        .lowercase()
-                        .replace(" ", "")
-                    
-                    // Construct URLs using the found domain
-                    urls.add("https://$domain/hls/$normalizedTitle-$videoId.mp4/txt/master.txt")
-                    //urls.add("https://$domain/hls/$normalizedTitle"."mp4-$videoId.mp4/master.txt")
-                }
-            }
-        }
-        
-    } catch (e: Exception) {
-        // Error extracting from obfuscated script
-    }
-    
-    return urls.distinct()
-}
-
-/**
- * Extract real video URLs from the obfuscated JavaScript
- */
-private fun extractRealVideoUrlsFromObfuscatedScript(scriptContent: String, iframeUrl: String): List<String> {
-    val videoUrls = mutableListOf<String>()
-    
-    try {
-        // Extract the packed script parameters
-        val packedScript = extractPackedScript(scriptContent)
-        if (packedScript != null) {
-            // The packed script contains the real video URLs
-            // Look for URL patterns in the packed script
-            val urlPatterns = listOf(
-                Regex("""https?://[^,"']+\.(m3u8|mp4|txt)"""),
-                Regex("""(srv\d+\.cdnimages\d+\.sbs[^,"']*)"""),
-                Regex("""(rapidrame\.com[^,"']*)"""),
-                Regex("""(cdn\.hdfilmcehennemi\.mobi[^,"']*)""")
+        callback(
+            newExtractorLink(
+                name = "Close Player (HLS)",
+                url = masterUrl,
+                source = "Close",
+                referer = iframeUrl,  // REQUIRED
+                headers = mapOf(
+                    "Origin" to "https://closeplayer.hdfilmcehennemi.mobi",
+                    "Accept" to "*/*"
+                )
             )
-            
-            urlPatterns.forEach { pattern ->
-                val matches = pattern.findAll(packedScript)
-                matches.forEach { match ->
-                    var url = match.value
-                    // Ensure it's a full URL
-                    if (!url.startsWith("http")) {
-                        url = "https://$url"
-                    }
-                    // Exclude fake URLs and include only real ones
-                    if (!url.contains("hls8.playmix.uno") && 
-                        (url.contains(".m3u8") || url.contains(".mp4") || url.contains("master."))) {
-                        videoUrls.add(url)
-                    }
-                }
-            }
-            
-            // Also look for base64 encoded URLs in the packed script
-            val base64Regex = Regex("""["']([A-Za-z0-9+/=]{20,})["']""")
-            val base64Matches = base64Regex.findAll(packedScript)
-            
-            base64Matches.forEach { match ->
-                val base64Data = match.groupValues[1]
+        )
+        foundVideo = true
+    }
+
+    // === 2. UNPACK OBFUSCATED SCRIPT (Fallback) ===
+    if (!foundVideo) {
+        iframeDoc.select("script").forEach { script ->
+            val content = script.data()
+            if (content.contains("eval(function(p,a,c,k,e,d)")) {
                 try {
-                    val decoded = base64Decode(base64Data)
-                    if (decoded.contains("http") && 
-                        (decoded.contains(".m3u8") || decoded.contains(".mp4")) &&
-                        !decoded.contains("hls8.playmix.uno")) {
-                        // Extract URL from decoded string
-                        val urlMatch = Regex("""https?://[^\s"']+""").find(decoded)
-                        urlMatch?.value?.let { url ->
-                            videoUrls.add(url)
+                    val unpacked = JsPackerUnpacker.unpack(content)
+                    Regex("""https?://[^\s"']+cdnimages\d+\.sbs[^\s"']*master\.txt""")
+                        .findAll(unpacked)
+                        .map { it.value }
+                        .forEach { url ->
+                            callback(
+                                newExtractorLink(
+                                    name = "Close (Unpacked)",
+                                    url = url,
+                                    source = "Close",
+                                    referer = iframeUrl,
+                                    headers = mapOf("Origin" to "https://closeplayer.hdfilmcehennemi.mobi")
+                                )
+                            )
+                            foundVideo = true
                         }
-                    }
                 } catch (e: Exception) {
-                    // Ignore base64 decode errors
+                    // ignore
                 }
             }
         }
-        
-        // If no URLs found in packed script, try to extract from the original obfuscated script
-        if (videoUrls.isEmpty()) {
-            // Look for common CDN domains in the original script
-            val cdnDomains = listOf("cdnimages1241.sbs", "rapidrame.com", "hdfilmcehennemi.mobi")
-            cdnDomains.forEach { domain ->
-                val domainRegex = Regex("""https?://[^\s"']*$domain[^\s"']*\.(m3u8|mp4|txt)[^\s"']*""")
-                val matches = domainRegex.findAll(scriptContent)
-                matches.forEach { match ->
-                    val url = match.value
-                    if (!url.contains("hls8.playmix.uno")) {
-                        videoUrls.add(url)
-                    }
-                }
-            }
-        }
-        
-    } catch (e: Exception) {
-        // Error extracting from obfuscated script
     }
-    
-    return videoUrls.distinct()
-}
 
-/**
- * Extract the packed JavaScript code from the eval function
- */
-private fun extractPackedScript(scriptContent: String): String? {
-    return try {
-        // Look for the packed code inside eval(function(p,a,c,k,e,d){...})
-        val packedRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{[^}]+\}\((.*?)\)\)""", RegexOption.DOT_MATCHES_ALL)
-        val match = packedRegex.find(scriptContent)
-        match?.groupValues?.get(1)
-    } catch (e: Exception) {
-        null
+    // === 3. Fallback to loadExtractor ===
+    if (!foundVideo) {
+        loadExtractor(iframeUrl, mainUrl, subtitleCallback, callback)
     }
 }
-
-private fun base64Decode(encoded: String): String {
-    return try {
-        String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
-    } catch (e: Exception) {
-        ""
-    }
-}
-
     private suspend fun handleRapidramePlayer(
         iframeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
