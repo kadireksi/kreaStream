@@ -178,7 +178,7 @@ class TRT : MainAPI() {
                         name = "$name - YouTube",
                         url = watchUrl
                     ){
-                        referer = data,
+                        referer = data;
                         quality = Qualities.Unknown.value
                     }
                 )
@@ -189,13 +189,29 @@ class TRT : MainAPI() {
         // Fallback: direct video, iframe, JS
         doc.select("video source").forEach {
             val src = it.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            callback(newExtractorLink(name, "$name - Video", fixUrl(src), data, Qualities.Unknown.value, src.contains(".m3u8")))
+            callback(
+                newExtractorLink(
+                    source = name, 
+                    name = "$name - Video", 
+                    url = fixUrl(src)
+                ){
+                    referer = data; 
+                    quality = Qualities.Unknown.value; 
+                })
             found = true
         }
 
         doc.select("iframe[src*=player], iframe[src*=video], iframe[src*=embed]").forEach {
             val src = it.attr("src").takeIf { it.isNotBlank() && !it.contains("about:") } ?: return@forEach
-            callback(newExtractorLink(name, "$name - Iframe", fixUrl(src), data, Qualities.Unknown.value, src.contains(".m3u8")))
+            callback(
+                newExtractorLink(
+                    source = name, 
+                    name = "$name - Iframe", 
+                    url = fixUrl(src)
+                ){
+                    referer = data; 
+                    quality = Qualities.Unknown.value; 
+                })
             found = true
         }
 
@@ -204,7 +220,15 @@ class TRT : MainAPI() {
                 .findAll(script.data())
                 .forEach { m ->
                     val url = m.groupValues[1]
-                    callback(newExtractorLink(name, "$name - JS", url, data, Qualities.Unknown.value, url.contains("m3u8")))
+                    callback(
+                        newExtractorLink(
+                            source = name, 
+                            name = "$name - JS", 
+                            url = url
+                        ){
+                            referer = data; 
+                            quality = Qualities.Unknown.value; 
+                        })
                     found = true
                 }
         }
