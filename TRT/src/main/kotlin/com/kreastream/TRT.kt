@@ -134,7 +134,7 @@ class TRT : MainAPI() {
             }
             .sortedBy { it.episode }
 
-        return newTvSeriesLoadResponse(title, url, TvType.TVSeries, episodes) {
+        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
             this.plot = plot
         }
@@ -159,11 +159,12 @@ class TRT : MainAPI() {
                 newExtractorLink(
                     source = name,
                     name = "$name - Video Tag",
-                    url = fixUrl(src),
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
-                )
+                    url = fixUrl(src)
+                ){
+                    this.referer = data
+                    this.quality = Qualities.Unknown.value
+                    this.isM3u8 = src.contains(".m3u8")
+                }
             )
             found = true
         }
@@ -176,11 +177,12 @@ class TRT : MainAPI() {
                 newExtractorLink(
                     source = name,
                     name = "$name - Iframe",
-                    url = fixUrl(src),
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
-                )
+                    url = fixUrl(src)
+                ){
+                    this.referer = data
+                    this.quality = Qualities.Unknown.value
+                    this.isM3u8 = src.contains(".m3u8")
+                }
             )
             found = true
         }
@@ -196,11 +198,11 @@ class TRT : MainAPI() {
                         newExtractorLink(
                             source = name,
                             name = "$name - JS",
-                            url = url,
-                            referer = data,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = url.contains("m3u8")
-                        )
+                            url = url
+                        ){
+                            this.quality = Qualities.Unknown.value
+                            this.isM3u8 = url.contains("m3u8")
+                        }
                     )
                     found = true
                 }
