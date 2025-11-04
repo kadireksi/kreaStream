@@ -1,6 +1,7 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.extractors.YoutubeExtractor
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
@@ -15,7 +16,7 @@ class TRT : MainAPI() {
     private val apiUrl = "$mainUrl/diziler"
 
     // --------------------------------------------------------------------- //
-    //  MAIN PAGE – Güncel & Eski Diziler (with pagination)
+    //  MAIN PAGE – with pagination
     // --------------------------------------------------------------------- //
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<HomePageList>()
@@ -35,7 +36,6 @@ class TRT : MainAPI() {
             items.add(HomePageList(title, shows))
         }
 
-        // Detect next page
         val hasNext = try {
             val nextUrl = "$baseUrl&page=${page + 1}"
             val nextDoc = app.get(nextUrl, timeout = 5L).document
@@ -47,9 +47,6 @@ class TRT : MainAPI() {
         return newHomePageResponse(items, hasNext)
     }
 
-    // --------------------------------------------------------------------- //
-    //  Helper: card → SearchResponse
-    // --------------------------------------------------------------------- //
     private fun Element.toSearchResult(): SearchResponse? {
         val a = selectFirst("a[target=\"_self\"]") ?: return null
         val href = fixUrl(a.attr("href"))
@@ -66,9 +63,6 @@ class TRT : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    //  SEARCH – both archives, paginated
-    // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val q = query.trim().lowercaseTurkish()
         val results = mutableSetOf<SearchResponse>()
@@ -91,7 +85,6 @@ class TRT : MainAPI() {
             if (pageResults.isEmpty()) break
             results.addAll(pageResults)
 
-            // Check next page
             val nextUrl = "$baseUrl&page=${page + 1}"
             try {
                 val nextDoc = app.get(nextUrl, timeout = 5L).document
@@ -107,14 +100,12 @@ class TRT : MainAPI() {
         this.replace("İ", "i").replace("I", "ı").lowercase().replace("ı", "i")
 
     // --------------------------------------------------------------------- //
-    //  LOAD – from /bolum page only
+    //  LOAD – NEW LAYOUT: /bolum → grid + thumbnails + descriptions
     // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
-        // Go to /bolum page to get real episodes
         val bolumUrl = if (url.endsWith("/bolum")) url else "$url/bolum"
         val doc = app.get(bolumUrl).document
 
-        // Series title from main page (fallback)
         val seriesDoc = app.get(url).document
         val title = seriesDoc.selectFirst("h1")?.text()
             ?: seriesDoc.selectFirst(".series-title")?.text()
@@ -130,20 +121,28 @@ class TRT : MainAPI() {
             ?: seriesDoc.selectFirst("meta[name=description]")?.attr("content")
             ?: seriesDoc.selectFirst("meta[property=og:description]")?.attr("content")
 
-        val episodes = doc.select("div.swiper-wrapper > div.swiper-slide > div.h-full.w-full")
+        val episodes = doc.select("div.row_row-wrapper__v3J0q div.grid_grid-wrapper__elAnh div.h-full.w-full")
             .mapNotNull { card ->
                 val a = card.selectFirst("a[target=\"_self\"]") ?: return@mapNotNull null
                 val href = fixUrl(a.attr("href"))
 
-                val epTitleEl = a.selectFirst("div.card_card-title__IJ9af") ?: return@mapNotNull null
-                val epTitle = epTitleEl.text().trim().takeIf { it.isNotBlank() } ?: "Bölüm"
+                val titleEl = a.selectFirst("div.card_card-title__IJ9af") ?: return@mapNotNull null
+                val epTitle = titleEl.text().trim().takeIf { it.isNotBlank() } ?: "Bölüm"
 
                 val epNum = epTitle.split(".").firstOrNull()?.trim()?.toIntOrNull()
                     ?: href.substringAfterLast("/bolum/").substringBefore("-").toIntOrNull()
 
+                val img = a.selectFirst("img.card_card-image__e0L1j") ?: return@mapNotNull null
+                val thumb = img.attr("src").takeIf { it.isNotBlank() }?.let { fixUrl(it) }
+
+                val descEl = a.selectFirst("p.card_card-description__0PSTi")
+                val desc = descEl?.text()?.trim()
+
                 newEpisode(href) {
                     this.name = epTitle
                     this.episode = epNum
+                    this.posterUrl = thumb
+                    this.plot = desc
                 }
             }
             .sortedByDescending { it.episode }
@@ -155,7 +154,7 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – YouTube iframe
+    //  LOAD LINKS – FULL YouTube quality
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -166,73 +165,21 @@ class TRT : MainAPI() {
         val doc = app.get(data).document
         var found = false
 
-        // YouTube iframe
+        // YouTube iframe → ALL qualities
         doc.select("iframe[src*=\"youtube.com/embed/\"]").forEach { iframe ->
             val embedSrc = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            val videoId = embedSrc.substringAfter("/embed/").substringBefore("?")
-            if (videoId.isNotBlank()) {
-                val watchUrl = "https://www.youtube.com/watch?v=$videoId"
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "$name - YouTube",
-                        url = watchUrl
-                    ){
-                        referer = data;
-                        quality = Qualities.Unknown.value
-                    }
-                )
-                found = true
-            }
-        }
-
-        // Fallback: direct video, iframe, JS
-        doc.select("video source").forEach {
-            val src = it.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            callback(
-                newExtractorLink(
-                    source = name, 
-                    name = "$name - Video", 
-                    url = fixUrl(src)
-                ){
-                    referer = data; 
-                    quality = Qualities.Unknown.value; 
-                })
-            found = true
-        }
-
-        doc.select("iframe[src*=player], iframe[src*=video], iframe[src*=embed]").forEach {
-            val src = it.attr("src").takeIf { it.isNotBlank() && !it.contains("about:") } ?: return@forEach
-            callback(
-                newExtractorLink(
-                    source = name, 
-                    name = "$name - Iframe", 
-                    url = fixUrl(src)
-                ){
-                    referer = data; 
-                    quality = Qualities.Unknown.value; 
-                })
-            found = true
-        }
-
-        doc.select("script").forEach { script ->
-            Regex("""["'](https?://[^"']+\.(mp4|m3u8)[^"']*)["']""")
-                .findAll(script.data())
-                .forEach { m ->
-                    val url = m.groupValues[1]
-                    callback(
-                        newExtractorLink(
-                            source = name, 
-                            name = "$name - JS", 
-                            url = url
-                        ){
-                            referer = data; 
-                            quality = Qualities.Unknown.value; 
-                        })
-                    found = true
+            val videoId = embedSrc.substringBetween("/embed/", "?") ?: return@forEach
+            YoutubeExtractor.invoke(
+                videoId = videoId,
+                referer = data,
+                callback = { link ->
+                    callback(link.copy(
+                        name = "$name - ${link.quality}p"
+                    ))
                 }
+            )
+            found = true
         }
-
         return found
     }
 }
