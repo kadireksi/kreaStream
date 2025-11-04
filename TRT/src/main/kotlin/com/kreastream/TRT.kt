@@ -15,35 +15,32 @@ class TRT : MainAPI() {
     private val apiUrl = "$mainUrl/diziler"
 
     // --------------------------------------------------------------------- //
-    //  MAIN PAGE – with pagination
+    //  MAIN PAGE – Güncel & Eski Diziler (separate requests for titles)
     // --------------------------------------------------------------------- //
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<HomePageList>()
-        val isArchive = request.data.contains("archive=true")
-        val baseUrl = if (isArchive) "$apiUrl?archive=true" else "$apiUrl?archive=false"
 
-        val url = if (page > 1) "$baseUrl&page=$page" else baseUrl
-        val doc = app.get(url).document
-
-        val shows = doc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
+        // ---- Current shows (Güncel) ----
+        val currentDoc = app.get("$apiUrl?archive=false").document
+        val currentShows = currentDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
             .mapNotNull { it.toSearchResult() }
             .distinctBy { it.url }
             .sortedBy { it.name }
-
-        val title = if (isArchive) "Eski Diziler" else "Güncel Diziler"
-        if (shows.isNotEmpty()) {
-            items.add(HomePageList(title, shows))
+        if (currentShows.isNotEmpty()) {
+            items.add(HomePageList("Güncel Diziler", currentShows))
         }
 
-        val hasNext = try {
-            val nextUrl = "$baseUrl&page=${page + 1}"
-            val nextDoc = app.get(nextUrl, timeout = 5L).document
-            nextDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full").isNotEmpty()
-        } catch (e: Exception) {
-            false
+        // ---- Archived shows (Eski) ----
+        val archiveDoc = app.get("$apiUrl?archive=true").document
+        val archiveShows = archiveDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
+            .mapNotNull { it.toSearchResult() }
+            .distinctBy { it.url }
+            .sortedBy { it.name }
+        if (archiveShows.isNotEmpty()) {
+            items.add(HomePageList("Eski Diziler", archiveShows))
         }
 
-        return newHomePageResponse(items, hasNext)
+        return newHomePageResponse(items)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
@@ -144,12 +141,12 @@ class TRT : MainAPI() {
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
-            //this.plot = plot
+            this.plot = plot
         }
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – YouTube: Pass watch?v= URL → CloudStream extracts ALL qualities
+    //  LOAD LINKS – YouTube: Explicit "YouTube" source + headers for in-app play
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -160,7 +157,7 @@ class TRT : MainAPI() {
         val doc = app.get(data).document
         var found = false
 
-        // ---- YouTube embed → convert to watch?v= → CloudStream handles quality ----
+        // ---- YouTube embed → convert to watch?v= → CloudStream extracts qualities ----
         doc.select("iframe[src*=\"youtube.com/embed/\"]").forEach { iframe ->
             val src = iframe.attr("src")
             if (src.isBlank()) return@forEach
@@ -170,15 +167,16 @@ class TRT : MainAPI() {
 
             val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-            // CloudStream will auto-extract 1080p, 720p, etc. from the watch page
             callback(
                 newExtractorLink(
-                    source = name,
+                    source = "YouTube",  // Explicit for auto-extraction
                     name = "$name - YouTube",
                     url = watchUrl
-                ){
+                )
+                {
                     this.referer = data
                     this.quality = Qualities.Unknown.value
+                    this.headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 }
             )
             found = true

@@ -68,7 +68,7 @@ class Trt1 : MainAPI() {
         val episodesUrl = "$mainUrl/diziler/$seriesSlug/bolum"
         
         // Function to parse episodes from a page
-        fun parseEpisodesPage(pageUrl: String): List<Episode> {
+        suspend fun parseEpisodesPage(pageUrl: String): List<Episode> {
             val episodeDoc = app.get(pageUrl).document
             return episodeDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
                 val epTitle = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
@@ -79,13 +79,12 @@ class Trt1 : MainAPI() {
                 // Extract episode number from title (e.g., "191. Bölüm" -> 191)
                 val episodeNumber = epTitle.replace(Regex("[^0-9]"), "").toIntOrNull()
                 
-                Episode(
-                    data = "$mainUrl$epHref",
-                    name = epTitle,
-                    posterUrl = epPoster,
-                    episode = episodeNumber,
-                    description = epDescription
-                )
+                newEpisode("$mainUrl$epHref") {
+                    this.name = epTitle
+                    this.posterUrl = epPoster
+                    this.episode = episodeNumber
+                    this.description = epDescription
+                }
             }
         }
 
@@ -110,7 +109,7 @@ class Trt1 : MainAPI() {
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
-            this.plot = description
+            //this.plot = description
         }
     }
 
@@ -129,10 +128,7 @@ class Trt1 : MainAPI() {
             val youtubeUrl = embedUrl.replace("youtube.com/embed", "youtube.com/watch")
             
             // Use YouTube extractor
-            val extractor = YouTubeExtractor()
-            extractor.getSafeUrl(youtubeUrl)?.forEach { link ->
-                callback(link)
-            }
+            loadExtractor(youtubeUrl, data, subtitleCallback, callback)
             return true
         }
         
@@ -145,10 +141,7 @@ class Trt1 : MainAPI() {
                 val match = regex.find(scriptContent)
                 if (match != null) {
                     val youtubeUrl = match.value
-                    val extractor = YouTubeExtractor()
-                    extractor.getSafeUrl(youtubeUrl)?.forEach { link ->
-                        callback(link)
-                    }
+                    loadExtractor(youtubeUrl, data, subtitleCallback, callback)
                     return true
                 }
             }
@@ -159,10 +152,7 @@ class Trt1 : MainAPI() {
         if (canonical != null) {
             val canonicalUrl = canonical.attr("href")
             if (canonicalUrl.contains("youtube.com/watch")) {
-                val extractor = YouTubeExtractor()
-                extractor.getSafeUrl(canonicalUrl)?.forEach { link ->
-                    callback(link)
-                }
+                loadExtractor(canonicalUrl, data, subtitleCallback, callback)
                 return true
             }
         }
