@@ -210,9 +210,10 @@ class TRT : MainAPI() {
                             source = name,
                             name = "$name - JS",
                             url = url
-                        )
+                        ){
+                            referer = data;
                             quality = Qualities.Unknown.value;
-                        )
+                        }
                     )
                     found = true
                 }
