@@ -151,9 +151,8 @@ class TRT : MainAPI() {
                     name = "$name - Video Tag",
                     url = fixUrl(src)
                 ){
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
+                    referer = data;
+                    quality = Qualities.Unknown.value
                 }
             )
             found = true
@@ -169,9 +168,8 @@ class TRT : MainAPI() {
                     name = "$name - Iframe",
                     url = fixUrl(src)
                 ){
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
+                    referer = data;
+                    quality = Qualities.Unknown.value
                 }
             )
             found = true
@@ -190,9 +188,8 @@ class TRT : MainAPI() {
                             name = "$name - JS",
                             url = url
                         ){
-                            referer = data,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = url.contains("m3u8")
+                            referer = data;
+                            quality = Qualities.Unknown.value
                         }
                     )
                     found = true
