@@ -20,7 +20,7 @@ class TRT : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<HomePageList>()
         val isArchive = request.data.contains("archive=true")
-        val baseUrl = if (isArchive) "$apiUrl?archive=true" else "$api.assignUrl?archive=false"
+        val baseUrl = if (isArchive) "$apiUrl?archive=true" else "$apiUrl?archive=false"
 
         val url = if (page > 1) "$baseUrl&page=$page" else baseUrl
         val doc = app.get(url).document
