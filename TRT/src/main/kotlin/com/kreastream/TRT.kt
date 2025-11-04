@@ -40,7 +40,7 @@ import java.io.IOException
 class TRT : MainAPI() {
     override var name = "TRT"
     override var lang = "tr"
-    override val supportedTypes = setOf(TvType.TVSeries)
+    override val supportedTypes = setOf(TvType.TvSeries)
     override val hasMainPage = true
     override val hasQuickSearch = true          // optional – shows in quick-search
 
