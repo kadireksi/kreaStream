@@ -155,7 +155,6 @@ class TRT : MainAPI() {
                 ){
                     referer = data;
                     quality = Qualities.Unknown.value;
-                    isM3u8 = src.contains(".m3u8");
                 }
             )
             found = true
@@ -173,7 +172,6 @@ class TRT : MainAPI() {
                 ){
                     referer = data;
                     quality = Qualities.Unknown.value;
-                    isM3u8 = src.contains(".m3u8");
                 }
             )
             found = true
@@ -194,7 +192,6 @@ class TRT : MainAPI() {
                         ){
                             referer = data;
                             quality = Qualities.Unknown.value;
-                            isM3u8 = url.contains("m3u8");
                         }
                     )
                     found = true
