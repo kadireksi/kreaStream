@@ -19,7 +19,8 @@ on:
       - "**/*.jpg"
       - "**/*.png"
       - "**/*.py"
-      - Hdfc
+      - "**/Hdfc"
+      - "Hdfc"
 
 jobs:
   kreaStreamDerleyici:
