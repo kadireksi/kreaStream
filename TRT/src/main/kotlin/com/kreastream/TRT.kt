@@ -32,7 +32,7 @@ class TRT : MainAPI() {
 
         val title = if (isArchive) "Eski Diziler" else "Güncel Diziler"
         if (shows.isNotEmpty()) {
-            items.add(HomePageList(title, shows, isLazy = true))
+            items.add(HomePageList(title, shows))
         }
 
         // Detect next page
