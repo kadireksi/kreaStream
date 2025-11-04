@@ -124,7 +124,7 @@ class TRT : MainAPI() {
                     this.episode = epNum
                 }
             }
-            .sortedByDescending { it.episode }  // Latest first (as on site), or use sortedBy for oldest first
+            .sortedByDescending { it.episode }  // Latest first
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
@@ -133,7 +133,7 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – iframe / video tag / JS mp4|m3u8 (fixed syntax)
+    //  LOAD LINKS – YouTube iframe → watch?v=… (plus fallback)
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -144,7 +144,28 @@ class TRT : MainAPI() {
         val doc = app.get(data).document
         var found = false
 
-        // 1. <video><source src="…">
+        // ---- 1. YouTube iframe (the one you posted) -----------------------
+        doc.select("iframe[src*=\"youtube.com/embed/\"]").forEach { iframe ->
+            val embedSrc = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
+            // Example: https://www.youtube.com/embed/0cewvnLiEoI?controls=0&...
+            val videoId = embedSrc.substringAfter("/embed/").substringBefore("?")
+            if (videoId.isNotBlank()) {
+                val watchUrl = "https://www.youtube.com/watch?v=$videoId"
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "$name - YouTube",
+                        url = watchUrl
+                    ){
+                        referer = data;
+                        quality = Qualities.Unknown.value;
+                    }
+                )
+                found = true
+            }
+        }
+
+        // ---- 2. Direct <video> source ------------------------------------
         doc.select("video source").forEach {
             val src = it.attr("src").takeIf { s -> s.isNotBlank() } ?: return@forEach
             callback(
@@ -160,7 +181,7 @@ class TRT : MainAPI() {
             found = true
         }
 
-        // 2. iframe players
+        // ---- 3. Other iframes (player, video, embed) --------------------
         doc.select("iframe[src*=player], iframe[src*=video], iframe[src*=embed]").forEach {
             val src = it.attr("src").takeIf { s -> s.isNotBlank() && !s.contains("about:") }
                 ?: return@forEach
@@ -177,7 +198,7 @@ class TRT : MainAPI() {
             found = true
         }
 
-        // 3. JS embedded URLs
+        // ---- 4. JS embedded .mp4 / .m3u8 --------------------------------
         doc.select("script").forEach { script ->
             val txt = script.data()
             Regex("""["'](https?://[^"']+\.(mp4|m3u8)[^"']*)["']""")
@@ -189,10 +210,9 @@ class TRT : MainAPI() {
                             source = name,
                             name = "$name - JS",
                             url = url
-                        ){
-                            referer = data;
+                        )
                             quality = Qualities.Unknown.value;
-                        }
+                        )
                     )
                     found = true
                 }
