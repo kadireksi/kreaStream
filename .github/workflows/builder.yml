@@ -19,6 +19,7 @@ on:
       - "**/*.jpg"
       - "**/*.png"
       - "**/*.py"
+      - Hdfc
 
 jobs:
   kreaStreamDerleyici:
