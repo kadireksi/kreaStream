@@ -151,11 +151,12 @@ class TRT : MainAPI() {
                 newExtractorLink(
                     source = name,
                     name = "$name - Video Tag",
-                    url = fixUrl(src),
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
-                )
+                    url = fixUrl(src)
+                ){
+                    referer = data;
+                    quality = Qualities.Unknown.value;
+                    isM3u8 = src.contains(".m3u8");
+                }
             )
             found = true
         }
@@ -168,11 +169,12 @@ class TRT : MainAPI() {
                 newExtractorLink(
                     source = name,
                     name = "$name - Iframe",
-                    url = fixUrl(src),
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
-                )
+                    url = fixUrl(src)
+                ){
+                    referer = data;
+                    quality = Qualities.Unknown.value;
+                    isM3u8 = src.contains(".m3u8");
+                }
             )
             found = true
         }
@@ -188,11 +190,12 @@ class TRT : MainAPI() {
                         newExtractorLink(
                             source = name,
                             name = "$name - JS",
-                            url = url,
-                            referer = data,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = url.contains("m3u8")
-                        )
+                            url = url
+                        ){
+                            referer = data;
+                            quality = Qualities.Unknown.value;
+                            isM3u8 = url.contains("m3u8");
+                        }
                     )
                     found = true
                 }
