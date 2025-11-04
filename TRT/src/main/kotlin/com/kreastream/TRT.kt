@@ -2,7 +2,6 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.YoutubeHelper.getYouTubeLinks
 import org.jsoup.nodes.Element
 
 class TRT : MainAPI() {
@@ -21,7 +20,7 @@ class TRT : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<HomePageList>()
         val isArchive = request.data.contains("archive=true")
-        val baseUrl = if (isArchive) "$apiUrl?archive=true" else "$apiUrl?archive=false"
+        val baseUrl = if (isArchive) "$apiUrl?archive=true" else "$api.assignUrl?archive=false"
 
         val url = if (page > 1) "$baseUrl&page=$page" else baseUrl
         val doc = app.get(url).document
@@ -145,12 +144,12 @@ class TRT : MainAPI() {
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
-            this.plot = plot
+            //this.plot = plot
         }
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – YouTube with **ALL** qualities
+    //  LOAD LINKS – YouTube: Pass watch?v= URL → CloudStream extracts ALL qualities
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -161,7 +160,7 @@ class TRT : MainAPI() {
         val doc = app.get(data).document
         var found = false
 
-        // ---- YouTube embed → extract videoId → get every quality ----
+        // ---- YouTube embed → convert to watch?v= → CloudStream handles quality ----
         doc.select("iframe[src*=\"youtube.com/embed/\"]").forEach { iframe ->
             val src = iframe.attr("src")
             if (src.isBlank()) return@forEach
@@ -169,39 +168,20 @@ class TRT : MainAPI() {
             val videoId = src.substringAfter("/embed/").substringBefore("?")
             if (videoId.isBlank()) return@forEach
 
-            try {
-                // CloudStream helper – returns a list of ExtractorLink (all qualities)
-                val ytLinks = app.getYouTubeLinks(videoId, data)
-                ytLinks.forEach { link ->
-                    // link.quality is an Int (e.g. 1080, 720 …)
-                    val quality = link.quality
-                    callback(
-                        newExtractorLink(
-                            source = name,
-                            name = "$name - ${quality}p",
-                            url = link.url
-                        ){
-                            this.referer = data;
-                            this.quality = quality;
-                        }
-                    )
+            val watchUrl = "https://www.youtube.com/watch?v=$videoId"
+
+            // CloudStream will auto-extract 1080p, 720p, etc. from the watch page
+            callback(
+                newExtractorLink(
+                    source = name,
+                    name = "$name - YouTube",
+                    url = watchUrl
+                ){
+                    this.referer = data
+                    this.quality = Qualities.Unknown.value
                 }
-                found = true
-            } catch (e: Exception) {
-                // Fallback – just give the watch?v= link (CloudStream will still play it)
-                val watchUrl = "https://www.youtube.com/watch?v=$videoId"
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "$name - YouTube",
-                        url = watchUrl
-                    ){
-                        this.referer = data;
-                        this.quality = Qualities.Unknown.value;
-                    }
-                )
-                found = true
-            }
+            )
+            found = true
         }
 
         return found
