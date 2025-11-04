@@ -138,7 +138,6 @@ class TRT : MainAPI() {
                     this.name = epTitle
                     this.episode = epNum
                     this.posterUrl = thumb
-                    // No plot field in EpisodeData
                 }
             }
             .sortedByDescending { it.episode }
@@ -150,7 +149,7 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – YouTube: extract ALL qualities
+    //  LOAD LINKS – YouTube with **ALL** qualities
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -161,7 +160,7 @@ class TRT : MainAPI() {
         val doc = app.get(data).document
         var found = false
 
-        // --- YouTube iframe → extract video ID → get all qualities ---
+        // ---- YouTube embed → extract videoId → get every quality ----
         doc.select("iframe[src*=\"youtube.com/embed/\"]").forEach { iframe ->
             val src = iframe.attr("src")
             if (src.isBlank()) return@forEach
@@ -169,21 +168,14 @@ class TRT : MainAPI() {
             val videoId = src.substringAfter("/embed/").substringBefore("?")
             if (videoId.isBlank()) return@forEach
 
-            // Use CloudStream's built-in YouTube extractor
             try {
-                val ytLinks = app.getYoutubeLinks(videoId, data)
+                // CloudStream helper – returns a list of ExtractorLink (all qualities)
+                val ytLinks = app.getYouTubeLinks(videoId, data)
                 ytLinks.forEach { link ->
-                    val quality = when {
-                        link.quality >= 2160 -> 2160
-                        link.quality >= 1440 -> 1440
-                        link.quality >= 1080 -> 1080
-                        link.quality >= 720 -> 720
-                        link.quality >= 480 -> 480
-                        link.quality >= 360 -> 360
-                        else -> 240
-                    }
+                    // link.quality is an Int (e.g. 1080, 720 …)
+                    val quality = link.quality
                     callback(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = name,
                             name = "$name - ${quality}p",
                             url = link.url
@@ -195,10 +187,10 @@ class TRT : MainAPI() {
                 }
                 found = true
             } catch (e: Exception) {
-                // Fallback: just pass watch link
+                // Fallback – just give the watch?v= link (CloudStream will still play it)
                 val watchUrl = "https://www.youtube.com/watch?v=$videoId"
                 callback(
-                    ExtractorLink(
+                    newExtractorLink(
                         source = name,
                         name = "$name - YouTube",
                         url = watchUrl
