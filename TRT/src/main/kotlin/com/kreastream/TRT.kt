@@ -41,7 +41,6 @@ class TRT : MainAPI() {
     //  Helper: card → SearchResponse
     // --------------------------------------------------------------------- //
     private fun Element.toSearchResult(): SearchResponse? {
-        // the whole card is inside an <a>
         val a = selectFirst("a[target=\"_self\"]") ?: return null
         val href = fixUrl(a.attr("href"))
 
@@ -88,7 +87,7 @@ class TRT : MainAPI() {
             .replace("ı", "i")          // treat ı as i for search
 
     // --------------------------------------------------------------------- //
-    //  LOAD – series page → episodes
+    //  LOAD – series page → episodes (updated for new layout)
     // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
         val doc = app.get(url).document
@@ -107,22 +106,25 @@ class TRT : MainAPI() {
             ?: doc.selectFirst("meta[name=description]")?.attr("content")
             ?: doc.selectFirst("meta[property=og:description]")?.attr("content")
 
-        val episodes = doc.select("div.episode-item a, .episodes-list a, .episode a")
-            .mapNotNull { el ->
-                val a = el.selectFirst("a") ?: el as? Element ?: return@mapNotNull null
-                val name = a.selectFirst("span.title, .episode-title, h4, .title")
-                    ?.text()?.trim() ?: "Bölüm"
+        val episodes = doc.select("div.swiper-wrapper > div.swiper-slide > div.h-full.w-full")
+            .mapNotNull { card ->
+                val a = card.selectFirst("a[target=\"_self\"]") ?: return@mapNotNull null
                 val href = fixUrl(a.attr("href"))
-                val epNumText = a.selectFirst(".episode-number, .episode-no")?.text()
-                    ?: a.attr("href").substringAfterLast("/").substringAfterLast("-")
-                val epNum = epNumText.replace(Regex("\\D"), "").toIntOrNull()
+
+                val epTitleEl = a.selectFirst("div.card_card-title__IJ9af") ?: return@mapNotNull null
+                val epTitle = epTitleEl.text().trim().takeIf { it.isNotBlank() } ?: "Bölüm"
+
+                // Extract episode number from title (e.g., "191. Bölüm" → 191)
+                val epNum = epTitle.split(".").firstOrNull()?.trim()?.toIntOrNull()
+                    // Fallback to URL: /bolum/191-bolum → 191
+                    ?: href.substringAfterLast("/bolum/").substringBefore("-").toIntOrNull()
 
                 newEpisode(href) {
-                    this.name = name
+                    this.name = epTitle
                     this.episode = epNum
                 }
             }
-            .sortedBy { it.episode }
+            .sortedByDescending { it.episode }  // Latest first (as on site), or use sortedBy for oldest first
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
@@ -131,7 +133,7 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – iframe / video tag / JS mp4|m3u8
+    //  LOAD LINKS – iframe / video tag / JS mp4|m3u8 (fixed syntax)
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -149,11 +151,11 @@ class TRT : MainAPI() {
                 newExtractorLink(
                     source = name,
                     name = "$name - Video Tag",
-                    url = fixUrl(src)
-                ){
-                    referer = data;
-                    quality = Qualities.Unknown.value
-                }
+                    url = fixUrl(src),
+                    referer = data,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = src.contains(".m3u8")
+                )
             )
             found = true
         }
@@ -166,11 +168,11 @@ class TRT : MainAPI() {
                 newExtractorLink(
                     source = name,
                     name = "$name - Iframe",
-                    url = fixUrl(src)
-                ){
-                    referer = data;
-                    quality = Qualities.Unknown.value
-                }
+                    url = fixUrl(src),
+                    referer = data,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = src.contains(".m3u8")
+                )
             )
             found = true
         }
@@ -186,11 +188,11 @@ class TRT : MainAPI() {
                         newExtractorLink(
                             source = name,
                             name = "$name - JS",
-                            url = url
-                        ){
-                            referer = data;
-                            quality = Qualities.Unknown.value
-                        }
+                            url = url,
+                            referer = data,
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = url.contains("m3u8")
+                        )
                     )
                     found = true
                 }
