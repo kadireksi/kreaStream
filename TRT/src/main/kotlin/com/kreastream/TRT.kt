@@ -1,7 +1,6 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.extractors.YoutubeExtractor
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
@@ -100,7 +99,7 @@ class TRT : MainAPI() {
         this.replace("İ", "i").replace("I", "ı").lowercase().replace("ı", "i")
 
     // --------------------------------------------------------------------- //
-    //  LOAD – NEW LAYOUT: /bolum → grid + thumbnails + descriptions
+    //  LOAD – /bolum → grid + thumbnails
     // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
         val bolumUrl = if (url.endsWith("/bolum")) url else "$url/bolum"
@@ -135,14 +134,11 @@ class TRT : MainAPI() {
                 val img = a.selectFirst("img.card_card-image__e0L1j") ?: return@mapNotNull null
                 val thumb = img.attr("src").takeIf { it.isNotBlank() }?.let { fixUrl(it) }
 
-                val descEl = a.selectFirst("p.card_card-description__0PSTi")
-                val desc = descEl?.text()?.trim()
-
                 newEpisode(href) {
                     this.name = epTitle
                     this.episode = epNum
                     this.posterUrl = thumb
-                    this.plot = desc
+                    // No plot field in EpisodeData
                 }
             }
             .sortedByDescending { it.episode }
@@ -154,7 +150,7 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – FULL YouTube quality
+    //  LOAD LINKS – YouTube: extract ALL qualities
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -165,21 +161,56 @@ class TRT : MainAPI() {
         val doc = app.get(data).document
         var found = false
 
-        // YouTube iframe → ALL qualities
+        // --- YouTube iframe → extract video ID → get all qualities ---
         doc.select("iframe[src*=\"youtube.com/embed/\"]").forEach { iframe ->
-            val embedSrc = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            val videoId = embedSrc.substringBetween("/embed/", "?") ?: return@forEach
-            YoutubeExtractor.invoke(
-                videoId = videoId,
-                referer = data,
-                callback = { link ->
-                    callback(link.copy(
-                        name = "$name - ${link.quality}p"
-                    ))
+            val src = iframe.attr("src")
+            if (src.isBlank()) return@forEach
+
+            val videoId = src.substringAfter("/embed/").substringBefore("?")
+            if (videoId.isBlank()) return@forEach
+
+            // Use CloudStream's built-in YouTube extractor
+            try {
+                val ytLinks = app.getYoutubeLinks(videoId, data)
+                ytLinks.forEach { link ->
+                    val quality = when {
+                        link.quality >= 2160 -> 2160
+                        link.quality >= 1440 -> 1440
+                        link.quality >= 1080 -> 1080
+                        link.quality >= 720 -> 720
+                        link.quality >= 480 -> 480
+                        link.quality >= 360 -> 360
+                        else -> 240
+                    }
+                    callback(
+                        ExtractorLink(
+                            source = name,
+                            name = "$name - ${quality}p",
+                            url = link.url
+                        ){
+                            this.referer = data;
+                            this.quality = quality;
+                        }
+                    )
                 }
-            )
-            found = true
+                found = true
+            } catch (e: Exception) {
+                // Fallback: just pass watch link
+                val watchUrl = "https://www.youtube.com/watch?v=$videoId"
+                callback(
+                    ExtractorLink(
+                        source = name,
+                        name = "$name - YouTube",
+                        url = watchUrl
+                    ){
+                        this.referer = data;
+                        this.quality = Qualities.Unknown.value;
+                    }
+                )
+                found = true
+            }
         }
+
         return found
     }
 }
