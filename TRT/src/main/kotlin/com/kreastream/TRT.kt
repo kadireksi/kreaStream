@@ -3,84 +3,77 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
-import java.util.concurrent.TimeUnit
 
 class TRT : MainAPI() {
     override var name = "TRT"
     override var lang = "tr"
     override val supportedTypes = setOf(TvType.TvSeries)
     override val hasMainPage = true
-    override val hasQuickSearch = true          // optional – shows in quick-search
+    override val hasQuickSearch = true
 
     override var mainUrl = "https://www.trt1.com.tr"
     private val apiUrl = "$mainUrl/diziler"
 
     // --------------------------------------------------------------------- //
-    //  MAIN PAGE (Güncel & Eski Diziler – sorted alphabetically)
+    //  MAIN PAGE – Güncel & Eski Diziler (sorted A-Z)
     // --------------------------------------------------------------------- //
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<HomePageList>()
 
         // ---- Current shows -------------------------------------------------
         val currentDoc = app.get("$apiUrl?archive=false").document
-        val currentShows = currentDoc.select("div.series-item")
+        val currentShows = currentDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
             .mapNotNull { it.toSearchResult() }
             .sortedBy { it.name }
-        if (currentShows.isNotEmpty()) {
-            items.add(HomePageList("Güncel Diziler", currentShows))
-        }
+        if (currentShows.isNotEmpty()) items.add(HomePageList("Güncel Diziler", currentShows))
 
         // ---- Archived shows ------------------------------------------------
         val archiveDoc = app.get("$apiUrl?archive=true").document
-        val archiveShows = archiveDoc.select("div.series-item")
+        val archiveShows = archiveDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
             .mapNotNull { it.toSearchResult() }
             .sortedBy { it.name }
-        if (archiveShows.isNotEmpty()) {
-            items.add(HomePageList("Eski Diziler", archiveShows))
-        }
+        if (archiveShows.isNotEmpty()) items.add(HomePageList("Eski Diziler", archiveShows))
 
         return newHomePageResponse(items, hasNext = false)
     }
 
     // --------------------------------------------------------------------- //
-    //  Helper: element → SearchResponse
+    //  Helper: card → SearchResponse
     // --------------------------------------------------------------------- //
     private fun Element.toSearchResult(): SearchResponse? {
-        val a = selectFirst("h3 a") ?: return null
-        val title = a.text().trim().takeIf { it.isNotBlank() } ?: return null
+        // the whole card is inside an <a>
+        val a = selectFirst("a[target=\"_self\"]") ?: return null
         val href = fixUrl(a.attr("href"))
 
-        val img = selectFirst("img")
-        val poster = when {
-            img?.attr("src")?.isNotBlank() == true -> img.attr("src")
-            img?.attr("data-src")?.isNotBlank() == true -> img.attr("data-src")
-            img?.attr("data-lazy")?.isNotBlank() == true -> img.attr("data-lazy")
-            else -> null
-        }?.let { fixUrl(it) }
+        val titleEl = selectFirst("div.card_card-title__IJ9af") ?: return null
+        val title = titleEl.text().trim().takeIf { it.isNotBlank() } ?: return null
 
-        return newMovieSearchResponse(title, href, TvType.TvSeries) {
+        val img = selectFirst("img.card_card-image__e0L1j") ?: return null
+        val poster = img.attr("src").takeIf { it.isNotBlank() }?.let { fixUrl(it) }
+            ?: img.attr("data-src").takeIf { it.isNotBlank() }?.let { fixUrl(it) }
+
+        return newAnimeSearchResponse(title, href, TvType.TvSeries) {
             this.posterUrl = poster
         }
     }
 
     // --------------------------------------------------------------------- //
-    //  SEARCH (both archives, Turkish-aware, sorted A-Z)
+    //  SEARCH – both archives, Turkish-aware, sorted A-Z
     // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val q = query.trim().lowercaseTurkish()
-
-        val results = mutableSetOf<SearchResponse>()   // set → no duplicates
+        val results = mutableSetOf<SearchResponse>()
 
         // current
         app.get("$apiUrl?archive=false").document
-            .select("div.series-item")
+            .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
             .mapNotNull { it.toSearchResult() }
             .filter { it.name.lowercaseTurkish().contains(q) }
             .forEach { results.add(it) }
 
         // archive
         app.get("$apiUrl?archive=true").document
-            .select("div.series-item")
+            .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
             .mapNotNull { it.toSearchResult() }
             .filter { it.name.lowercaseTurkish().contains(q) }
             .forEach { results.add(it) }
@@ -95,7 +88,7 @@ class TRT : MainAPI() {
             .replace("ı", "i")          // treat ı as i for search
 
     // --------------------------------------------------------------------- //
-    //  LOAD (series page → episodes)
+    //  LOAD – series page → episodes
     // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
         val doc = app.get(url).document
@@ -106,11 +99,8 @@ class TRT : MainAPI() {
             ?: return null
 
         val poster = doc.selectFirst("img.series-poster, img.detail-poster")
-            ?.attr("src")
-            ?.takeIf { it.isNotBlank() }
-            ?.let { fixUrl(it) }
-            ?: doc.selectFirst("meta[property=og:image]")?.attr("content")
-                ?.let { fixUrl(it) }
+            ?.attr("src")?.takeIf { it.isNotBlank() }?.let { fixUrl(it) }
+            ?: doc.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrl(it) }
 
         val plot = doc.selectFirst(".series-description, .synopsis, .summary")
             ?.text()
@@ -141,7 +131,7 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS (iframe, video tag, JS mp4/m3u8)
+    //  LOAD LINKS – iframe / video tag / JS mp4|m3u8
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -154,16 +144,16 @@ class TRT : MainAPI() {
 
         // 1. <video><source src="…">
         doc.select("video source").forEach {
-            val src = it.attr("src").takeIf { src -> src.isNotBlank() } ?: return@forEach
+            val src = it.attr("src").takeIf { s -> s.isNotBlank() } ?: return@forEach
             callback(
                 newExtractorLink(
                     source = name,
                     name = "$name - Video Tag",
-                    url = fixUrl(src)
-                ){
-                   referer = data
-                   quality = Qualities.Unknown.value
-                }
+                    url = fixUrl(src),
+                    referer = data,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = src.contains(".m3u8")
+                )
             )
             found = true
         }
@@ -176,11 +166,11 @@ class TRT : MainAPI() {
                 newExtractorLink(
                     source = name,
                     name = "$name - Iframe",
-                    url = fixUrl(src)
-                ){
-                    referer = data
-                    quality = Qualities.Unknown.value
-                }
+                    url = fixUrl(src),
+                    referer = data,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = src.contains(".m3u8")
+                )
             )
             found = true
         }
@@ -196,10 +186,11 @@ class TRT : MainAPI() {
                         newExtractorLink(
                             source = name,
                             name = "$name - JS",
-                            url = url
-                        ){
-                            quality = Qualities.Unknown.value
-                        }
+                            url = url,
+                            referer = data,
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = url.contains("m3u8")
+                        )
                     )
                     found = true
                 }
