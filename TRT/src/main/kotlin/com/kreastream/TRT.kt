@@ -15,26 +15,36 @@ class TRT : MainAPI() {
     private val apiUrl = "$mainUrl/diziler"
 
     // --------------------------------------------------------------------- //
-    //  MAIN PAGE – Güncel & Eski Diziler (sorted A-Z)
+    //  MAIN PAGE – Güncel & Eski Diziler (with pagination)
     // --------------------------------------------------------------------- //
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<HomePageList>()
+        val isArchive = request.data.contains("archive=true")
+        val baseUrl = if (isArchive) "$apiUrl?archive=true" else "$apiUrl?archive=false"
 
-        // ---- Current shows -------------------------------------------------
-        val currentDoc = app.get("$apiUrl?archive=false").document
-        val currentShows = currentDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
+        val url = if (page > 1) "$baseUrl&page=$page" else baseUrl
+        val doc = app.get(url).document
+
+        val shows = doc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
             .mapNotNull { it.toSearchResult() }
+            .distinctBy { it.url }
             .sortedBy { it.name }
-        if (currentShows.isNotEmpty()) items.add(HomePageList("Güncel Diziler", currentShows))
 
-        // ---- Archived shows ------------------------------------------------
-        val archiveDoc = app.get("$apiUrl?archive=true").document
-        val archiveShows = archiveDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
-            .mapNotNull { it.toSearchResult() }
-            .sortedBy { it.name }
-        if (archiveShows.isNotEmpty()) items.add(HomePageList("Eski Diziler", archiveShows))
+        val title = if (isArchive) "Eski Diziler" else "Güncel Diziler"
+        if (shows.isNotEmpty()) {
+            items.add(HomePageList(title, shows, isLazy = true))
+        }
 
-        return newHomePageResponse(items, hasNext = false)
+        // Detect next page
+        val hasNext = try {
+            val nextUrl = "$baseUrl&page=${page + 1}"
+            val nextDoc = app.get(nextUrl, timeout = 5L).document
+            nextDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full").isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+
+        return newHomePageResponse(items, hasNext)
     }
 
     // --------------------------------------------------------------------- //
@@ -57,54 +67,68 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  SEARCH – both archives, Turkish-aware, sorted A-Z
+    //  SEARCH – both archives, paginated
     // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val q = query.trim().lowercaseTurkish()
         val results = mutableSetOf<SearchResponse>()
 
-        // current
-        app.get("$apiUrl?archive=false").document
-            .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
-            .mapNotNull { it.toSearchResult() }
-            .filter { it.name.lowercaseTurkish().contains(q) }
-            .forEach { results.add(it) }
-
-        // archive
-        app.get("$apiUrl?archive=true").document
-            .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
-            .mapNotNull { it.toSearchResult() }
-            .filter { it.name.lowercaseTurkish().contains(q) }
-            .forEach { results.add(it) }
+        searchInArchive("$apiUrl?archive=false", q, results)
+        searchInArchive("$apiUrl?archive=true", q, results)
 
         return results.sortedBy { it.name }
     }
 
+    private suspend fun searchInArchive(baseUrl: String, query: String, results: MutableSet<SearchResponse>) {
+        var page = 1
+        while (true) {
+            val url = if (page > 1) "$baseUrl&page=$page" else baseUrl
+            val doc = app.get(url).document
+            val pageResults = doc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full")
+                .mapNotNull { it.toSearchResult() }
+                .filter { it.name.lowercaseTurkish().contains(query) }
+
+            if (pageResults.isEmpty()) break
+            results.addAll(pageResults)
+
+            // Check next page
+            val nextUrl = "$baseUrl&page=${page + 1}"
+            try {
+                val nextDoc = app.get(nextUrl, timeout = 5L).document
+                if (nextDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full").isEmpty()) break
+            } catch (e: Exception) {
+                break
+            }
+            page++
+        }
+    }
+
     private fun String.lowercaseTurkish(): String =
-        this.replace("İ", "i")
-            .replace("I", "ı")
-            .lowercase()
-            .replace("ı", "i")          // treat ı as i for search
+        this.replace("İ", "i").replace("I", "ı").lowercase().replace("ı", "i")
 
     // --------------------------------------------------------------------- //
-    //  LOAD – series page → episodes (updated for new layout)
+    //  LOAD – from /bolum page only
     // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse? {
-        val doc = app.get(url).document
+        // Go to /bolum page to get real episodes
+        val bolumUrl = if (url.endsWith("/bolum")) url else "$url/bolum"
+        val doc = app.get(bolumUrl).document
 
-        val title = doc.selectFirst("h1")?.text()
-            ?: doc.selectFirst(".series-title")?.text()
-            ?: doc.selectFirst("title")?.text()?.substringBefore(" - ")
+        // Series title from main page (fallback)
+        val seriesDoc = app.get(url).document
+        val title = seriesDoc.selectFirst("h1")?.text()
+            ?: seriesDoc.selectFirst(".series-title")?.text()
+            ?: seriesDoc.selectFirst("title")?.text()?.substringBefore(" - ")
             ?: return null
 
-        val poster = doc.selectFirst("img.series-poster, img.detail-poster")
+        val poster = seriesDoc.selectFirst("img.series-poster, img.detail-poster")
             ?.attr("src")?.takeIf { it.isNotBlank() }?.let { fixUrl(it) }
-            ?: doc.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrl(it) }
+            ?: seriesDoc.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrl(it) }
 
-        val plot = doc.selectFirst(".series-description, .synopsis, .summary")
+        val plot = seriesDoc.selectFirst(".series-description, .synopsis, .summary")
             ?.text()
-            ?: doc.selectFirst("meta[name=description]")?.attr("content")
-            ?: doc.selectFirst("meta[property=og:description]")?.attr("content")
+            ?: seriesDoc.selectFirst("meta[name=description]")?.attr("content")
+            ?: seriesDoc.selectFirst("meta[property=og:description]")?.attr("content")
 
         val episodes = doc.select("div.swiper-wrapper > div.swiper-slide > div.h-full.w-full")
             .mapNotNull { card ->
@@ -114,9 +138,7 @@ class TRT : MainAPI() {
                 val epTitleEl = a.selectFirst("div.card_card-title__IJ9af") ?: return@mapNotNull null
                 val epTitle = epTitleEl.text().trim().takeIf { it.isNotBlank() } ?: "Bölüm"
 
-                // Extract episode number from title (e.g., "191. Bölüm" → 191)
                 val epNum = epTitle.split(".").firstOrNull()?.trim()?.toIntOrNull()
-                    // Fallback to URL: /bolum/191-bolum → 191
                     ?: href.substringAfterLast("/bolum/").substringBefore("-").toIntOrNull()
 
                 newEpisode(href) {
@@ -124,7 +146,7 @@ class TRT : MainAPI() {
                     this.episode = epNum
                 }
             }
-            .sortedByDescending { it.episode }  // Latest first
+            .sortedByDescending { it.episode }
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
@@ -133,7 +155,7 @@ class TRT : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  LOAD LINKS – YouTube iframe → watch?v=… (plus fallback)
+    //  LOAD LINKS – YouTube iframe
     // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
@@ -144,10 +166,9 @@ class TRT : MainAPI() {
         val doc = app.get(data).document
         var found = false
 
-        // ---- 1. YouTube iframe (the one you posted) -----------------------
+        // YouTube iframe
         doc.select("iframe[src*=\"youtube.com/embed/\"]").forEach { iframe ->
             val embedSrc = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            // Example: https://www.youtube.com/embed/0cewvnLiEoI?controls=0&...
             val videoId = embedSrc.substringAfter("/embed/").substringBefore("?")
             if (videoId.isNotBlank()) {
                 val watchUrl = "https://www.youtube.com/watch?v=$videoId"
@@ -157,64 +178,33 @@ class TRT : MainAPI() {
                         name = "$name - YouTube",
                         url = watchUrl
                     ){
-                        referer = data;
-                        quality = Qualities.Unknown.value;
+                        referer = data,
+                        quality = Qualities.Unknown.value
                     }
                 )
                 found = true
             }
         }
 
-        // ---- 2. Direct <video> source ------------------------------------
+        // Fallback: direct video, iframe, JS
         doc.select("video source").forEach {
-            val src = it.attr("src").takeIf { s -> s.isNotBlank() } ?: return@forEach
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = "$name - Video Tag",
-                    url = fixUrl(src)
-                ){
-                    referer = data;
-                    quality = Qualities.Unknown.value;
-                }
-            )
+            val src = it.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
+            callback(newExtractorLink(name, "$name - Video", fixUrl(src), data, Qualities.Unknown.value, src.contains(".m3u8")))
             found = true
         }
 
-        // ---- 3. Other iframes (player, video, embed) --------------------
         doc.select("iframe[src*=player], iframe[src*=video], iframe[src*=embed]").forEach {
-            val src = it.attr("src").takeIf { s -> s.isNotBlank() && !s.contains("about:") }
-                ?: return@forEach
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = "$name - Iframe",
-                    url = fixUrl(src)
-                ){
-                    referer = data;
-                    quality = Qualities.Unknown.value;
-                }
-            )
+            val src = it.attr("src").takeIf { it.isNotBlank() && !it.contains("about:") } ?: return@forEach
+            callback(newExtractorLink(name, "$name - Iframe", fixUrl(src), data, Qualities.Unknown.value, src.contains(".m3u8")))
             found = true
         }
 
-        // ---- 4. JS embedded .mp4 / .m3u8 --------------------------------
         doc.select("script").forEach { script ->
-            val txt = script.data()
             Regex("""["'](https?://[^"']+\.(mp4|m3u8)[^"']*)["']""")
-                .findAll(txt)
+                .findAll(script.data())
                 .forEach { m ->
                     val url = m.groupValues[1]
-                    callback(
-                        newExtractorLink(
-                            source = name,
-                            name = "$name - JS",
-                            url = url
-                        ){
-                            referer = data;
-                            quality = Qualities.Unknown.value;
-                        }
-                    )
+                    callback(newExtractorLink(name, "$name - JS", url, data, Qualities.Unknown.value, url.contains("m3u8")))
                     found = true
                 }
         }
