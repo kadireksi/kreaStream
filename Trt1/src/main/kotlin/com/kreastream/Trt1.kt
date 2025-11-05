@@ -324,12 +324,11 @@ class Trt1 : MainAPI() {
                     newExtractorLink(
                         name = "YouTube",
                         source = "YouTube",
-                        url = link.url
+                        url = url
                     ) {
-                        this.referer = "https://www.youtube.com/"
-                        this.quality = link.quality
-                        this.isM3u8 = link.isM3u8
-                        this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+                        this.referer = "https://www.youtube.com/";
+                        this.quality = link.quality;
+                        this.headers = mapOf("User-Agent" to "Mozilla/5.0");
                     }
                 )
             }
