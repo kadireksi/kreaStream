@@ -8,15 +8,15 @@ class TrtLive : MainAPI() {
     override var name = "TRT Canlı"
     override val supportedTypes = setOf(TvType.Live)
 
-    override suspend fun getMainPage(): HomePageResponse {
-        val channels = TrtUtils.liveChannels.map { (name, url, logo) ->
-            val now = TrtUtils.getNowPlaying(name)
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
+        val channels = TrtUtils.liveChannels.map { (channelName, streamUrl, logoUrl) ->
+            val nowPlaying = TrtUtils.getNowPlaying(channelName)
             HomePageList(
-                name,
+                channelName,
                 listOf(
-                    newMovieSearchResponse(name, url, TvType.Live) {
-                        this.posterUrl = logo
-                        this.plot = now ?: "Canlı yayın akışı"
+                    newMovieSearchResponse(channelName, streamUrl, TvType.Live) {
+                        this.posterUrl = logoUrl
+                        this.description = nowPlaying ?: "Canlı yayın akışı"
                     }
                 ),
                 isHorizontalImages = true
@@ -26,9 +26,12 @@ class TrtLive : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val name = TrtUtils.liveChannels.find { it.second == url }?.first ?: "TRT Canlı"
+        val channel = TrtUtils.liveChannels.find { it.second == url }
+        val name = channel?.first ?: "TRT Canlı"
+        val logo = channel?.third
+
         return newMovieLoadResponse(name, url, TvType.Live, url) {
-            this.posterUrl = TrtUtils.liveChannels.find { it.second == url }?.third
+            this.posterUrl = logo
         }
     }
 
