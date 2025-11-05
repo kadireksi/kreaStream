@@ -313,31 +313,37 @@ class Trt1 : MainAPI() {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        // Use the helper in Cloudstream that fetches adaptive qualities
-        val links = YoutubeHelper.extractLinks(watchUrl) ?: return false
+        // Collect all extracted links first
+        val extractedLinks = mutableListOf<ExtractorLink>()
 
-        for (link in links) {
+        // Use the internal universal extractor which supports multiple YouTube qualities
+        loadExtractor(
+            watchUrl,
+            "https://www.youtube.com/",
+            subtitleCallback
+        ) { link ->
+            extractedLinks.add(link)
+        }
+
+        if (extractedLinks.isEmpty()) return false
+
+        // Re-wrap all with newExtractorLink to standardize the output
+        for (extracted in extractedLinks) {
             callback(
                 newExtractorLink(
                     name = "YouTube",
                     source = "YouTube",
-                    url = link.url
+                    url = extracted.url
                 ) {
                     this.referer = "https://www.youtube.com/";
-                    this.quality = link.quality;
-                    this.headers = mapOf("User-Agent" to "Mozilla/5.0");
+                    this.quality = extracted.quality;
+                    //this.isM3u8 = extracted.isM3u8;
+                    this.headers = extracted.headers ?: mapOf("User-Agent" to "Mozilla/5.0");
                 }
             )
         }
 
-        // Handle subtitles (if available)
-        val subs = YoutubeHelper.extractSubtitles(videoId)
-        subs?.forEach { sub ->
-            subtitleCallback(SubtitleFile(sub.language ?: "Unknown", sub.url))
-        }
-
-        return links.isNotEmpty()
+        return true
     }
-
 
 }
