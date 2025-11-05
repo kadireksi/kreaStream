@@ -8,6 +8,7 @@ import org.jsoup.nodes.Element
 import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 
 class Trt1 : MainAPI() {
@@ -329,21 +330,28 @@ class Trt1 : MainAPI() {
             requestBody = payload.toRequestBody("application/json".toMediaType())
         ).text
 
-        val json = tryParseJson<JsonObject>(response)
-        val formats = json?.get("streamingData")?.jsonObject?.get("formats")?.jsonArray
-            ?: return emptyList()
+        val result = mutableListOf<Pair<String, Int>>()
 
-        val links = mutableListOf<Pair<String, Int>>()
+        try {
+            val root = org.json.JSONObject(response)
+            val streamingData = root.optJSONObject("streamingData") ?: return emptyList()
+            val formats = streamingData.optJSONArray("formats") ?: return emptyList()
 
-        for (format in formats) {
-            val obj = format.jsonObject
-            val url = obj["url"]?.jsonPrimitive?.contentOrNull ?: continue
-            val qualityLabel = obj["qualityLabel"]?.jsonPrimitive?.contentOrNull
-            val q = qualityLabel?.replace("p", "")?.toIntOrNull() ?: Qualities.Unknown.value
-            links.add(url to q)
+            for (i in 0 until formats.length()) {
+                val fmt = formats.optJSONObject(i) ?: continue
+                val url = fmt.optString("url", "")
+                if (url.isBlank()) continue
+
+                val qualityLabel = fmt.optString("qualityLabel", "Unknown")
+                val q = qualityLabel.replace("p", "").toIntOrNull() ?: Qualities.Unknown.value
+
+                result.add(Pair(url, q))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
-        return links
+        return result
     }
 
     private suspend fun handleYouTubeVideo(
@@ -372,4 +380,5 @@ class Trt1 : MainAPI() {
 
         return true
     }
+
 }
