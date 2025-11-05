@@ -39,15 +39,17 @@ class TrtLive : MainAPI() {
                 }
             }
 
-            val response = newTvSeriesLoadResponse("Canlı Yayınlar", "$mainUrl/canli") {
+            // Use the old form: newTvSeriesLoadResponse(title, url, type)
+            val response = newTvSeriesLoadResponse("Canlı Yayınlar", "$mainUrl/canli", TvType.Live) {
                 this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
                 this.plot = "TRT kanallarının canlı yayın listesi"
-                this.episodes = episodes
             }
+
+            response.episodes = episodes
             return response
         }
 
-        return newTvSeriesLoadResponse("TRT Canlı", "$mainUrl") {
+        return newTvSeriesLoadResponse("TRT Canlı", "$mainUrl", TvType.Live) {
             this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
         }
     }
