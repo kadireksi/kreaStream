@@ -26,7 +26,9 @@ class TrtLive : MainAPI() {
         val liveItem = newTvSeriesSearchResponse("Canlı Yayınlar", "$mainUrl/canli") {
             this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
         }
-        return HomePageResponse(listOf(HomePageList("Canlı Yayınlar", listOf(liveItem))))
+        return newHomePageResponse(
+            listOf(HomePageList("Canlı Yayınlar", listOf(liveItem)))
+        )
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -40,12 +42,25 @@ class TrtLive : MainAPI() {
                 }
             }.toMutableList()
 
-            return newTvSeriesLoadResponse("Canlı Yayınlar", url, TvType.Live, episodes) {
+            return newTvSeriesLoadResponse(
+                title = "Canlı Yayınlar",
+                dataUrl = url,
+                type = TvType.Live,
+                episodes = episodes
+            ) {
                 this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
                 this.plot = "TRT kanallarının canlı yayın listesi"
             }
         }
-        return newTvSeriesLoadResponse("TRT Canlı", url, TvType.Live, listOf()) {}
+        return newTvSeriesLoadResponse(
+            title = "TRT Canlı", 
+            dataUrl = url, 
+            type = TvType.Live, 
+            episodes = listOf()) 
+            {
+                this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
+                this.plot = "TRT kanallarının canlı yayın listesi"
+            }
     }
 
     override suspend fun loadLinks(
