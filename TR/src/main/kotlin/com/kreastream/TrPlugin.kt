@@ -1,11 +1,9 @@
 package com.kreastream
 
-import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
-import com.lagradost.cloudstream3.plugins.Plugin
-import android.content.Context
+import com.lagradost.cloudstream3.Plugin
 
 class TrPlugin : Plugin() {
-    override fun load(context: PluginContext) {
+    override fun load() {
         registerMainAPI(Trt1Parser())
         registerMainAPI(TrtLive())
     }
