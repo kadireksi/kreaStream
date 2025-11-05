@@ -126,13 +126,13 @@ class TRT1Provider : MainAPI() {
         if (m3u8Url != null) {
             // Add m3u8 stream with quality options
             callback(
-                ExtractorLink(
-                    name,
-                    name,
-                    m3u8Url
+                newExtractorLink(
+                    source = name,
+                    name = name,
+                    url = m3u8Url
                 ){
-                    referer = "$mainUrl/";
-                    quality = Qualities.Unknown.value
+                    this.referer = "$mainUrl/";
+                    this.quality = Qualities.Unknown.value
                 }
             )
             return true
