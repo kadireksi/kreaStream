@@ -65,7 +65,7 @@ class Trt1 : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/arama?q=${query.encodeUrl()}"
+        val searchUrl = "$mainUrl/arama?q=${query}"
         val document = app.get(searchUrl).document
         
         return document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
