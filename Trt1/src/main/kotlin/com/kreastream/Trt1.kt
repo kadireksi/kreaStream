@@ -354,6 +354,32 @@ class Trt1 : MainAPI() {
         return result
     }
 
+    private suspend fun getYoutubeStreamsViaPiped(videoId: String): List<Pair<String, Int>> {
+        val apiUrl = "https://pipedapi.kavin.rocks/streams/$videoId"
+        val response = app.get(apiUrl).text
+        val result = mutableListOf<Pair<String, Int>>()
+
+        try {
+            val json = org.json.JSONObject(response)
+            val formats = json.optJSONArray("videoStreams") ?: return emptyList()
+
+            for (i in 0 until formats.length()) {
+                val fmt = formats.optJSONObject(i) ?: continue
+                val url = fmt.optString("url", "")
+                if (url.isBlank()) continue
+
+                val qualityLabel = fmt.optString("qualityLabel", fmt.optString("quality", "Unknown"))
+                val q = qualityLabel.replace("p", "").toIntOrNull() ?: Qualities.Unknown.value
+
+                result.add(Pair(url, q))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return result
+    }
+
     private suspend fun handleYouTubeVideo(
         youtubeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -361,14 +387,14 @@ class Trt1 : MainAPI() {
     ): Boolean {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
 
-        val links = getYoutubeStreams(videoId)
+        val links = getYoutubeStreamsViaPiped(videoId)
         if (links.isEmpty()) return false
 
         for ((url, quality) in links) {
             callback(
                 newExtractorLink(
                     name = "YouTube",
-                    source = "YouTube",
+                    source = "YouTube (Piped)",
                     url = url
                 ) {
                     this.referer = "https://www.youtube.com/"
