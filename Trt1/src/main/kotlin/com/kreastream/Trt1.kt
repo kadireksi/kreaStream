@@ -310,14 +310,36 @@ class Trt1 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val directYoutubeUrl = youtubeUrl
-        loadExtractor(
-            directYoutubeUrl,
-            mainUrl,  // use your plugin’s domain as referer
-            subtitleCallback,
-            callback
-        )
+        val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
+
+        // Use YouTubeExtractor directly for better control and quality handling
+        val extractor = YoutubeExtractor()
+        val links = extractor.getUrl(youtubeUrl, true) // 'true' => fetch all qualities
+
+        if (links.isNullOrEmpty()) return false
+
+        for (link in links) {
+            callback(
+                newExtractorLink(
+                    name = "YouTube",
+                    source = "YouTube",
+                    url = link.url
+                ) {
+                    this.referer = "https://www.youtube.com/"
+                    this.quality = link.quality
+                    this.isM3u8 = link.isM3u8
+                    this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+                }
+            )
+        }
+
+        // Subtitles if available
+        extractor.getSubtitles(videoId)?.forEach { sub ->
+            subtitleCallback(SubtitleFile(sub.lang, sub.url))
+        }
+
         return true
     }
+
 
 }
