@@ -380,21 +380,57 @@ class Trt1 : MainAPI() {
         return result
     }
 
+    private suspend fun getYoutubeStreamsInvidious(videoId: String): List<Pair<String, Int>> {
+        val apiUrl = "https://invidious.nerdvpn.de/api/v1/videos/$videoId"
+        val result = mutableListOf<Pair<String, Int>>()
+
+        try {
+            val response = app.get(apiUrl).text
+            val json = org.json.JSONObject(response)
+
+            // Get both progressive and adaptive streams
+            val allStreams = mutableListOf<org.json.JSONObject>()
+            json.optJSONArray("formatStreams")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    arr.optJSONObject(i)?.let { allStreams.add(it) }
+                }
+            }
+            json.optJSONArray("adaptiveFormats")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    arr.optJSONObject(i)?.let { allStreams.add(it) }
+                }
+            }
+
+            for (fmt in allStreams) {
+                val url = fmt.optString("url", "")
+                if (url.isBlank()) continue
+
+                val qualityLabel = fmt.optString("qualityLabel", fmt.optString("quality", "Unknown"))
+                val q = qualityLabel.replace("p", "").toIntOrNull() ?: Qualities.Unknown.value
+
+                result.add(Pair(url, q))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return result
+    }
+
     private suspend fun handleYouTubeVideo(
         youtubeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
-
-        val links = getYoutubeStreamsViaPiped(videoId)
+        val links = getYoutubeStreamsInvidious(videoId)
         if (links.isEmpty()) return false
 
         for ((url, quality) in links) {
             callback(
                 newExtractorLink(
                     name = "YouTube",
-                    source = "YouTube (Piped)",
+                    source = "YouTube (Invidious)",
                     url = url
                 ) {
                     this.referer = "https://www.youtube.com/"
@@ -406,5 +442,4 @@ class Trt1 : MainAPI() {
 
         return true
     }
-
 }
