@@ -16,7 +16,7 @@ class TrtLive : MainAPI() {
                 listOf(
                     newMovieSearchResponse(channelName, streamUrl, TvType.Live) {
                         this.posterUrl = logoUrl
-                        this.description = nowPlaying ?: "Canlı yayın akışı"
+                        //this.description = nowPlaying ?: "Canlı yayın akışı"
                     }
                 ),
                 isHorizontalImages = true
