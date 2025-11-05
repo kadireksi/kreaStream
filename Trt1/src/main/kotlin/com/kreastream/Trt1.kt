@@ -354,88 +354,31 @@ class Trt1 : MainAPI() {
         return result
     }
 
-    private suspend fun getYoutubeStreamsViaPiped(videoId: String): List<Pair<String, Int>> {
-        val apiUrl = "https://pipedapi.kavin.rocks/streams/$videoId"
-        val response = app.get(apiUrl).text
-        val result = mutableListOf<Pair<String, Int>>()
-
-        try {
-            val json = org.json.JSONObject(response)
-            val formats = json.optJSONArray("videoStreams") ?: return emptyList()
-
-            for (i in 0 until formats.length()) {
-                val fmt = formats.optJSONObject(i) ?: continue
-                val url = fmt.optString("url", "")
-                if (url.isBlank()) continue
-
-                val qualityLabel = fmt.optString("qualityLabel", fmt.optString("quality", "Unknown"))
-                val q = qualityLabel.replace("p", "").toIntOrNull() ?: Qualities.Unknown.value
-
-                result.add(Pair(url, q))
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        return result
-    }
-
-    private suspend fun getYoutubeStreamsInvidious(videoId: String): List<Pair<String, Int>> {
-        val apiUrl = "https://invidious.nerdvpn.de/api/v1/videos/$videoId"
-        val result = mutableListOf<Pair<String, Int>>()
-
-        try {
-            val response = app.get(apiUrl).text
-            val json = org.json.JSONObject(response)
-
-            // Get both progressive and adaptive streams
-            val allStreams = mutableListOf<org.json.JSONObject>()
-            json.optJSONArray("formatStreams")?.let { arr ->
-                for (i in 0 until arr.length()) {
-                    arr.optJSONObject(i)?.let { allStreams.add(it) }
-                }
-            }
-            json.optJSONArray("adaptiveFormats")?.let { arr ->
-                for (i in 0 until arr.length()) {
-                    arr.optJSONObject(i)?.let { allStreams.add(it) }
-                }
-            }
-
-            for (fmt in allStreams) {
-                val url = fmt.optString("url", "")
-                if (url.isBlank()) continue
-
-                val qualityLabel = fmt.optString("qualityLabel", fmt.optString("quality", "Unknown"))
-                val q = qualityLabel.replace("p", "").toIntOrNull() ?: Qualities.Unknown.value
-
-                result.add(Pair(url, q))
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        return result
-    }
-
     private suspend fun handleYouTubeVideo(
         youtubeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Extract the ID and use the standard watch URL
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
-        val links = getYoutubeStreamsInvidious(videoId)
-        if (links.isEmpty()) return false
+        val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        for ((url, quality) in links) {
+        // Use the built-in Cloudstream extractor (returns one reliable progressive link)
+        loadExtractor(
+            watchUrl,
+            referer = "https://www.youtube.com/",
+            subtitleCallback = subtitleCallback
+        ) { link ->
             callback(
                 newExtractorLink(
                     name = "YouTube",
-                    source = "YouTube (Invidious)",
-                    url = url
+                    source = "YouTube",
+                    url = link.url
                 ) {
                     this.referer = "https://www.youtube.com/"
-                    this.quality = quality
-                    this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+                    this.quality = link.quality
+                    //this.isM3u8 = link.isM3u8
+                    this.headers = link.headers ?: mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
         }
