@@ -313,30 +313,35 @@ class Trt1 : MainAPI() {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        // Because loadExtractor is suspend, we call it directly (not inside another lambda)
-        // and pass our own wrapped callback to ensure proper YouTube quality handling.
+        // Run extraction inside a coroutine scope, not inside a lambda
+        val links = mutableListOf<ExtractorLink>()
+
+        // Use runBlocking or coroutineScope is not needed since we’re already in suspend.
         loadExtractor(
             watchUrl,
             "https://www.youtube.com/",
             subtitleCallback
         ) { extracted ->
-            // Wrap each extracted link properly with newExtractorLink
+            links.add(extracted)
+        }
+
+        // Now wrap them outside (avoids suspend-in-lambda issue)
+        for (link in links) {
             callback(
                 newExtractorLink(
                     name = "YouTube",
                     source = "YouTube",
-                    url = extracted.url
+                    url = link.url
                 ) {
                     this.referer = "https://www.youtube.com/"
-                    this.quality = extracted.quality
-                    this.isM3u8 = extracted.isM3u8
+                    this.quality = link.quality
+                    this.isM3u8 = link.isM3u8
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
         }
 
-        return true
+        return links.isNotEmpty()
     }
-
 
 }
