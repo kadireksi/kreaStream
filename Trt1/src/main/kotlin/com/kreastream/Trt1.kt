@@ -313,37 +313,38 @@ class Trt1 : MainAPI() {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        // Collect all extracted links first
+        // Ask the core extractor dispatcher to resolve YouTube
         val extractedLinks = mutableListOf<ExtractorLink>()
 
-        // Use the internal universal extractor which supports multiple YouTube qualities
+        // This internally calls the YouTube extractor (multi-quality)
         loadExtractor(
             watchUrl,
-            "https://www.youtube.com/",
-            subtitleCallback
+            referer = "https://www.youtube.com/",
+            subtitleCallback = subtitleCallback
         ) { link ->
             extractedLinks.add(link)
         }
 
         if (extractedLinks.isEmpty()) return false
 
-        // Re-wrap all with newExtractorLink to standardize the output
-        for (extracted in extractedLinks) {
+        // Wrap every resolved stream into newExtractorLink
+        for (link in extractedLinks) {
             callback(
                 newExtractorLink(
                     name = "YouTube",
                     source = "YouTube",
-                    url = extracted.url
+                    url = link.url
                 ) {
-                    this.referer = "https://www.youtube.com/";
-                    this.quality = extracted.quality;
-                    //this.isM3u8 = extracted.isM3u8;
-                    this.headers = extracted.headers ?: mapOf("User-Agent" to "Mozilla/5.0");
+                    this.quality = link.quality
+                    this.referer = "https://www.youtube.com/"
+                    //this.isM3u8 = link.isM3u8
+                    this.headers = link.headers ?: mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
         }
 
         return true
     }
+
 
 }
