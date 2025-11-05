@@ -14,10 +14,10 @@ class Trt1 : MainAPI() {
     override var lang = "tr"
 
     override val mainPage = mainPageOf(
-        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler (A-Z)",
-        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler (A-Z)",
-        "$mainUrl/diziler?archive=false" to "Güncel Diziler",
-        "$mainUrl/diziler?archive=true" to "Eski Diziler"
+        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler",
+        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler",
+        //"$mainUrl/diziler?archive=false" to "Güncel Diziler",
+        //"$mainUrl/diziler?archive=true" to "Eski Diziler"
     )
 
     override suspend fun getMainPage(
@@ -335,7 +335,6 @@ class Trt1 : MainAPI() {
                 ) {
                     this.referer = "https://www.youtube.com/"
                     this.quality = link.quality
-                    this.isM3u8 = link.isM3u8
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
