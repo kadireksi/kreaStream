@@ -1,4 +1,4 @@
-package com.lagradost.cloudstream3.trt1
+package com.kreastream
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -6,7 +6,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
-class TRT1Provider : MainAPI() {
+class Trt1 : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
     override var name = "TRT1"
     override val hasMainPage = true
