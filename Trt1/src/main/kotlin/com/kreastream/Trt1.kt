@@ -1,17 +1,20 @@
-package com.kreastream
+package com.lagradost.cloudstream3.trt1
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
-class Trt1 : MainAPI() {
+class TRT1Provider : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
     override var name = "TRT1"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
 
     override val mainPage = mainPageOf(
+        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler (A-Z)",
+        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler (A-Z)",
         "$mainUrl/diziler?archive=false" to "Güncel Diziler",
         "$mainUrl/diziler?archive=true" to "Eski Diziler"
     )
@@ -25,7 +28,7 @@ class Trt1 : MainAPI() {
         } else {
             // Handle pagination for archive (old series)
             if (request.data.contains("archive=true")) {
-                "$mainUrl/diziler/$page?archive=true"
+                "$mainUrl/diziler/$page?archive=true" + if (request.data.contains("order=title_asc")) "&order=title_asc" else ""
             } else {
                 request.data
             }
@@ -66,7 +69,7 @@ class Trt1 : MainAPI() {
         val seriesSlug = url.removePrefix("$mainUrl/diziler/")
         val episodesUrl = "$mainUrl/diziler/$seriesSlug/bolum"
         
-        // Function to parse episodes from a page
+        // Function to parse episodes from a page with proper pagination
         suspend fun parseEpisodesPage(pageUrl: String): List<Episode> {
             val episodeDoc = app.get(pageUrl).document
             return episodeDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
@@ -90,17 +93,27 @@ class Trt1 : MainAPI() {
         // Get first page episodes
         episodes.addAll(parseEpisodesPage(episodesUrl))
         
-        // Handle pagination
-        val pagination = document.select("div.pagination_wrapper__FpNrb a.pagination_item__PAJVt")
+        // Handle pagination for episodes - get pagination from the episodes page, not series page
+        val episodesDocument = app.get(episodesUrl).document
+        val pagination = episodesDocument.select("div.pagination_wrapper__FpNrb a.pagination_item__PAJVt")
         if (pagination.isNotEmpty()) {
-            val lastPage = pagination.lastOrNull { it.text().matches(Regex("\\d+")) }?.text()?.toIntOrNull() ?: 1
+            // Find the last page number from pagination
+            val lastPage = pagination.mapNotNull { 
+                it.text().toIntOrNull() 
+            }.maxOrNull() ?: 1
             
+            // Get episodes from all pages
             for (page in 2..lastPage) {
                 val pageUrl = "$episodesUrl/$page"
                 try {
-                    episodes.addAll(parseEpisodesPage(pageUrl))
+                    val pageEpisodes = parseEpisodesPage(pageUrl)
+                    if (pageEpisodes.isNotEmpty()) {
+                        episodes.addAll(pageEpisodes)
+                    } else {
+                        break
+                    }
                 } catch (e: Exception) {
-                    // If page doesn't exist, break
+                    // If page doesn't exist or error occurs, break
                     break
                 }
             }
@@ -136,8 +149,8 @@ class Trt1 : MainAPI() {
         // If no m3u8 found, look for YouTube embed
         val youtubeUrl = findYouTubeUrl(document)
         if (youtubeUrl != null) {
-            // Try multiple approaches for YouTube
-            return handleYouTubeVideo(youtubeUrl, data, subtitleCallback, callback)
+            // For YouTube, we need to extract the video ID and use it directly
+            return handleYouTubeVideo(youtubeUrl, subtitleCallback, callback)
         }
 
         return false
@@ -179,7 +192,9 @@ class Trt1 : MainAPI() {
         val iframe = document.selectFirst("iframe[src*='youtube.com/embed']")
         if (iframe != null) {
             val embedUrl = iframe.attr("src")
-            return embedUrl.replace("youtube.com/embed", "youtube.com/watch")
+            // Extract video ID and create direct YouTube URL
+            val videoId = embedUrl.substringAfter("embed/").substringBefore("?")
+            return "https://www.youtube.com/watch?v=$videoId"
         }
         
         // Look for YouTube URL in script tags
@@ -198,7 +213,17 @@ class Trt1 : MainAPI() {
             
             // Look for YouTube embed URLs that might be in JSON
             if (scriptContent.contains("youtube.com/embed")) {
-                val regex = Regex("""https://www\.youtube\.com/embed/([^"'\s]+)""")
+                val regex = Regex("""https://www\.youtube\.com/embed/([a-zA-Z0-9_-]+)""")
+                val match = regex.find(scriptContent)
+                if (match != null) {
+                    val videoId = match.groupValues[1]
+                    return "https://www.youtube.com/watch?v=$videoId"
+                }
+            }
+            
+            // Look for video IDs in contentUrl
+            if (scriptContent.contains("contentUrl")) {
+                val regex = Regex(""""contentUrl"\s*:\s*"https://www\.youtube\.com/watch\?v=([^"]+)""")
                 val match = regex.find(scriptContent)
                 if (match != null) {
                     return "https://www.youtube.com/watch?v=${match.groupValues[1]}"
@@ -220,110 +245,18 @@ class Trt1 : MainAPI() {
 
     private suspend fun handleYouTubeVideo(
         youtubeUrl: String,
-        data: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // First try the standard extractor
-        var success = false
+        // Extract the video ID for direct YouTube access
+        val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
+        val directYoutubeUrl = "https://www.youtube.com/watch?v=$videoId"
         
-        try {
-            loadExtractor(youtubeUrl, data, subtitleCallback) { link ->
-                // Check if we're getting multiple qualities or just 360p
-                if (link.quality > Qualities.P360.value) {
-                    success = true
-                }
-                callback(link)
-            }
-            
-            // If we got at least one link, consider it successful
-            if (success) {
-                return true
-            }
-        } catch (e: Exception) {
-            // Extractor failed, try alternative approach
-        }
-
-        // Alternative approach: Direct YouTube extraction
-        try {
-            // Use app.get to fetch the YouTube page directly
-            val youtubeDoc = app.get(youtubeUrl).document
-            
-            // Look for adaptive formats in the page
-            val scriptTags = youtubeDoc.select("script")
-            for (script in scriptTags) {
-                val scriptContent = script.html()
-                
-                // Look for ytInitialPlayerResponse which contains stream info
-                if (scriptContent.contains("ytInitialPlayerResponse")) {
-                    val regex = Regex(""""url":"(https://[^"]+googlevideo[^"]+)""")
-                    val matches = regex.findAll(scriptContent)
-                    
-                    matches.forEach { match ->
-                        val videoUrl = match.groupValues[1]
-                        // Extract quality from URL if possible
-                        val quality = extractQualityFromYouTubeUrl(videoUrl)
-                        
-                        callback(
-                            newExtractorLink(
-                                source = name,
-                                name = "YouTube",
-                                url = videoUrl
-                            ){
-                                this.quality = quality;
-                            }
-                        )
-                        success = true
-                    }
-                    
-                    if (success) return true
-                }
-            }
-        } catch (e: Exception) {
-            // Direct extraction also failed
-        }
-
-        // Last resort: Use the YouTube URL directly with assumed qualities
-        if (!success) {
-            // Provide multiple quality options manually
-            val qualities = listOf(
-                Qualities.P1080.value to "best",
-                Qualities.P720.value to "medium", 
-                Qualities.P480.value to "standard",
-                Qualities.P360.value to "base"
-            )
-            
-            qualities.forEach { (quality, label) ->
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "YouTube $label",
-                        url = youtubeUrl
-                    ){
-                        this.quality = quality
-                    }
-                )
-            }
-            success = true
-        }
-
-        return success
-    }
-
-    private fun extractQualityFromYouTubeUrl(url: String): Int {
-        return when {
-            url.contains("/mime/") -> {
-                when {
-                    url.contains("1080") -> Qualities.P1080.value
-                    url.contains("720") -> Qualities.P720.value
-                    url.contains("480") -> Qualities.P480.value
-                    url.contains("360") -> Qualities.P360.value
-                    url.contains("240") -> Qualities.P240.value
-                    url.contains("144") -> Qualities.P144.value
-                    else -> Qualities.Unknown.value
-                }
-            }
-            else -> Qualities.Unknown.value
-        }
+        // Use the standard extractor with the direct YouTube URL
+        // This should give us all available qualities since we're using the direct URL
+        // instead of the embedded restricted version
+        loadExtractor(directYoutubeUrl, directYoutubeUrl, subtitleCallback, callback)
+        
+        return true
     }
 }
