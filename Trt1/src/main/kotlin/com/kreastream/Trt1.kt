@@ -14,10 +14,10 @@ class Trt1 : MainAPI() {
     override var lang = "tr"
 
     override val mainPage = mainPageOf(
-        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler (A-Z)",
-        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler (A-Z)",
-        "$mainUrl/diziler?archive=false" to "Güncel Diziler",
-        "$mainUrl/diziler?archive=true" to "Eski Diziler"
+        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler",
+        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler",
+        //"$mainUrl/diziler?archive=false" to "Güncel Diziler",
+        //"$mainUrl/diziler?archive=true" to "Eski Diziler"
     )
 
     override suspend fun getMainPage(
@@ -65,7 +65,7 @@ class Trt1 : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/arama?q=${query}"
+        val searchUrl = "$mainUrl/arama/${query}?contenttype=series"
         val document = app.get(searchUrl).document
         
         return document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
