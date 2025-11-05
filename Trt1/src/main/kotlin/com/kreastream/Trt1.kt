@@ -313,28 +313,30 @@ class Trt1 : MainAPI() {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        // Use loadExtractor which now supports YouTube internally
+        // Because loadExtractor is suspend, we call it directly (not inside another lambda)
+        // and pass our own wrapped callback to ensure proper YouTube quality handling.
         loadExtractor(
-            url = watchUrl,
-            referer = "https://www.youtube.com/",
-            subtitleCallback = subtitleCallback,
-            callback = { link ->
-                // Re-wrap with newExtractorLink for consistency
-                callback(
-                    newExtractorLink(
-                        name = "YouTube",
-                        source = "YouTube",
-                        url = url
-                    ) {
-                        this.referer = "https://www.youtube.com/";
-                        this.quality = link.quality;
-                        this.headers = mapOf("User-Agent" to "Mozilla/5.0");
-                    }
-                )
-            }
-        )
+            watchUrl,
+            "https://www.youtube.com/",
+            subtitleCallback
+        ) { extracted ->
+            // Wrap each extracted link properly with newExtractorLink
+            callback(
+                newExtractorLink(
+                    name = "YouTube",
+                    source = "YouTube",
+                    url = extracted.url
+                ) {
+                    this.referer = "https://www.youtube.com/"
+                    this.quality = extracted.quality
+                    this.isM3u8 = extracted.isM3u8
+                    this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+                }
+            )
+        }
 
         return true
     }
+
 
 }
