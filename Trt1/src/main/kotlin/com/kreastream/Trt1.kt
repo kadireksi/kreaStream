@@ -9,9 +9,9 @@ import org.jsoup.nodes.Element
 class Trt1 : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
     override var name = "TRT1"
-    override var language = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
+    override var lang = "tr"
 
     override val mainPage = mainPageOf(
         "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler (A-Z)",
@@ -46,15 +46,45 @@ class Trt1 : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return null
         val href = this.attr("href")
-        val posterUrl = this.selectFirst("img")?.attr("src")
+        var posterUrl = this.selectFirst("img")?.attr("src")
         
-        return newTvSeriesSearchResponse(title, href) {
+        // Fix poster URL for continue watching
+        posterUrl = fixPosterUrl(posterUrl)
+        
+        return newTvSeriesSearchResponse(title, fixUrl(href)) {
             this.posterUrl = posterUrl
         }
     }
 
+    private fun fixPosterUrl(url: String?): String? {
+        return url?.replace("webp/w800/h450", "webp/w400/h600")?.replace("/q75/", "/q85/")
+    }
+
+    private fun fixUrl(url: String): String {
+        return if (url.startsWith("http")) url else "$mainUrl$url"
+    }
+
     override suspend fun search(query: String): List<SearchResponse> {
-        return listOf()
+        val searchUrl = "$mainUrl/arama?q=${query.encodeUrl()}"
+        val document = app.get(searchUrl).document
+        
+        return document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
+            val title = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
+            val href = element.attr("href")
+            var posterUrl = element.selectFirst("img")?.attr("src")
+            
+            // Fix poster URL
+            posterUrl = fixPosterUrl(posterUrl)
+            
+            // Check if it's a series (diziler in URL)
+            if (href.contains("/diziler/")) {
+                newTvSeriesSearchResponse(title, fixUrl(href)) {
+                    this.posterUrl = posterUrl
+                }
+            } else {
+                null // Skip non-series results
+            }
+        }
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -62,7 +92,10 @@ class Trt1 : MainAPI() {
         
         val title = document.selectFirst("h1")?.text()?.trim() ?: throw ErrorLoadingException("Title not found")
         val description = document.selectFirst("meta[name=description]")?.attr("content") ?: ""
-        val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
+        var poster = document.selectFirst("meta[property=og:image]")?.attr("content")
+        
+        // Fix poster URL for better quality in continue watching
+        poster = fixPosterUrl(poster)
         
         val episodes = mutableListOf<Episode>()
         
@@ -76,13 +109,16 @@ class Trt1 : MainAPI() {
             return episodeDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
                 val epTitle = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
                 val epHref = element.attr("href")
-                val epPoster = element.selectFirst("img")?.attr("src")
+                var epPoster = element.selectFirst("img")?.attr("src")
                 val epDescription = element.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
+                
+                // Fix episode poster URL
+                epPoster = fixPosterUrl(epPoster)
                 
                 // Extract episode number from title (e.g., "191. Bölüm" -> 191)
                 val episodeNumber = epTitle.replace(Regex("[^0-9]"), "").toIntOrNull()
                 
-                newEpisode("$mainUrl$epHref") {
+                newEpisode(fixUrl(epHref)) {
                     this.name = epTitle
                     this.posterUrl = epPoster
                     this.episode = episodeNumber
@@ -92,31 +128,56 @@ class Trt1 : MainAPI() {
         }
 
         // Get first page episodes
-        episodes.addAll(parseEpisodesPage(episodesUrl))
+        try {
+            episodes.addAll(parseEpisodesPage(episodesUrl))
+        } catch (e: Exception) {
+            // If episodes page doesn't exist, try alternative episode structure
+            val alternativeEpisodes = document.select("a[href*='/bolum/']").mapNotNull { element ->
+                val epHref = element.attr("href")
+                if (epHref.contains("/bolum/") && !epHref.contains("/bolum/1")) {
+                    val epTitle = element.selectFirst("div, span, h3")?.text()?.trim() ?: "Bölüm"
+                    val epPoster = element.selectFirst("img")?.attr("src")?.let { fixPosterUrl(it) }
+                    
+                    newEpisode(fixUrl(epHref)) {
+                        this.name = epTitle
+                        this.posterUrl = epPoster
+                    }
+                } else {
+                    null
+                }
+            }
+            episodes.addAll(alternativeEpisodes)
+        }
         
         // Handle pagination for episodes - get pagination from the episodes page, not series page
-        val episodesDocument = app.get(episodesUrl).document
-        val pagination = episodesDocument.select("div.pagination_wrapper__FpNrb a.pagination_item__PAJVt")
-        if (pagination.isNotEmpty()) {
-            // Find the last page number from pagination
-            val lastPage = pagination.mapNotNull { 
-                it.text().toIntOrNull() 
-            }.maxOrNull() ?: 1
-            
-            // Get episodes from all pages
-            for (page in 2..lastPage) {
-                val pageUrl = "$episodesUrl/$page"
-                try {
-                    val pageEpisodes = parseEpisodesPage(pageUrl)
-                    if (pageEpisodes.isNotEmpty()) {
-                        episodes.addAll(pageEpisodes)
-                    } else {
-                        break
+        if (episodes.isNotEmpty()) {
+            try {
+                val episodesDocument = app.get(episodesUrl).document
+                val pagination = episodesDocument.select("div.pagination_wrapper__FpNrb a.pagination_item__PAJVt")
+                if (pagination.isNotEmpty()) {
+                    // Find the last page number from pagination
+                    val lastPage = pagination.mapNotNull { 
+                        it.text().toIntOrNull() 
+                    }.maxOrNull() ?: 1
+                    
+                    // Get episodes from all pages
+                    for (page in 2..lastPage) {
+                        val pageUrl = "$episodesUrl/$page"
+                        try {
+                            val pageEpisodes = parseEpisodesPage(pageUrl)
+                            if (pageEpisodes.isNotEmpty()) {
+                                episodes.addAll(pageEpisodes)
+                            } else {
+                                break
+                            }
+                        } catch (e: Exception) {
+                            // If page doesn't exist or error occurs, break
+                            break
+                        }
                     }
-                } catch (e: Exception) {
-                    // If page doesn't exist or error occurs, break
-                    break
                 }
+            } catch (e: Exception) {
+                // If we can't get pagination, just use the episodes we have
             }
         }
 
