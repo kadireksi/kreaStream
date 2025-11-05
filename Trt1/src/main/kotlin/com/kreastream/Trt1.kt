@@ -14,10 +14,10 @@ class Trt1 : MainAPI() {
     override var lang = "tr"
 
     override val mainPage = mainPageOf(
-        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler",
-        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler",
-        //"$mainUrl/diziler?archive=false" to "Güncel Diziler",
-        //"$mainUrl/diziler?archive=true" to "Eski Diziler"
+        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler (A-Z)",
+        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler (A-Z)",
+        "$mainUrl/diziler?archive=false" to "Güncel Diziler",
+        "$mainUrl/diziler?archive=true" to "Eski Diziler"
     )
 
     override suspend fun getMainPage(
@@ -310,15 +310,14 @@ class Trt1 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Extract the video ID for direct YouTube access
-        val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
-        val directYoutubeUrl = "https://www.youtube.com/watch?v=$videoId"
-        
-        // Use the standard extractor with the direct YouTube URL
-        // This should give us all available qualities since we're using the direct URL
-        // instead of the embedded restricted version
-        loadExtractor(directYoutubeUrl, directYoutubeUrl, subtitleCallback, callback)
-        
+        val directYoutubeUrl = youtubeUrl
+        loadExtractor(
+            directYoutubeUrl,
+            mainUrl,  // use your plugin’s domain as referer
+            subtitleCallback,
+            callback
+        )
         return true
     }
+
 }
