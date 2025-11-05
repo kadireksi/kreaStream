@@ -32,12 +32,11 @@ class TrtLive : MainAPI() {
         if (url.endsWith("/canli")) {
             val episodes = trtLiveChannels.map { (name, streamUrl, logo) ->
                 val now = TrtUtils.getNowPlaying(name)
-                Episode(
-                    data = streamUrl,
-                    name = name,
-                    posterUrl = logo,
-                    description = now ?: "Canlı yayın akışı"
-                )
+                newEpisode(streamUrl) {
+                    this.name = name
+                    this.posterUrl = logo
+                    this.description = now ?: "Canlı yayın akışı"
+                }
             }
 
             val response = newTvSeriesLoadResponse("Canlı Yayınlar", "$mainUrl/canli") {
