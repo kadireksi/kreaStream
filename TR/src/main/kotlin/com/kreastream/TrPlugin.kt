@@ -6,8 +6,7 @@ import com.lagradost.cloudstream3.plugins.Plugin
 @CloudstreamPlugin
 class TrPlugin : Plugin() {
     override fun load() {
-        registerMainAPI(Trt1Parser())
-        registerMainAPI(TrtLive())
+        registerMainAPI(TrtMain())
     }
 }
 
