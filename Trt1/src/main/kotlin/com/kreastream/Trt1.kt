@@ -313,19 +313,9 @@ class Trt1 : MainAPI() {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        // Run extraction inside a coroutine scope, not inside a lambda
-        val links = mutableListOf<ExtractorLink>()
+        // Use the helper in Cloudstream that fetches adaptive qualities
+        val links = YoutubeHelper.extractLinks(watchUrl) ?: return false
 
-        // Use runBlocking or coroutineScope is not needed since we’re already in suspend.
-        loadExtractor(
-            watchUrl,
-            "https://www.youtube.com/",
-            subtitleCallback
-        ) { extracted ->
-            links.add(extracted)
-        }
-
-        // Now wrap them outside (avoids suspend-in-lambda issue)
         for (link in links) {
             callback(
                 newExtractorLink(
@@ -333,14 +323,21 @@ class Trt1 : MainAPI() {
                     source = "YouTube",
                     url = link.url
                 ) {
-                    this.referer = "https://www.youtube.com/"
-                    this.quality = link.quality
-                    this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+                    this.referer = "https://www.youtube.com/";
+                    this.quality = link.quality;
+                    this.headers = mapOf("User-Agent" to "Mozilla/5.0");
                 }
             )
         }
 
+        // Handle subtitles (if available)
+        val subs = YoutubeHelper.extractSubtitles(videoId)
+        subs?.forEach { sub ->
+            subtitleCallback(SubtitleFile(sub.language ?: "Unknown", sub.url))
+        }
+
         return links.isNotEmpty()
     }
+
 
 }
