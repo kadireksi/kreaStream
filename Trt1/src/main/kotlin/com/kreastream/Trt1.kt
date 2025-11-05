@@ -5,6 +5,10 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import kotlinx.serialization.json.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+
 
 class Trt1 : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
@@ -305,46 +309,67 @@ class Trt1 : MainAPI() {
         return null
     }
 
+    private suspend fun getYoutubeStreams(videoId: String): List<Pair<String, Int>> {
+        val apiUrl = "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FQyR3E6Uo7I0QFh0v4H4KQj6YkzZ5Y"
+        val payload = """
+            {
+            "context": {
+                "client": {
+                "hl": "en",
+                "clientName": "WEB",
+                "clientVersion": "2.20240725.00.00"
+                }
+            },
+            "videoId": "$videoId"
+            }
+        """.trimIndent()
+
+        val response = app.post(
+            apiUrl,
+            requestBody = payload.toRequestBody("application/json".toMediaType())
+        ).text
+
+        val json = tryParseJson<JsonObject>(response)
+        val formats = json?.get("streamingData")?.jsonObject?.get("formats")?.jsonArray
+            ?: return emptyList()
+
+        val links = mutableListOf<Pair<String, Int>>()
+
+        for (format in formats) {
+            val obj = format.jsonObject
+            val url = obj["url"]?.jsonPrimitive?.contentOrNull ?: continue
+            val qualityLabel = obj["qualityLabel"]?.jsonPrimitive?.contentOrNull
+            val q = qualityLabel?.replace("p", "")?.toIntOrNull() ?: Qualities.Unknown.value
+            links.add(url to q)
+        }
+
+        return links
+    }
+
     private suspend fun handleYouTubeVideo(
         youtubeUrl: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
-        val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        // Ask the core extractor dispatcher to resolve YouTube
-        val extractedLinks = mutableListOf<ExtractorLink>()
+        val links = getYoutubeStreams(videoId)
+        if (links.isEmpty()) return false
 
-        // This internally calls the YouTube extractor (multi-quality)
-        loadExtractor(
-            watchUrl,
-            referer = "https://www.youtube.com/",
-            subtitleCallback = subtitleCallback
-        ) { link ->
-            extractedLinks.add(link)
-        }
-
-        if (extractedLinks.isEmpty()) return false
-
-        // Wrap every resolved stream into newExtractorLink
-        for (link in extractedLinks) {
+        for ((url, quality) in links) {
             callback(
                 newExtractorLink(
                     name = "YouTube",
                     source = "YouTube",
-                    url = link.url
+                    url = url
                 ) {
-                    this.quality = link.quality
                     this.referer = "https://www.youtube.com/"
-                    //this.isM3u8 = link.isM3u8
-                    this.headers = link.headers ?: mapOf("User-Agent" to "Mozilla/5.0")
+                    this.quality = quality
+                    this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
         }
 
         return true
     }
-
-
 }
