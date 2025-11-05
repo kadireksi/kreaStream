@@ -2,6 +2,19 @@
     {
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
+        "fileSize": 23058,
+        "status": 1,
+        "authors": [
+            "kreastream"
+        ],
+        "version": 1,
+        "internalName": "TR",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TR.cs3",
+        "name": "TR"
+    },
+    {
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
         "fileSize": 17840,
         "status": 1,
         "authors": [
