@@ -270,7 +270,6 @@ class Trt1 : MainAPI() {
                                 name = "YouTube",
                                 url = videoUrl
                             ){
-                                this.referrer = "$mainUrl/";
                                 this.quality = quality;
                             }
                         )
@@ -301,7 +300,6 @@ class Trt1 : MainAPI() {
                         name = "YouTube $label",
                         url = youtubeUrl
                     ){
-                        this.referrer = "$mainUrl/";
                         this.quality = quality
                     }
                 )
