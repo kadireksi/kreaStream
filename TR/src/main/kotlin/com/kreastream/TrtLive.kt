@@ -3,7 +3,6 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.json.JSONObject
-import com.kreastream.TrtUtils
 
 class TrtLive : MainAPI() {
     override var mainUrl = "https://www.trt.net.tr"
@@ -24,33 +23,30 @@ class TrtLive : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val home = mutableListOf<HomePageList>()
-        val liveSeries = listOf(
-            newTvSeriesSearchResponse("Canlı Yayınlar", "$mainUrl/canli") {
-                this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-            }
-        )
-        home.add(HomePageList("Canlı Yayınlar", liveSeries))
-        return HomePageResponse(home)
+        val liveItem = newTvSeriesSearchResponse("Canlı Yayınlar", "$mainUrl/canli") {
+            this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
+        }
+        return newHomePageResponse(listOf(HomePageList("Canlı Yayınlar", listOf(liveItem))))
     }
 
     override suspend fun load(url: String): LoadResponse {
         if (url.endsWith("/canli")) {
             val episodes = trtLiveChannels.map { (name, streamUrl, logo) ->
-                val nowPlaying = TrtUtils.getNowPlaying(name)
+                val now = TrtUtils.getNowPlaying(name)
                 newEpisode(streamUrl) {
                     this.name = name
                     this.posterUrl = logo
-                    this.description = nowPlaying ?: "Canlı yayın akışı"
+                    this.description = now ?: "Canlı yayın akışı"
                 }
-            }.toMutableList()
+            }
 
-            return newTvSeriesLoadResponse("Canlı Yayınlar", url, TvType.Live, episodes) {
+            return newTvSeriesLoadResponse("Canlı Yayınlar", TvType.Live, episodes) {
                 this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
                 this.plot = "TRT kanallarının canlı yayın listesi"
             }
         }
-        return newTvSeriesLoadResponse("TRT Canlı", url, TvType.Live, listOf()) {}
+
+        return newTvSeriesLoadResponse("TRT Canlı", TvType.Live, listOf()) {}
     }
 
     override suspend fun loadLinks(

@@ -1,6 +1,7 @@
 package com.kreastream
 
-import com.lagradost.cloudstream3.Plugin
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
 
 class TrPlugin : Plugin() {
     override fun load() {
