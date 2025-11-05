@@ -359,24 +359,33 @@ class Trt1 : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Extract the ID and use the standard watch URL
         val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
         val watchUrl = "https://www.youtube.com/watch?v=$videoId"
 
-        // Use the built-in Cloudstream extractor (returns one reliable progressive link)
+        // Ask the core extractor dispatcher to resolve YouTube
+        val extractedLinks = mutableListOf<ExtractorLink>()
+
+        // This internally calls the YouTube extractor (multi-quality)
         loadExtractor(
             watchUrl,
             referer = "https://www.youtube.com/",
             subtitleCallback = subtitleCallback
         ) { link ->
+            extractedLinks.add(link)
+        }
+
+        if (extractedLinks.isEmpty()) return false
+
+        // Wrap every resolved stream into newExtractorLink
+        for (link in extractedLinks) {
             callback(
                 newExtractorLink(
                     name = "YouTube",
                     source = "YouTube",
                     url = link.url
                 ) {
-                    this.referer = "https://www.youtube.com/"
                     this.quality = link.quality
+                    this.referer = "https://www.youtube.com/"
                     //this.isM3u8 = link.isM3u8
                     this.headers = link.headers ?: mapOf("User-Agent" to "Mozilla/5.0")
                 }
@@ -385,4 +394,5 @@ class Trt1 : MainAPI() {
 
         return true
     }
+
 }
