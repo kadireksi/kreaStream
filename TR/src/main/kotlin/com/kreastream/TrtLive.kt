@@ -2,7 +2,6 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.json.JSONObject
 
 class TrtLive : MainAPI() {
     override var mainUrl = "https://www.trt.net.tr"
@@ -33,20 +32,25 @@ class TrtLive : MainAPI() {
         if (url.endsWith("/canli")) {
             val episodes = trtLiveChannels.map { (name, streamUrl, logo) ->
                 val now = TrtUtils.getNowPlaying(name)
-                newEpisode(streamUrl) {
-                    this.name = name
-                    this.posterUrl = logo
-                    this.description = now ?: "Canlı yayın akışı"
-                }
+                Episode(
+                    data = streamUrl,
+                    name = name,
+                    posterUrl = logo,
+                    description = now ?: "Canlı yayın akışı"
+                )
             }
 
-            return newTvSeriesLoadResponse("Canlı Yayınlar", TvType.Live, episodes) {
+            val response = newTvSeriesLoadResponse("Canlı Yayınlar", "$mainUrl/canli") {
                 this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
                 this.plot = "TRT kanallarının canlı yayın listesi"
+                this.episodes = episodes
             }
+            return response
         }
 
-        return newTvSeriesLoadResponse("TRT Canlı", TvType.Live, listOf()) {}
+        return newTvSeriesLoadResponse("TRT Canlı", "$mainUrl") {
+            this.posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
+        }
     }
 
     override suspend fun loadLinks(
@@ -57,8 +61,8 @@ class TrtLive : MainAPI() {
     ): Boolean {
         if (data.endsWith(".m3u8")) {
             M3u8Helper.generateM3u8(
-                name = "TRT",
-                url = data,
+                source = "TRT",
+                streamUrl = data,
                 referer = mainUrl,
                 headers = mapOf("Referer" to mainUrl)
             ).forEach(callback)
