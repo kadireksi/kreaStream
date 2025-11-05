@@ -42,11 +42,12 @@ class TrtLive : MainAPI() {
             newExtractorLink(
                 name = "TRT",
                 source = "TRT",
-                url = data,
-                referer = mainUrl,
-                quality = Qualities.P720.value,
-                isM3u8 = true
-            )
+                url = data
+            ){
+                this.referer = mainUrl
+                this.quality = Qualities.P720.value
+                //this.isM3u8 = true
+            }
         )
         return true
     }
