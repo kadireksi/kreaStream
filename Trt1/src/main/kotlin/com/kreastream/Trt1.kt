@@ -1,5 +1,4 @@
 package com.kreastream
-
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -124,54 +123,21 @@ class Trt1 : MainAPI() {
         // First, look for m3u8 streams in JSON data
         val m3u8Url = findM3u8Url(document)
         if (m3u8Url != null) {
-            // Add m3u8 stream with quality options
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = m3u8Url
-                ){
-                    this.referer = "$mainUrl/";
-                    this.quality = Qualities.Unknown.value
-                }
-            )
+            // For m3u8 streams, we need to use M3u8Helper to get quality options
+            M3u8Helper.generateM3u8(
+                name,
+                m3u8Url,
+                "$mainUrl/",
+                headers = mapOf("Referer" to "$mainUrl/")
+            ).forEach(callback)
             return true
         }
         
         // If no m3u8 found, look for YouTube embed
-        val iframe = document.selectFirst("iframe[src*='youtube.com/embed']")
-        if (iframe != null) {
-            val embedUrl = iframe.attr("src")
-            val youtubeUrl = embedUrl.replace("youtube.com/embed", "youtube.com/watch")
-            
-            // Use YouTube extractor
-            loadExtractor(youtubeUrl, data, subtitleCallback, callback)
-            return true
-        }
-        
-        // Alternative: Look for YouTube URL in script tags
-        val scripts = document.select("script")
-        for (script in scripts) {
-            val scriptContent = script.html()
-            if (scriptContent.contains("youtube.com/watch")) {
-                val regex = Regex("""https://www\.youtube\.com/watch\?v=([^"']+)""")
-                val match = regex.find(scriptContent)
-                if (match != null) {
-                    val youtubeUrl = match.value
-                    loadExtractor(youtubeUrl, data, subtitleCallback, callback)
-                    return true
-                }
-            }
-        }
-        
-        // Alternative: Look for canonical link
-        val canonical = document.selectFirst("link[rel=canonical]")
-        if (canonical != null) {
-            val canonicalUrl = canonical.attr("href")
-            if (canonicalUrl.contains("youtube.com/watch")) {
-                loadExtractor(canonicalUrl, data, subtitleCallback, callback)
-                return true
-            }
+        val youtubeUrl = findYouTubeUrl(document)
+        if (youtubeUrl != null) {
+            // Try multiple approaches for YouTube
+            return handleYouTubeVideo(youtubeUrl, data, subtitleCallback, callback)
         }
 
         return false
@@ -206,5 +172,160 @@ class Trt1 : MainAPI() {
         }
         
         return null
+    }
+
+    private fun findYouTubeUrl(document: org.jsoup.nodes.Document): String? {
+        // Look for YouTube embed in iframe
+        val iframe = document.selectFirst("iframe[src*='youtube.com/embed']")
+        if (iframe != null) {
+            val embedUrl = iframe.attr("src")
+            return embedUrl.replace("youtube.com/embed", "youtube.com/watch")
+        }
+        
+        // Look for YouTube URL in script tags
+        val scripts = document.select("script")
+        for (script in scripts) {
+            val scriptContent = script.html()
+            
+            // Look for YouTube watch URLs
+            if (scriptContent.contains("youtube.com/watch")) {
+                val regex = Regex("""https://www\.youtube\.com/watch\?v=([^"']+)""")
+                val match = regex.find(scriptContent)
+                if (match != null) {
+                    return match.value
+                }
+            }
+            
+            // Look for YouTube embed URLs that might be in JSON
+            if (scriptContent.contains("youtube.com/embed")) {
+                val regex = Regex("""https://www\.youtube\.com/embed/([^"'\s]+)""")
+                val match = regex.find(scriptContent)
+                if (match != null) {
+                    return "https://www.youtube.com/watch?v=${match.groupValues[1]}"
+                }
+            }
+        }
+        
+        // Look for canonical link
+        val canonical = document.selectFirst("link[rel=canonical]")
+        if (canonical != null) {
+            val canonicalUrl = canonical.attr("href")
+            if (canonicalUrl.contains("youtube.com/watch")) {
+                return canonicalUrl
+            }
+        }
+
+        return null
+    }
+
+    private suspend fun handleYouTubeVideo(
+        youtubeUrl: String,
+        data: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // First try the standard extractor
+        var success = false
+        
+        try {
+            loadExtractor(youtubeUrl, data, subtitleCallback) { link ->
+                // Check if we're getting multiple qualities or just 360p
+                if (link.quality > Qualities.P360.value) {
+                    success = true
+                }
+                callback(link)
+            }
+            
+            // If we got at least one link, consider it successful
+            if (success) {
+                return true
+            }
+        } catch (e: Exception) {
+            // Extractor failed, try alternative approach
+        }
+
+        // Alternative approach: Direct YouTube extraction
+        try {
+            // Use app.get to fetch the YouTube page directly
+            val youtubeDoc = app.get(youtubeUrl).document
+            
+            // Look for adaptive formats in the page
+            val scriptTags = youtubeDoc.select("script")
+            for (script in scriptTags) {
+                val scriptContent = script.html()
+                
+                // Look for ytInitialPlayerResponse which contains stream info
+                if (scriptContent.contains("ytInitialPlayerResponse")) {
+                    val regex = Regex(""""url":"(https://[^"]+googlevideo[^"]+)""")
+                    val matches = regex.findAll(scriptContent)
+                    
+                    matches.forEach { match ->
+                        val videoUrl = match.groupValues[1]
+                        // Extract quality from URL if possible
+                        val quality = extractQualityFromYouTubeUrl(videoUrl)
+                        
+                        callback(
+                            newExtractorLink(
+                                source = name,
+                                name = "YouTube",
+                                url = videoUrl
+                            ){
+                                this.referrer = "$mainUrl/";
+                                this.quality = quality;
+                            }
+                        )
+                        success = true
+                    }
+                    
+                    if (success) return true
+                }
+            }
+        } catch (e: Exception) {
+            // Direct extraction also failed
+        }
+
+        // Last resort: Use the YouTube URL directly with assumed qualities
+        if (!success) {
+            // Provide multiple quality options manually
+            val qualities = listOf(
+                Qualities.P1080.value to "best",
+                Qualities.P720.value to "medium", 
+                Qualities.P480.value to "standard",
+                Qualities.P360.value to "base"
+            )
+            
+            qualities.forEach { (quality, label) ->
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "YouTube $label",
+                        url = youtubeUrl
+                    ){
+                        this.referrer = "$mainUrl/";
+                        this.quality = quality
+                    }
+                )
+            }
+            success = true
+        }
+
+        return success
+    }
+
+    private fun extractQualityFromYouTubeUrl(url: String): Int {
+        return when {
+            url.contains("/mime/") -> {
+                when {
+                    url.contains("1080") -> Qualities.P1080.value
+                    url.contains("720") -> Qualities.P720.value
+                    url.contains("480") -> Qualities.P480.value
+                    url.contains("360") -> Qualities.P360.value
+                    url.contains("240") -> Qualities.P240.value
+                    url.contains("144") -> Qualities.P144.value
+                    else -> Qualities.Unknown.value
+                }
+            }
+            else -> Qualities.Unknown.value
+        }
     }
 }
