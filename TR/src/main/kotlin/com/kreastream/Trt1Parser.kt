@@ -11,7 +11,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
 
-class Trt1 : MainAPI() {
+class Trt1Parser : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
     override var name = "TRT 1"
     override val hasMainPage = true
