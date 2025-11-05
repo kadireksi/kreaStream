@@ -1,4 +1,4 @@
-package com.kreastream
+package com.lagradost.cloudstream3.trt1
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -6,7 +6,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
-class Trt1 : MainAPI() {
+class TRT1Provider : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
     override var name = "TRT1"
     override val hasMainPage = true
@@ -109,7 +109,7 @@ class Trt1 : MainAPI() {
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
-            //this.plot = description
+            this.plot = description
         }
     }
 
@@ -121,7 +121,24 @@ class Trt1 : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        // Look for YouTube embed
+        // First, look for m3u8 streams in JSON data
+        val m3u8Url = findM3u8Url(document)
+        if (m3u8Url != null) {
+            // Add m3u8 stream with quality options
+            callback(
+                ExtractorLink(
+                    name,
+                    name,
+                    m3u8Url
+                ){
+                    referer = "$mainUrl/";
+                    quality = Qualities.Unknown.value
+                }
+            )
+            return true
+        }
+        
+        // If no m3u8 found, look for YouTube embed
         val iframe = document.selectFirst("iframe[src*='youtube.com/embed']")
         if (iframe != null) {
             val embedUrl = iframe.attr("src")
@@ -158,5 +175,36 @@ class Trt1 : MainAPI() {
         }
 
         return false
+    }
+
+    private fun findM3u8Url(document: org.jsoup.nodes.Document): String? {
+        // Look for m3u8 URLs in script tags with JSON data
+        val scripts = document.select("script")
+        for (script in scripts) {
+            val scriptContent = script.html()
+            
+            // Pattern 1: Look for "mediaSrc" with m3u8 URL
+            val mediaSrcPattern = Regex(""""mediaSrc"\s*:\s*\[\s*\{[^}]*"url"\s*:\s*"([^"]+\.m3u8[^"]*)""")
+            val mediaSrcMatch = mediaSrcPattern.find(scriptContent)
+            if (mediaSrcMatch != null) {
+                return mediaSrcMatch.groupValues[1]
+            }
+            
+            // Pattern 2: Look for "src" in media object with m3u8 URL
+            val mediaSrcPattern2 = Regex(""""media"\s*:\s*\{[^}]*"src"\s*:\s*"([^"]+\.m3u8[^"]*)""")
+            val mediaSrcMatch2 = mediaSrcPattern2.find(scriptContent)
+            if (mediaSrcMatch2 != null) {
+                return mediaSrcMatch2.groupValues[1]
+            }
+            
+            // Pattern 3: Look for direct m3u8 URLs in the script
+            val m3u8Pattern = Regex("""https://[^"\s]+\.m3u8[^"\s]*""")
+            val m3u8Match = m3u8Pattern.find(scriptContent)
+            if (m3u8Match != null && m3u8Match.value.contains("trt.com.tr")) {
+                return m3u8Match.value
+            }
+        }
+        
+        return null
     }
 }
