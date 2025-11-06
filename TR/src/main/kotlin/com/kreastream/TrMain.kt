@@ -6,8 +6,8 @@ import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
 class TrMain : MainAPI() {
-    override var mainUrl = "https://www.trt1.com.tr"
-    override var name = "TR Plugin"
+    override var mainUrl = "https://trt1.com.tr"
+    override var name = "TR Plugin (Debug)"
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
     private val parser = Trt1Parser()

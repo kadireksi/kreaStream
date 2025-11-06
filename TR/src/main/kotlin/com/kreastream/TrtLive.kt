@@ -3,7 +3,7 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
-class TrtLive : TrMain() {
+class TrtLive : MainAPI() {
     override var mainUrl = "https://www.trt.net.tr"
     override var name = "TRT Canlı"
     override val supportedTypes = setOf(TvType.Live)
