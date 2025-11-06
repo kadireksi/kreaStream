@@ -9,6 +9,6 @@ import com.lagradost.cloudstream3.plugins.registerMainAPI
 class TrPlugin : Plugin() {
     override fun load(context: Context) {
         // Register a single unified main API
-        registerMainAPI(TrMain())
+       this.registerMainAPI(TrMain())
     }
 }
