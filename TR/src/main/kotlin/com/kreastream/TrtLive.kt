@@ -10,13 +10,13 @@ class TrtLive : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
         val channels = TrtUtils.liveChannels.map { (channelName, streamUrl, logoUrl) ->
-            val nowPlaying = TrtUtils.getNowPlaying(channelName)
+            //val nowPlaying = TrtUtils.getNowPlaying(channelName)
             HomePageList(
                 channelName,
                 listOf(
                     newMovieSearchResponse(channelName, streamUrl, TvType.Live) {
                         this.posterUrl = logoUrl
-                        this.plot = nowPlaying ?: "Canlı yayın akışı"
+                        //this.plot = nowPlaying ?: "Canlı yayın akışı"
                     }
                 ),
                 isHorizontalImages = true
@@ -45,11 +45,12 @@ class TrtLive : MainAPI() {
             newExtractorLink(
                 name = "TRT",
                 source = "TRT",
-                url = data,
-                referer = mainUrl,
-                quality = Qualities.P720.value,
-                isM3u8 = true
-            )
+                url = data
+            ){
+                this.referer = mainUrl
+                this.quality = Qualities.P720.value
+                //this.isM3u8 = true
+            }
         )
         return true
     }
