@@ -12,7 +12,7 @@ import org.json.JSONObject
 
 
 class Trt1Parser : MainAPI() {
-    override var TRT1Url = "https://www.trt1.com.tr"
+    var TRT1Url = "https://www.trt1.com.tr"
     override var name = "TRT1"
     //override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
