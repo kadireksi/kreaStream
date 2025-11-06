@@ -44,12 +44,18 @@ class TrtLive : MainAPI() {
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        M3u8Helper.generateM3u8(
-            name = "TRT Live", 
-            data, 
-            mainUrl
-        ).forEach(callback)
+        ): Boolean {
+        callback.invoke(
+            newExtractorLink(
+                name = "TRT",
+                source = "TRT",
+                url = data
+            ){
+                this.referer = mainUrl
+                this.quality = Qualities.P720.value
+                //this.isM3u8 = true
+            }
+        )
         return true
     }
 }
