@@ -12,13 +12,13 @@ class TrtLive : MainAPI() {
         "" to "TRT Canlı Yayınlar"
     )
 
-    /** Main page with live channels */
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val items = TrtUtils.liveChannels.map { (name, streamUrl, logoUrl) ->
-            newMovieLoadResponse(name, streamUrl, TvType.Live, streamUrl) {
+            // Use newMovieSearchResponse for live streams
+            newMovieSearchResponse(name, streamUrl, TvType.Live) {
                 this.posterUrl = logoUrl
             }
         }
@@ -26,19 +26,14 @@ class TrtLive : MainAPI() {
         return newHomePageResponse(request.name, items)
     }
 
-    /** Direct load for individual live streams */
     override suspend fun load(url: String): LoadResponse {
-        // Find the channel info from the URL
         val channelInfo = TrtUtils.liveChannels.find { it.second == url }
-        
-        return newMovieLoadResponse(
-            channelInfo?.first ?: "TRT Canlı",
-            url,
-            TvType.Live,
-            url
-        ) {
-            this.posterUrl = channelInfo?.third
-            this.plot = "TRT canlı yayın akışı"
+        val title = channelInfo?.first ?: "TRT Canlı"
+        val poster = channelInfo?.third
+
+        return newMovieLoadResponse(title, url, TvType.Live, url) {
+            this.posterUrl = poster
+            this.plot = "TRT canlı yayın"
         }
     }
 
@@ -48,25 +43,12 @@ class TrtLive : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Use M3u8Helper to get quality options for live streams
         M3u8Helper.generateM3u8(
             name = "TRT Live",
             data,
             mainUrl,
             headers = mapOf("Referer" to mainUrl)
         ).forEach(callback)
-        
         return true
-    }
-
-    /** Search functionality for live channels */
-    override suspend fun search(query: String): List<SearchResponse> {
-        return TrtUtils.liveChannels
-            .filter { it.first.contains(query, ignoreCase = true) }
-            .map { (name, streamUrl, logoUrl) ->
-                newMovieSearchResponse(name, streamUrl, TvType.Live) {
-                    this.posterUrl = logoUrl
-                }
-            }
     }
 }
