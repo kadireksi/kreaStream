@@ -1,52 +1,57 @@
 package com.kreastream
+
+import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
-
+/**
+ * Main Turkish plugin hub combining TRT, ATV, etc.
+ * Currently includes TRT (series + live)
+ */
 class TrMain : MainAPI() {
-override var mainUrl = "https://www.trt1.com.tr"
-override var name = "TR Plugin"
-override var lang = "tr"
-override val hasMainPage = true
-override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
+    override var mainUrl = "https://www.trt1.com.tr"
+    override var name = "Türkiye TV"
+    override var lang = "tr"
+    override val hasMainPage = true
+    override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
-
-private val parser by lazy { Trt1Parser() }
-private val live by lazy { TrtLive() }
-
+    private val trtParser by lazy { Trt1Parser() }
+    private val trtLive by lazy { TrtLive() }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        val parserHome = parser.getMainPage(page, request)
-        val liveHome = live.getMainPage(page, request)
         val allLists = mutableListOf<HomePageList>()
 
+        // TRT sections
+        trtParser.getMainPage(page, request)?.items?.let { allLists.addAll(it) }
 
-        parserHome?.items?.let { allLists.addAll(it) }
-        liveHome?.items?.let { allLists.addAll(it) }
+        // TRT Canlı
+        trtLive.getMainPage(page, request)?.items?.let { allLists.addAll(it) }
 
+        // later we’ll add:
+        // atvParser.getMainPage(...)
+        // showTvParser.getMainPage(...)
+        // etc.
 
         return newHomePageResponse(allLists)
     }
 
-
     override suspend fun load(url: String): LoadResponse {
         return when {
-            url.contains("/live", true) -> live.load(url)
-            url.contains("trt1.com.tr", true) -> parser.load(url)
-            else -> parser.load(url)
+            url.contains("/live", true) -> trtLive.load(url)
+            url.contains("trt1.com.tr", true) -> trtParser.load(url)
+            else -> trtParser.load(url)
         }
     }
-
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-        ): Boolean {
+    ): Boolean {
         return if (data.endsWith(".m3u8")) {
-        live.loadLinks(data, isCasting, subtitleCallback, callback)
+            trtLive.loadLinks(data, isCasting, subtitleCallback, callback)
         } else {
-        parser.loadLinks(data, isCasting, subtitleCallback, callback)
+            trtParser.loadLinks(data, isCasting, subtitleCallback, callback)
         }
     }
 }
