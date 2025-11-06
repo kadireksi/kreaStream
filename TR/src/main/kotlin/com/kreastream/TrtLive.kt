@@ -13,7 +13,7 @@ class TrtLive : MainAPI() {
         val list = listOf(
             newTvSeriesSearchResponse("TRT Canlı", "$mainUrl/live", TvType.Live) {
                 posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-                plot = "TRT kanallarını canlı izleyin"
+                //plot = "TRT kanallarını canlı izleyin"
             }
         )
         return newHomePageResponse(
