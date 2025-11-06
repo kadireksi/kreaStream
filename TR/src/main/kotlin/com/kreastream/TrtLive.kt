@@ -7,6 +7,7 @@ class TrtLive : MainAPI() {
     override var mainUrl = "https://www.trt.net.tr"
     override var name = "TRT Canlı"
     override val supportedTypes = setOf(TvType.Live)
+    override var lang = "tr"
 
     override val mainPage = mainPageOf(
         "" to "TRT Canlı Yayınlar"

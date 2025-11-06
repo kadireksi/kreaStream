@@ -12,17 +12,15 @@ import org.json.JSONObject
 
 
 class Trt1Parser : MainAPI() {
-    override var mainUrl = "https://www.trt1.com.tr"
+    override var TRT1Url = "https://www.trt1.com.tr"
     override var name = "TRT1"
     //override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
     override var lang = "tr"
 
     override val mainPage = mainPageOf(
-        "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler",
-        "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler",
-        //"$mainUrl/diziler?archive=false" to "Güncel Diziler",
-        //"$mainUrl/diziler?archive=true" to "Eski Diziler"
+        "$TRT1Url/diziler?archive=false&order=title_asc" to "Güncel Diziler",
+        "$TRT1Url/diziler?archive=true&order=title_asc" to "Eski Diziler"
     )
 
     override suspend fun getMainPage(
@@ -34,7 +32,7 @@ class Trt1Parser : MainAPI() {
         } else {
             // Handle pagination for archive (old series)
             if (request.data.contains("archive=true")) {
-                "$mainUrl/diziler/$page?archive=true" + if (request.data.contains("order=title_asc")) "&order=title_asc" else ""
+                "$TRT1Url/diziler/$page?archive=true" + if (request.data.contains("order=title_asc")) "&order=title_asc" else ""
             } else {
                 request.data
             }
@@ -66,11 +64,11 @@ class Trt1Parser : MainAPI() {
     }
 
     private fun fixUrl(url: String): String {
-        return if (url.startsWith("http")) url else "$mainUrl$url"
+        return if (url.startsWith("http")) url else "$TRT1Url$url"
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/arama/${query}?contenttype=series"
+        val searchUrl = "$TRT1Url/arama/${query}?contenttype=series"
         val document = app.get(searchUrl).document
         
         return document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
@@ -105,8 +103,8 @@ class Trt1Parser : MainAPI() {
         val episodes = mutableListOf<Episode>()
         
         // Get episodes from the bolum page
-        val seriesSlug = url.removePrefix("$mainUrl/diziler/")
-        val episodesUrl = "$mainUrl/diziler/$seriesSlug/bolum"
+        val seriesSlug = url.removePrefix("$TRT1Url/diziler/")
+        val episodesUrl = "$TRT1Url/diziler/$seriesSlug/bolum"
         
         // Function to parse episodes from a page with proper pagination
         suspend fun parseEpisodesPage(pageUrl: String): List<Episode> {
