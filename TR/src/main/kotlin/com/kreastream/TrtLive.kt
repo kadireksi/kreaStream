@@ -13,7 +13,6 @@ class TrtLive : MainAPI() {
         val list = listOf(
             newTvSeriesSearchResponse("TRT Canlı", "https://trt.net.tr/live", TvType.Live) {
                 posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-                //plot = "TRT kanallarını canlı izleyin"
             }
         )
         return newHomePageResponse(
@@ -21,7 +20,7 @@ class TrtLive : MainAPI() {
         )
     }
 
-    /** When user clicks “TRT Canlı” → list each channel as an episode */
+    /** When user clicks "TRT Canlı" → list each channel as an episode */
     override suspend fun load(url: String): LoadResponse {
         val episodes = TrtUtils.liveChannels.map { (name, streamUrl, logoUrl) ->
             val nowPlaying = TrtUtils.getNowPlaying(name)
@@ -34,7 +33,6 @@ class TrtLive : MainAPI() {
 
         return newTvSeriesLoadResponse("TRT Canlı", url, TvType.Live, episodes) {
             posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-            //plot = "TRT canlı yayınları"
         }
     }
 
@@ -44,17 +42,14 @@ class TrtLive : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        callback.invoke(
-            newExtractorLink(
-                name = "TRT",
-                source = "TRT",
-                url = data
-            ){
-                this.referer = mainUrl
-                this.quality = Qualities.P720.value
-                //this.isM3u8 = true
-            }
-        )
+        // Use M3u8Helper to get quality options for live streams
+        M3u8Helper.generateM3u8(
+            name = "TRT Live",
+            data,
+            mainUrl,
+            headers = mapOf("Referer" to mainUrl)
+        ).forEach(callback)
+        
         return true
     }
 }
