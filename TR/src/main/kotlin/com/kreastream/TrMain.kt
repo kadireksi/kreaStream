@@ -2,6 +2,8 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
 
 class TrMain : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
