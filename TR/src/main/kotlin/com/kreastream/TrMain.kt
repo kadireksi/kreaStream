@@ -41,7 +41,7 @@ class TrMain : MainAPI() {
                         newMovieSearchResponse("TR Plugin Debug", mainUrl, TvType.Live) {
                             posterUrl =
                                 "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-                            plot = "Plugin loaded but no data (debug placeholder)"
+                            //plot = "Plugin loaded but no data (debug placeholder)"
                         }
                     )
                 )
