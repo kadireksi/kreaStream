@@ -8,31 +8,37 @@ class TrtLive : MainAPI() {
     override var name = "TRT Canlı"
     override val supportedTypes = setOf(TvType.Live)
 
-    /** Only one section on main page: TRT Canlı */
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        val list = listOf(
-            newTvSeriesSearchResponse("TRT Canlı", "https://trt.net.tr/live", TvType.Live) {
-                posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-            }
-        )
-        return newHomePageResponse(
-            listOf(HomePageList("TRT Canlı", list, isHorizontalImages = true))
-        )
-    }
+    override val mainPage = mainPageOf(
+        "" to "TRT Canlı Yayınlar"
+    )
 
-    /** When user clicks "TRT Canlı" → list each channel as an episode */
-    override suspend fun load(url: String): LoadResponse {
-        val episodes = TrtUtils.liveChannels.map { (name, streamUrl, logoUrl) ->
-            val nowPlaying = TrtUtils.getNowPlaying(name)
-            newEpisode(streamUrl) {
-                this.name = name
+    /** Main page with live channels */
+    override suspend fun getMainPage(
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
+        val items = TrtUtils.liveChannels.map { (name, streamUrl, logoUrl) ->
+            newMovieLoadResponse(name, streamUrl, TvType.Live, streamUrl) {
                 this.posterUrl = logoUrl
-                this.description = nowPlaying ?: "Canlı yayın akışı"
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Canlı", url, TvType.Live, episodes) {
-            posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
+        return newHomePageResponse(request.name, items)
+    }
+
+    /** Direct load for individual live streams */
+    override suspend fun load(url: String): LoadResponse {
+        // Find the channel info from the URL
+        val channelInfo = TrtUtils.liveChannels.find { it.second == url }
+        
+        return newMovieLoadResponse(
+            channelInfo?.first ?: "TRT Canlı",
+            url,
+            TvType.Live,
+            url
+        ) {
+            this.posterUrl = channelInfo?.third
+            this.plot = "TRT canlı yayın akışı"
         }
     }
 
@@ -51,5 +57,16 @@ class TrtLive : MainAPI() {
         ).forEach(callback)
         
         return true
+    }
+
+    /** Search functionality for live channels */
+    override suspend fun search(query: String): List<SearchResponse> {
+        return TrtUtils.liveChannels
+            .filter { it.first.contains(query, ignoreCase = true) }
+            .map { (name, streamUrl, logoUrl) ->
+                newMovieSearchResponse(name, streamUrl, TvType.Live) {
+                    this.posterUrl = logoUrl
+                }
+            }
     }
 }
