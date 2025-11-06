@@ -1,19 +1,28 @@
 package com.kreastream
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+//import kotlinx.serialization.json.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+
 
 class Trt1Parser : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
-    override var name = "TRT 1"
+    override var name = "TRT1"
+    //override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
     override var lang = "tr"
 
     override val mainPage = mainPageOf(
         "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler",
         "$mainUrl/diziler?archive=true&order=title_asc" to "Eski Diziler",
+        //"$mainUrl/diziler?archive=false" to "Güncel Diziler",
+        //"$mainUrl/diziler?archive=true" to "Eski Diziler"
     )
 
     override suspend fun getMainPage(
@@ -96,7 +105,7 @@ class Trt1Parser : MainAPI() {
         val episodes = mutableListOf<Episode>()
         
         // Get episodes from the bolum page
-        val seriesSlug = url.removePrefix("$mainUrl/diziler/").substringBefore("?")
+        val seriesSlug = url.removePrefix("$mainUrl/diziler/")
         val episodesUrl = "$mainUrl/diziler/$seriesSlug/bolum"
         
         // Function to parse episodes from a page with proper pagination
@@ -128,28 +137,24 @@ class Trt1Parser : MainAPI() {
             episodes.addAll(parseEpisodesPage(episodesUrl))
         } catch (e: Exception) {
             // If episodes page doesn't exist, try alternative episode structure
-            try {
-                val alternativeEpisodes = document.select("a[href*='/bolum/']").mapNotNull { element ->
-                    val epHref = element.attr("href")
-                    if (epHref.contains("/bolum/") && !epHref.contains("/bolum/1")) {
-                        val epTitle = element.selectFirst("div, span, h3")?.text()?.trim() ?: "Bölüm"
-                        val epPoster = element.selectFirst("img")?.attr("src")?.let { fixPosterUrl(it) }
-                        
-                        newEpisode(fixUrl(epHref)) {
-                            this.name = epTitle
-                            this.posterUrl = epPoster
-                        }
-                    } else {
-                        null
+            val alternativeEpisodes = document.select("a[href*='/bolum/']").mapNotNull { element ->
+                val epHref = element.attr("href")
+                if (epHref.contains("/bolum/") && !epHref.contains("/bolum/1")) {
+                    val epTitle = element.selectFirst("div, span, h3")?.text()?.trim() ?: "Bölüm"
+                    val epPoster = element.selectFirst("img")?.attr("src")?.let { fixPosterUrl(it) }
+                    
+                    newEpisode(fixUrl(epHref)) {
+                        this.name = epTitle
+                        this.posterUrl = epPoster
                     }
+                } else {
+                    null
                 }
-                episodes.addAll(alternativeEpisodes)
-            } catch (e2: Exception) {
-                // If both methods fail, continue with empty episodes
             }
+            episodes.addAll(alternativeEpisodes)
         }
         
-        // Handle pagination for episodes
+        // Handle pagination for episodes - get pagination from the episodes page, not series page
         if (episodes.isNotEmpty()) {
             try {
                 val episodesDocument = app.get(episodesUrl).document
@@ -211,8 +216,8 @@ class Trt1Parser : MainAPI() {
         // If no m3u8 found, look for YouTube embed
         val youtubeUrl = findYouTubeUrl(document)
         if (youtubeUrl != null) {
-            // For YouTube, use the built-in extractor
-            return loadExtractor(youtubeUrl, "$mainUrl/", subtitleCallback, callback)
+            // For YouTube, we need to extract the video ID and use it directly
+            return handleYouTubeVideo(youtubeUrl, subtitleCallback, callback)
         }
 
         return false
@@ -304,4 +309,90 @@ class Trt1Parser : MainAPI() {
 
         return null
     }
+
+    private suspend fun getYoutubeStreams(videoId: String): List<Pair<String, Int>> {
+        val apiUrl = "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FQyR3E6Uo7I0QFh0v4H4KQj6YkzZ5Y"
+        val payload = """
+            {
+            "context": {
+                "client": {
+                "hl": "en",
+                "clientName": "WEB",
+                "clientVersion": "2.20240725.00.00"
+                }
+            },
+            "videoId": "$videoId"
+            }
+        """.trimIndent()
+
+        val response = app.post(
+            apiUrl,
+            requestBody = payload.toRequestBody("application/json".toMediaType())
+        ).text
+
+        val result = mutableListOf<Pair<String, Int>>()
+
+        try {
+            val root = org.json.JSONObject(response)
+            val streamingData = root.optJSONObject("streamingData") ?: return emptyList()
+            val formats = streamingData.optJSONArray("formats") ?: return emptyList()
+
+            for (i in 0 until formats.length()) {
+                val fmt = formats.optJSONObject(i) ?: continue
+                val url = fmt.optString("url", "")
+                if (url.isBlank()) continue
+
+                val qualityLabel = fmt.optString("qualityLabel", "Unknown")
+                val q = qualityLabel.replace("p", "").toIntOrNull() ?: Qualities.Unknown.value
+
+                result.add(Pair(url, q))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return result
+    }
+
+    private suspend fun handleYouTubeVideo(
+        youtubeUrl: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val videoId = youtubeUrl.substringAfter("v=").substringBefore("&")
+        val watchUrl = "https://www.youtube.com/watch?v=$videoId"
+
+        // Ask the core extractor dispatcher to resolve YouTube
+        val extractedLinks = mutableListOf<ExtractorLink>()
+
+        // This internally calls the YouTube extractor (multi-quality)
+        loadExtractor(
+            watchUrl,
+            referer = "https://www.youtube.com/",
+            subtitleCallback = subtitleCallback
+        ) { link ->
+            extractedLinks.add(link)
+        }
+
+        if (extractedLinks.isEmpty()) return false
+
+        // Wrap every resolved stream into newExtractorLink
+        for (link in extractedLinks) {
+            callback(
+                newExtractorLink(
+                    name = "YouTube",
+                    source = "YouTube",
+                    url = link.url
+                ) {
+                    this.quality = link.quality
+                    this.referer = "https://www.youtube.com/"
+                    //this.isM3u8 = link.isM3u8
+                    this.headers = link.headers ?: mapOf("User-Agent" to "Mozilla/5.0")
+                }
+            )
+        }
+
+        return true
+    }
+
 }
