@@ -8,30 +8,33 @@ class TrtLive : MainAPI() {
     override var name = "TRT Canlı"
     override val supportedTypes = setOf(TvType.Live)
 
+    /** Only one section on main page: TRT Canlı */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        val channels = TrtUtils.liveChannels.map { (channelName, streamUrl, logoUrl) ->
-            //val nowPlaying = TrtUtils.getNowPlaying(channelName)
-            HomePageList(
-                channelName,
-                listOf(
-                    newMovieSearchResponse(channelName, streamUrl, TvType.Live) {
-                        this.posterUrl = logoUrl
-                        //this.plot = nowPlaying ?: "Canlı yayın akışı"
-                    }
-                ),
-                isHorizontalImages = true
-            )
-        }
-        return newHomePageResponse(channels)
+        val list = listOf(
+            newTvSeriesSearchResponse("TRT Canlı", "$mainUrl/live", TvType.Live) {
+                posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
+                plot = "TRT kanallarını canlı izleyin"
+            }
+        )
+        return newHomePageResponse(
+            listOf(HomePageList("TRT Canlı", list, isHorizontalImages = true))
+        )
     }
 
+    /** When user clicks “TRT Canlı” → list each channel as an episode */
     override suspend fun load(url: String): LoadResponse {
-        val channel = TrtUtils.liveChannels.find { it.second == url }
-        val name = channel?.first ?: "TRT Canlı"
-        val logo = channel?.third
+        val episodes = TrtUtils.liveChannels.map { (name, streamUrl, logoUrl) ->
+            val nowPlaying = TrtUtils.getNowPlaying(name)
+            newEpisode(streamUrl) {
+                this.name = name
+                this.posterUrl = logoUrl
+                this.description = nowPlaying ?: "Canlı yayın akışı"
+            }
+        }
 
-        return newMovieLoadResponse(name, url, TvType.Live, url) {
-            this.posterUrl = logo
+        return newTvSeriesLoadResponse("TRT Canlı", url, TvType.Live, episodes) {
+            posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
+            plot = "TRT canlı yayınları"
         }
     }
 
@@ -45,12 +48,11 @@ class TrtLive : MainAPI() {
             newExtractorLink(
                 name = "TRT",
                 source = "TRT",
-                url = data
-            ){
-                this.referer = mainUrl
-                this.quality = Qualities.P480.value
-                //this.isM3u8 = true
-            }
+                url = data,
+                referer = mainUrl,
+                quality = Qualities.P720.value,
+                isM3u8 = true
+            )
         )
         return true
     }

@@ -3,59 +3,42 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
+/**
+ * Main Turkish plugin hub combining TRT, ATV, etc.
+ * Currently includes TRT (series + live)
+ */
 class TrMain : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
-    override var name = "TR Plugin (Debug)"
+    override var name = "Türkiye TV"
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
-    private val parser by lazy { Trt1Parser() }
-    private val live by lazy { TrtLive() }
-
-    init {
-        println("✅ TR Plugin initialized")
-    }
+    private val trtParser by lazy { Trt1Parser() }
+    private val trtLive by lazy { TrtLive() }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
         val allLists = mutableListOf<HomePageList>()
 
-        try {
-            parser.getMainPage(page, request)?.items?.let { allLists.addAll(it) }
-        } catch (e: Exception) {
-            println("⚠️ Trt1Parser failed: ${e.message}")
-        }
+        // TRT sections
+        trtParser.getMainPage(page, request)?.items?.let { allLists.addAll(it) }
 
-        try {
-            live.getMainPage(page, request)?.items?.let { allLists.addAll(it) }
-        } catch (e: Exception) {
-            println("⚠️ TrtLive failed: ${e.message}")
-        }
+        // TRT Canlı
+        trtLive.getMainPage(page, request)?.items?.let { allLists.addAll(it) }
 
-        // Fallback so plugin is always visible even if parsing fails
-        if (allLists.isEmpty()) {
-            allLists.add(
-                HomePageList(
-                    "Test Section",
-                    listOf(
-                        newMovieSearchResponse("TR Plugin Debug", mainUrl, TvType.Live) {
-                            posterUrl =
-                                "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-                            //plot = "Plugin loaded but no data (debug placeholder)"
-                        }
-                    )
-                )
-            )
-        }
+        // later we’ll add:
+        // atvParser.getMainPage(...)
+        // showTvParser.getMainPage(...)
+        // etc.
 
         return newHomePageResponse(allLists)
     }
 
     override suspend fun load(url: String): LoadResponse {
         return when {
-            url.contains("trt1.com.tr", true) -> parser.load(url)
-            url.endsWith(".m3u8") -> live.load(url)
-            else -> parser.load(url)
+            url.contains("/live", true) -> trtLive.load(url)
+            url.contains("trt1.com.tr", true) -> trtParser.load(url)
+            else -> trtParser.load(url)
         }
     }
 
@@ -66,9 +49,9 @@ class TrMain : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         return if (data.endsWith(".m3u8")) {
-            live.loadLinks(data, isCasting, subtitleCallback, callback)
+            trtLive.loadLinks(data, isCasting, subtitleCallback, callback)
         } else {
-            parser.loadLinks(data, isCasting, subtitleCallback, callback)
+            trtParser.loadLinks(data, isCasting, subtitleCallback, callback)
         }
     }
 }
