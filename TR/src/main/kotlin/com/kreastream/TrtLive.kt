@@ -34,7 +34,7 @@ class TrtLive : MainAPI() {
 
         return newTvSeriesLoadResponse("TRT Canlı", url, TvType.Live, episodes) {
             posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
-            plot = "TRT canlı yayınları"
+            //plot = "TRT canlı yayınları"
         }
     }
 
@@ -48,11 +48,12 @@ class TrtLive : MainAPI() {
             newExtractorLink(
                 name = "TRT",
                 source = "TRT",
-                url = data,
-                referer = mainUrl,
-                quality = Qualities.P720.value,
-                isM3u8 = true
-            )
+                url = data
+            ){
+                this.referer = mainUrl
+                this.quality = Qualities.P720.value
+                //this.isM3u8 = true
+            }
         )
         return true
     }
