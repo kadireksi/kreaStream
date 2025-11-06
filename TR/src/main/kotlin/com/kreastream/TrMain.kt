@@ -9,6 +9,8 @@ class TrMain : MainAPI() {
     override var mainUrl = "https://trt1.com.tr"
     override var name = "TR Plugin (Debug)"
     override var lang = "tr"
+    override val hasMainPage = true
+    override val hasSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
     private val parser = Trt1Parser()
