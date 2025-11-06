@@ -11,7 +11,7 @@ class TrtLive : MainAPI() {
     /** Only one section on main page: TRT Canlı */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
         val list = listOf(
-            newTvSeriesSearchResponse("TRT Canlı", "$mainUrl/live", TvType.Live) {
+            newTvSeriesSearchResponse("TRT Canlı", "https://trt.net.tr/live", TvType.Live) {
                 posterUrl = "https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_of_TRT1.png"
                 //plot = "TRT kanallarını canlı izleyin"
             }
