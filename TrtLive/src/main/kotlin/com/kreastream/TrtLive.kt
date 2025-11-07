@@ -41,15 +41,16 @@ class TrtLive : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Use newExtractorLink with configuration
         callback(
             newExtractorLink(
-                name = name,
-                source = "TRT Live",
+                name = "TRT Live",
+                source = name,
                 url = data
-            ){
-                //this.mainUrl = mainUrl,
-                this.quality = Qualities.P720.value,
-              
+            ) {
+                this.referer = mainUrl
+                this.quality = Qualities.P720.value
+                //this.isM3u8 = true
             }
         )
         return true
