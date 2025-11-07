@@ -13,15 +13,18 @@
         "name": "TR"
     },
     {
+        "iconUrl": "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/trt.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 11806,
+        "fileSize": 26535,
         "status": 1,
+        "language": "tr",
         "authors": [
             "kreastream"
         ],
         "version": 1,
         "internalName": "TrtLive",
+        "description": "TRT Canl\u0131 yay\u0131n\u0131 ve TRT dizileri",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TrtLive.cs3",
         "name": "TrtLive"
     }
