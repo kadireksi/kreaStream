@@ -291,7 +291,7 @@ class TrtLive : MainAPI() {
 
             callback(
                 newExtractorLink(
-                    name = if (isAudio) "${channel.name}" else "${channel.name}",
+                    name = "${channel.name}",
                     source = name,
                     url = streamUrl
                 ) {
