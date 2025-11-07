@@ -1,8 +1,0 @@
-{
-  "name": "kreaStream",
-  "description": "kreaStream",
-  "manifestVersion": 1,
-  "pluginLists": [
-    "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/plugins.json"
-  ]
-}
