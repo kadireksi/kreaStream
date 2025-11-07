@@ -329,7 +329,7 @@ class TrtLive : MainAPI() {
                     this.referer = mainUrl
                     this.quality = quality
                     //this.isM3u8 = isM3u8
-                    this.audioOnly = isAudio
+                    //this.audioOnly = isAudio
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
