@@ -42,14 +42,15 @@ class TrtLive : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         callback(
-            ExtractorLink(
-                name,
-                "TRT Live",
-                data,
-                mainUrl,
-                Qualities.P720.value,
-                true
-            )
+            newExtractorLink(
+                name = name,
+                source = "TRT Live",
+                url = data
+            ){
+                //this.mainUrl = mainUrl,
+                this.quality = Qualities.P720.value,
+              
+            }
         )
         return true
     }
