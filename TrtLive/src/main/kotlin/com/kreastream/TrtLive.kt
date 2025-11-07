@@ -235,7 +235,15 @@ class TrtLive : MainAPI() {
             else -> emptyList()
         }
 
-        return newHomePageResponse(request.name, items)
+        return newHomePageResponse(
+            listOf(
+                HomePageList(
+                    name = request.name,
+                    list = items,
+                    isHorizontalImages = true
+                )
+            )
+        )
     }
 
     override suspend fun load(url: String): LoadResponse {
