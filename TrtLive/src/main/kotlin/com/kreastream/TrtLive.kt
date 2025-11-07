@@ -291,7 +291,7 @@ class TrtLive : MainAPI() {
 
             callback(
                 newExtractorLink(
-                    name = "${channel.name}",
+                    name = channel.name,
                     source = name,
                     url = streamUrl
                 ) {
