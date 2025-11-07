@@ -8,5 +8,6 @@ import android.content.Context
 class TrtLivePlugin: Plugin() {
     override fun load(context: Context) {
         registerMainAPI(TrtLive())
+        registerMainAPI(Trt1())
     }
 }

@@ -207,15 +207,29 @@ class TrtLive : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
+        "series" to "Güncel Diziler",
+        "archive" to "Eski Diziler",
         "tv" to "TV Kanalları",
         "radio" to "Radyo Kanalları"
     )
+
+    private val Trt1 by lazy { Trt1() }
 
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val items = when (request.data) {
+            "series" -> {
+                // Get series from TRT1 parser
+                trt1Parser.getMainPage(page, MainPageRequest("Güncel Diziler", "$mainUrl/diziler?archive=false&order=title_asc"))
+                    .items?.firstOrNull()?.list ?: emptyList()
+            }
+            "archive" -> {
+                // Get series from TRT1 parser
+                trt1Parser.getMainPage(page, MainPageRequest("Eski Diziler", "$mainUrl/diziler?archive=true&order=title_asc"))
+                    .items?.firstOrNull()?.list ?: emptyList()
+            }
             "tv" -> {
                 tvChannels.map { channel ->
                     val mainStream = channel.streamUrls.firstOrNull() ?: ""
@@ -291,7 +305,7 @@ class TrtLive : MainAPI() {
 
             callback(
                 newExtractorLink(
-                    name = channel?.name,
+                    name = if (isAudio) "TRT Radyo" else "TRT Live",
                     source = name,
                     url = streamUrl
                 ) {
