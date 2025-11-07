@@ -7,7 +7,7 @@ class TrtLive : MainAPI() {
     override var mainUrl = "https://www.trt.net.tr"
     override var name = "TRT Canlı"
     override var hasMainPage = true
-    override val supportedTypes = setOf(TvType.Live, TvType.Series)
+    override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
 
     private val mainLogo = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/trt.png"
@@ -324,7 +324,7 @@ class TrtLive : MainAPI() {
                     this.referer = mainUrl
                     this.quality = quality
                     //this.isM3u8 = isM3u8
-                    this.audioOnly = isAudio
+                    //this.audioOnly = isAudio
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
