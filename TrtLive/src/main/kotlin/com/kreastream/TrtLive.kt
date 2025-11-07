@@ -7,7 +7,7 @@ class TrtLive : MainAPI() {
     override var mainUrl = "https://www.trt.net.tr"
     override var name = "TRT Canlı"
     override var hasMainPage = true
-    override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
+    override val supportedTypes = setOf(TvType.Live)
     override var lang = "tr"
 
     private val mainLogo = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/trt.png"
@@ -207,7 +207,8 @@ class TrtLive : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "live" to "Canlı Yayınlar"
+        "tv" to "TV Kanalları",
+        "radio" to "Radyo Kanalları"
     )
 
     override suspend fun getMainPage(
@@ -215,15 +216,21 @@ class TrtLive : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val items = when (request.data) {
-            "live" -> {
-                listOf(
-                    newMovieSearchResponse("TV Kanalları", "tv_section", TvType.Live) {
-                        this.posterUrl = mainLogo
-                    },
-                    newMovieSearchResponse("Radyo Kanalları", "radio_section", TvType.Live) {
-                        this.posterUrl = mainLogo
+            "tv" -> {
+                tvChannels.map { channel ->
+                    val mainStream = channel.streamUrls.firstOrNull() ?: ""
+                    newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
+                        this.posterUrl = channel.logoUrl
                     }
-                )
+                }
+            }
+            "radio" -> {
+                radioChannels.map { channel ->
+                    val mainStream = channel.streamUrls.firstOrNull() ?: ""
+                    newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
+                        this.posterUrl = channel.logoUrl
+                    }
+                }
             }
             else -> emptyList()
         }
@@ -232,47 +239,6 @@ class TrtLive : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        return when (url) {
-            "tv_section" -> loadTvSection()
-            "radio_section" -> loadRadioSection()
-            else -> loadChannel(url)
-        }
-    }
-
-    private suspend fun loadTvSection(): LoadResponse {
-        val episodes = tvChannels.map { channel ->
-            // Use the highest quality stream as the main URL
-            val mainStream = channel.streamUrls.firstOrNull() ?: ""
-            newEpisode(mainStream) {
-                this.name = channel.name
-                this.posterUrl = channel.logoUrl
-                this.description = "TRT TV Kanalı - ${channel.streamUrls.size} kalite seçeneği"
-            }
-        }
-
-        return newTvSeriesLoadResponse("TV Kanalları", "tv_section", TvType.Live, episodes) {
-            this.posterUrl = mainLogo
-            this.plot = "TRT TV kanallarını canlı izleyin"
-        }
-    }
-
-    private suspend fun loadRadioSection(): LoadResponse {
-        val episodes = radioChannels.map { channel ->
-            val mainStream = channel.streamUrls.firstOrNull() ?: ""
-            newEpisode(mainStream) {
-                this.name = channel.name
-                this.posterUrl = channel.logoUrl
-                this.description = "TRT Radyo Kanalı"
-            }
-        }
-
-        return newTvSeriesLoadResponse("Radyo Kanalları", "radio_section", TvType.Live, episodes) {
-            this.posterUrl = mainLogo
-            this.plot = "TRT Radyo kanallarını canlı dinleyin"
-        }
-    }
-
-    private suspend fun loadChannel(url: String): LoadResponse {
         // Find channel by any of its stream URLs
         val channel = (tvChannels + radioChannels).find { channel ->
             channel.streamUrls.contains(url)
@@ -304,11 +270,11 @@ class TrtLive : MainAPI() {
 
         streams.forEach { streamUrl ->
             val quality = when {
-                streamUrl.contains("_1440") -> Qualities.P1440.value
-                streamUrl.contains("_1080") -> Qualities.P1080.value
-                streamUrl.contains("_720") -> Qualities.P720.value
-                streamUrl.contains("_480") -> Qualities.P480.value
-                streamUrl.contains("_360") -> Qualities.P360.value
+                streamUrl.contains("_1440") || streamUrl.contains("1440p") -> Qualities.P1440.value
+                streamUrl.contains("_1080") || streamUrl.contains("1080p") -> Qualities.P1080.value
+                streamUrl.contains("_720") || streamUrl.contains("720p") -> Qualities.P720.value
+                streamUrl.contains("_480") || streamUrl.contains("480p") -> Qualities.P480.value
+                streamUrl.contains("_360") || streamUrl.contains("360p") -> Qualities.P360.value
                 else -> Qualities.Unknown.value
             }
 
@@ -323,8 +289,6 @@ class TrtLive : MainAPI() {
                 ) {
                     this.referer = mainUrl
                     this.quality = quality
-                    //this.isM3u8 = isM3u8
-                    //this.audioOnly = isAudio
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
