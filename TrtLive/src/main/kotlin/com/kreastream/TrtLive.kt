@@ -222,12 +222,12 @@ class TrtLive : MainAPI() {
         val items = when (request.data) {
             "series" -> {
                 // Get series from TRT1 parser
-                trt1Parser.getMainPage(page, MainPageRequest("Güncel Diziler", "$mainUrl/diziler?archive=false&order=title_asc"))
+                Trt1.getMainPage(page, MainPageRequest("Güncel Diziler", "$mainUrl/diziler?archive=false&order=title_asc"))
                     .items?.firstOrNull()?.list ?: emptyList()
             }
             "archive" -> {
                 // Get series from TRT1 parser
-                trt1Parser.getMainPage(page, MainPageRequest("Eski Diziler", "$mainUrl/diziler?archive=true&order=title_asc"))
+                Trt1.getMainPage(page, MainPageRequest("Eski Diziler", "$mainUrl/diziler?archive=true&order=title_asc"))
                     .items?.firstOrNull()?.list ?: emptyList()
             }
             "tv" -> {
@@ -305,7 +305,7 @@ class TrtLive : MainAPI() {
 
             callback(
                 newExtractorLink(
-                    name = if (isAudio) "TRT Radyo" else "TRT Live",
+                    name = if (isAudio) channel?.name ?: "TRT Radyo" else "${channel?.name ?: "TRT Live"}_${getQualityName(quality)}",
                     source = name,
                     url = streamUrl
                 ) {
