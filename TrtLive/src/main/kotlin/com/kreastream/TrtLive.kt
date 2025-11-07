@@ -222,12 +222,12 @@ class TrtLive : MainAPI() {
         val items = when (request.data) {
             "series" -> {
                 // Get series from TRT1 parser
-                Trt1.getMainPage(page, MainPageRequest("Güncel Diziler", "$mainUrl/diziler?archive=false&order=title_asc","false"))
+                Trt1.getMainPage(page, MainPageRequest("Güncel Diziler", "$mainUrl/diziler?archive=false&order=title_asc",false))
                     .items?.firstOrNull()?.list ?: emptyList()
             }
             "archive" -> {
                 // Get series from TRT1 parser
-                Trt1.getMainPage(page, MainPageRequest("Eski Diziler", "$mainUrl/diziler?archive=true&order=title_asc","false"))
+                Trt1.getMainPage(page, MainPageRequest("Eski Diziler", "$mainUrl/diziler?archive=true&order=title_asc",false))
                     .items?.firstOrNull()?.list ?: emptyList()
             }
             "tv" -> {
