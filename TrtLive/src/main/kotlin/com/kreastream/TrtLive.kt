@@ -305,7 +305,7 @@ class TrtLive : MainAPI() {
 
             callback(
                 newExtractorLink(
-                    name = if (isAudio) channel?.name ?: "TRT Radyo" else "${channel?.name ?: "TRT Live"}_${getQualityName(quality)}",
+                    name = if (isAudio) channel?.name ?: "TRT Radyo" else "${channel?.name ?: "TRT Live"} ${getQualityName(quality)}",
                     source = name,
                     url = streamUrl
                 ) {
@@ -317,6 +317,18 @@ class TrtLive : MainAPI() {
         }
 
         return true
+    }
+
+    private fun getQualityName(quality: Int): String {
+        return when (quality) {
+            Qualities.P480.value -> "480p"
+            Qualities.P360.value -> "360p"
+            Qualities.P720.value -> "720p"
+            Qualities.P1080.value -> "1080p"
+            Qualities.P1440.value -> "1440p"
+            
+            else -> "Unknown"
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {

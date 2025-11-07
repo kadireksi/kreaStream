@@ -45,7 +45,15 @@ class Trt1 : MainAPI() {
             it.toSearchResult()
         }
 
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(
+            listOf(
+                HomePageList(
+                    name = request.name,
+                    list = home,
+                    isHorizontalImages = false
+                )
+            )
+        )
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
