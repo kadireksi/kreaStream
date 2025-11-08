@@ -53,15 +53,7 @@ class TurkTV : MainAPI() {
             else -> emptyList()
         }
 
-        return newHomePageResponse(
-            listOf(
-                HomePageList(
-                    name = request.name,
-                    list = items,
-                    isHorizontalImages = true
-                )
-            )
-        )
+        return newHomePageResponse(request.name, items)
     }
 
     private suspend fun loadTrt1Series(url: String): List<SearchResponse> {
