@@ -4,21 +4,27 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class TurkTV : MainAPI() {
-    override var mainUrl = "https://turktv.com"
+    // Use a dummy domain that ALL internal URLs will be rewritten to
+    override var mainUrl = "https://turktv.internal"
     override var name = "Türk TV"
     override var hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
     override var lang = "tr"
 
-    override fun hasValidUrl(url: String): Boolean = true
-
+    // --------------------------------------------------------------------- //
+    //  All providers
+    // --------------------------------------------------------------------- //
     private val providers by lazy {
         listOf(
             Trt1(),
             TrtLive()
+            // Add: Atv(), ShowTv(), etc.
         )
     }
 
+    // --------------------------------------------------------------------- //
+    //  Main page
+    // --------------------------------------------------------------------- //
     override val mainPage = mainPageOf(
         "trt1_series" to "TRT 1 - Güncel Diziler",
         "trt1_archive" to "TRT 1 - Eski Diziler",
@@ -28,6 +34,9 @@ class TurkTV : MainAPI() {
 
     private val mainPageCache = mutableMapOf<String, List<SearchResponse>>()
 
+    // --------------------------------------------------------------------- //
+    //  getMainPage
+    // --------------------------------------------------------------------- //
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val cacheKey = "${request.data}_$page"
         val cached = mainPageCache[cacheKey]
@@ -63,41 +72,80 @@ class TurkTV : MainAPI() {
         val provider = providers.find { it::class.java.name == providerClassName } ?: return emptyList()
         return try {
             provider.getMainPage(page, MainPageRequest("", url, false))
-                ?.items?.firstOrNull()?.list ?: emptyList()
+                ?.items?.firstOrNull()?.list?.map { wrapUrl(it) } ?: emptyList()
         } catch (e: Exception) {
             emptyList()
         }
     }
 
-    override suspend fun load(url: String): LoadResponse {
-        val normalized = normalizeUrl(url)
-        val provider = findProviderForUrl(normalized)
-            ?: throw ErrorLoadingException("No provider supports URL: $normalized")
-
-        return provider.load(normalized)!!
+    // --------------------------------------------------------------------- //
+    //  Wrap ALL URLs with our internal domain
+    // --------------------------------------------------------------------- //
+    private fun wrapUrl(response: SearchResponse): SearchResponse {
+        return when (response) {
+            is TvSeriesSearchResponse -> {
+                newTvSeriesSearchResponse(response.name, "https://turktv.internal/trt1${response.url}", TvType.TvSeries) {
+                    this.posterUrl = response.posterUrl
+                }
+            }
+            is MovieSearchResponse -> {
+                newMovieSearchResponse(response.name, "https://turktv.internal/live${response.url}", TvType.Live) {
+                    this.posterUrl = response.posterUrl
+                }
+            }
+            else -> response
+        }
     }
 
+    private fun unwrapUrl(wrapped: String): String {
+        return when {
+            wrapped.startsWith("https://turktv.internal/trt1") -> wrapped.removePrefix("https://turktv.internal/trt1")
+            wrapped.startsWith("https://turktv.internal/live") -> wrapped.removePrefix("https://turktv.internal/live")
+            else -> wrapped
+        }
+    }
+
+    // --------------------------------------------------------------------- //
+    //  load() – unwrap and delegate
+    // --------------------------------------------------------------------- //
+    override suspend fun load(url: String): LoadResponse {
+        val realUrl = unwrapUrl(url)
+        val provider = findProviderForUrl(realUrl)
+            ?: throw ErrorLoadingException("No provider for: $realUrl")
+
+        return provider.load(realUrl)!!
+    }
+
+    // --------------------------------------------------------------------- //
+    //  loadLinks()
+    // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val normalized = normalizeUrl(data)
-        val provider = findProviderForUrl(normalized) ?: return false
-        return provider.loadLinks(normalized, isCasting, subtitleCallback, callback)
+        val realUrl = unwrapUrl(data)
+        val provider = findProviderForUrl(realUrl) ?: return false
+        return provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
     }
 
+    // --------------------------------------------------------------------- //
+    //  search()
+    // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
         providers.forEach { provider ->
             try {
-                results.addAll(provider.search(query).orEmpty())
+                results.addAll(provider.search(query).orEmpty().map { wrapUrl(it) })
             } catch (_: Exception) {}
         }
         return results.distinctBy { it.url }
     }
 
+    // --------------------------------------------------------------------- //
+    //  Routing
+    // --------------------------------------------------------------------- //
     private fun findProviderForUrl(url: String): MainAPI? {
         return providers.find { provider ->
             when (provider) {
@@ -106,21 +154,5 @@ class TurkTV : MainAPI() {
                 else -> false
             }
         }
-    }
-
-    private fun normalizeUrl(url: String): String {
-        val base = when {
-            url.startsWith("http") -> url
-            url.startsWith("//") -> "https:$url"
-            url.startsWith("/") -> "https://www.trt1.com.tr$url"
-            else -> url
-        }
-        return fixTrt1Slug(base)
-    }
-
-    private fun fixTrt1Slug(url: String): String {
-        return if (url.contains("/diziler/") && !url.contains("trt1.com.tr")) {
-            "https://www.trt1.com.tr$url"
-        } else url
     }
 }
