@@ -96,7 +96,7 @@ class Trt1 : MainAPI() {
             url.startsWith("http") -> url
             url.startsWith("//") -> "https:$url"
             url.startsWith("/") -> "https://www.trt1.com.tr$url"
-            else -> "https://www.trt1.com.tr/$url"
+            else -> "https://www.trt1.com.tr/diziler/$url"
         }
     }
 
@@ -106,7 +106,7 @@ class Trt1 : MainAPI() {
         
         return document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
             val title = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
-            var href = element.attr("href")
+            var href = fixUrl(element.attr("href"))
             var posterUrl = element.selectFirst("img")?.attr("src")
             
             // Fix poster URL
@@ -153,7 +153,7 @@ class Trt1 : MainAPI() {
             val episodeDoc = app.get(pageUrl).document
             return episodeDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
                 val epTitle = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
-                val epHref = element.attr("href")
+                val epHref = fixUrl(element.attr("href"))
                 var epPoster = element.selectFirst("img")?.attr("src")
                 val epDescription = element.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
                 
@@ -178,7 +178,7 @@ class Trt1 : MainAPI() {
         } catch (e: Exception) {
             // If episodes page doesn't exist, try alternative episode structure
             val alternativeEpisodes = document.select("a[href*='/bolum/']").mapNotNull { element ->
-                val epHref = element.attr("href")
+                val epHref = fixUrl(element.attr("href"))
                 if (epHref.contains("/bolum/") && !epHref.contains("/bolum/1")) {
                     val epTitle = element.selectFirst("div, span, h3")?.text()?.trim() ?: "Bölüm"
                     val epPoster = element.selectFirst("img")?.attr("src")?.let { fixPosterUrl(it) }
