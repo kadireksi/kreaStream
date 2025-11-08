@@ -2,7 +2,7 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 
-class Atv : BaseTvChannel {
+class Atv : MainAPI(), BaseTvChannel {
     override val name = "ATV"
     override val mainUrl = "https://www.atv.com.tr"
     override val logoUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/atv.png"
@@ -10,17 +10,27 @@ class Atv : BaseTvChannel {
     override val lang = "tr"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        // Implement ATV series loading
+        // TODO: Implement ATV series loading
         return null
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // Implement ATV series loading
+        // TODO: Implement ATV series loading
         return newMovieLoadResponse("ATV", url, TvType.TvSeries, url)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // Implement ATV search
+        // TODO: Implement ATV search
         return emptyList()
+    }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // TODO: Implement ATV video extraction
+        return false
     }
 }

@@ -2,7 +2,7 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 
-class ShowTv : BaseTvChannel {
+class ShowTv : MainAPI(), BaseTvChannel {
     override val name = "Show TV"
     override val mainUrl = "https://www.showtv.com.tr"
     override val logoUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/show-tv.png"
@@ -10,17 +10,27 @@ class ShowTv : BaseTvChannel {
     override val lang = "tr"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        // Implement Show TV series loading
+        // TODO: Implement Show TV series loading
         return null
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // Implement Show TV series loading
+        // TODO: Implement Show TV series loading
         return newMovieLoadResponse("Show TV", url, TvType.TvSeries, url)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // Implement Show TV search
+        // TODO: Implement Show TV search
         return emptyList()
+    }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // TODO: Implement Show TV video extraction
+        return false
     }
 }

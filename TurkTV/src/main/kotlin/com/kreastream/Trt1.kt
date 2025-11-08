@@ -11,11 +11,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
 
-class Trt1 : MainAPI() {
-    override var mainUrl = "https://www.trt1.com.tr"
-    override var name = "TRT1"
+class Trt1 : MainAPI(), BaseTvChannel {
+    override val name = "TRT1"
+    override val mainUrl = "https://www.trt1.com.tr"
+    override val logoUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/TRT%201.png"
     override val supportedTypes = setOf(TvType.TvSeries)
-    override var lang = "tr"
+    override val lang = "tr"
 
     override val mainPage = mainPageOf(
         "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler",

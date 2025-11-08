@@ -3,11 +3,12 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
-class TrtLive : MainAPI() {
-    override var mainUrl = "https://www.trt.net.tr"
-    override var name = "TRT Canlı"
+class TrtLive : MainAPI(), BaseTvChannel {
+    override val name = "TRT Canlı"
+    override val mainUrl = "https://www.trt.net.tr"
+    override val logoUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/trt.png"
     override val supportedTypes = setOf(TvType.Live)
-    override var lang = "tr"
+    override val lang = "tr"
 
     private val mainLogo = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/trt.png"
 

@@ -12,4 +12,10 @@ interface BaseTvChannel {
     suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse?
     suspend fun load(url: String): LoadResponse
     suspend fun search(query: String): List<SearchResponse>
+    suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean
 }
