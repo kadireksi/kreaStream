@@ -33,29 +33,15 @@ class TurkTV : MainAPI() {
         val cached = mainPageCache[cacheKey]
         if (cached != null) {
             return newHomePageResponse(
-                listOf(
-                    HomePageList(
-                        name = request.name,
-                        list = cached,
-                        isHorizontalImages = request.data.startsWith("live_")
-                    )
-                )
+                listOf(HomePageList(request.name, cached, isHorizontalImages = request.data.startsWith("live_")))
             )
         }
 
         val items = when (request.data) {
             "trt1_series" ->
-                getProviderSection(
-                    Trt1::class.java.name,
-                    "https://www.trt1.com.tr/diziler?archive=false&order=title_asc",
-                    page
-                )
+                getProviderSection(Trt1::class.java.name, "https://www.trt1.com.tr/diziler?archive=false&order=title_asc", page)
             "trt1_archive" ->
-                getProviderSection(
-                    Trt1::class.java.name,
-                    "https://www.trt1.com.tr/diziler?archive=true&order=title_asc",
-                    page
-                )
+                getProviderSection(Trt1::class.java.name, "https://www.trt1.com.tr/diziler?archive=true&order=title_asc", page)
             "live_tv" ->
                 getProviderSection(TrtLive::class.java.name, "tv", 1)
             "live_radio" ->
@@ -65,13 +51,7 @@ class TurkTV : MainAPI() {
 
         mainPageCache[cacheKey] = items
         return newHomePageResponse(
-            listOf(
-                HomePageList(
-                    name = request.name,
-                    list = items,
-                    isHorizontalImages = request.data.startsWith("live_")
-                )
-            )
+            listOf(HomePageList(request.name, items, isHorizontalImages = request.data.startsWith("live_")))
         )
     }
 
@@ -113,7 +93,7 @@ class TurkTV : MainAPI() {
         providers.forEach { provider ->
             try {
                 results.addAll(provider.search(query).orEmpty())
-            } catch (_: Exception) { /* ignore */ }
+            } catch (_: Exception) {}
         }
         return results.distinctBy { it.url }
     }
@@ -141,8 +121,6 @@ class TurkTV : MainAPI() {
     private fun fixTrt1Slug(url: String): String {
         return if (url.contains("/diziler/") && !url.contains("trt1.com.tr")) {
             "https://www.trt1.com.tr$url"
-        } else {
-            url
-        }
+        } else url
     }
 }
