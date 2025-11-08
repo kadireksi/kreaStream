@@ -69,8 +69,18 @@ class Trt1 : MainAPI() {
         // Fix poster URL for continue watching
         posterUrl = fixPosterUrl(posterUrl)
         
-        // Ensure href is an absolute URL
-        href = if (href.startsWith("http")) href else "https://www.trt1.com.tr$href"
+        // Ensure href is an absolute URL that TurkTV can route correctly
+        href = when {
+            href.startsWith("http") -> href
+            href.startsWith("/diziler/") -> "https://www.trt1.com.tr$href"
+            href.startsWith("/") -> "https://www.trt1.com.tr$href"
+            else -> "https://www.trt1.com.tr/$href"
+        }
+        
+        // Make sure it's a TRT1 URL that TurkTV can recognize
+        if (!href.contains("trt1.com.tr")) {
+            href = "https://www.trt1.com.tr/diziler/$href"
+        }
         
         return newTvSeriesSearchResponse(title, href) {
             this.posterUrl = posterUrl
@@ -96,15 +106,23 @@ class Trt1 : MainAPI() {
         
         return document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
             val title = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
-            val href = element.attr("href")
+            var href = element.attr("href")
             var posterUrl = element.selectFirst("img")?.attr("src")
             
             // Fix poster URL
             posterUrl = fixPosterUrl(posterUrl)
             
+            // Format URL to be recognizable by TurkTV
+            href = when {
+                href.startsWith("http") -> href
+                href.startsWith("/diziler/") -> "https://www.trt1.com.tr$href"
+                href.startsWith("/") -> "https://www.trt1.com.tr$href"
+                else -> "https://www.trt1.com.tr/diziler/$href"
+            }
+            
             // Check if it's a series (diziler in URL)
             if (href.contains("/diziler/")) {
-                newTvSeriesSearchResponse(title, fixUrl(href)) {
+                newTvSeriesSearchResponse(title, href) {
                     this.posterUrl = posterUrl
                 }
             } else {

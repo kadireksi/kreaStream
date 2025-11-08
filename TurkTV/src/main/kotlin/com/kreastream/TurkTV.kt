@@ -53,7 +53,6 @@ class TurkTV : MainAPI() {
 
     private suspend fun getTrt1Section(url: String, page: Int): List<SearchResponse> {
         return try {
-            // Use the actual TRT1 URL instead of the TurkTV URL
             trt1.getMainPage(page, MainPageRequest("", url, false))
                 ?.items?.firstOrNull()?.list ?: emptyList()
         } catch (e: Exception) {
@@ -82,7 +81,7 @@ class TurkTV : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         // Delegate to appropriate provider based on URL
         return when {
-            url.contains("trt1.com.tr") -> trt1.load(url)
+            url.contains("trt1.com.tr") || url.contains("/diziler/") -> trt1.load(url)
             url.contains("trt.net.tr") || url.contains(".m3u8") || url.contains(".aac") -> trtLive.load(url)
             else -> throw ErrorLoadingException("No provider found for URL: $url")
         }
@@ -96,7 +95,7 @@ class TurkTV : MainAPI() {
     ): Boolean {
         // Delegate to appropriate provider
         return when {
-            data.contains("trt1.com.tr") -> trt1.loadLinks(data, isCasting, subtitleCallback, callback)
+            data.contains("trt1.com.tr") || data.contains("/diziler/") -> trt1.loadLinks(data, isCasting, subtitleCallback, callback)
             data.contains("trt.net.tr") || data.contains(".m3u8") || data.contains(".aac") -> 
                 trtLive.loadLinks(data, isCasting, subtitleCallback, callback)
             else -> false
