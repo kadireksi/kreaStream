@@ -7,7 +7,6 @@ import android.content.Context
 @CloudstreamPlugin
 class TurkTVPlugin : Plugin() {
     override fun load(context: Context) {
-        // Register only the main hub
         registerMainAPI(TurkTV())
     }
 }
