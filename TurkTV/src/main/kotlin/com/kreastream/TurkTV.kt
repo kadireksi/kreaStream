@@ -29,9 +29,9 @@ class TurkTV : MainAPI() {
         "trt1_series" to "TRT1 - Güncel Diziler",
         "trt1_archive" to "TRT1 - Eski Diziler",
         // Add more channel sections:
-        "startv" to "Star TV Diziler",
-        "atv" to "ATV Diziler", 
-        "showtv" to "Show TV Diziler",
+        //"startv" to "Star TV Diziler",
+        //"atv" to "ATV Diziler", 
+        //"showtv" to "Show TV Diziler",
         
         // Live TV sections
         "live_tv" to "Canlı TV Kanalları",
@@ -48,9 +48,9 @@ class TurkTV : MainAPI() {
             "trt1_archive" -> loadSeriesFromUrl("https://www.trt1.com.tr/diziler?archive=true&order=title_asc")
             
             // Other TV channels (add as you implement them)
-            "startv" -> getChannelMainPage("Star TV")
-            "atv" -> getChannelMainPage("ATV")
-            "showtv" -> getChannelMainPage("Show TV")
+            //"startv" -> getChannelMainPage("Star TV")
+            //"atv" -> getChannelMainPage("ATV")
+            //"showtv" -> getChannelMainPage("Show TV")
             
             // Live TV
             "live_tv" -> getLiveTvChannels()

@@ -16,8 +16,8 @@ class TurkTVPlugin : Plugin() {
         registerMainAPI(TrtLive())
         
         // Register more channels as you create them:
-        registerMainAPI(StarTv())
-        registerMainAPI(Atv())
-        registerMainAPI(ShowTv())
+        //registerMainAPI(StarTv())
+        //registerMainAPI(Atv())
+        //registerMainAPI(ShowTv())
     }
 }
