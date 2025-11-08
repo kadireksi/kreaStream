@@ -1,31 +1,18 @@
 [
     {
+        "iconUrl": "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/tr_flag.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 23043,
-        "status": 1,
-        "authors": [
-            "kreastream"
-        ],
-        "version": 1,
-        "internalName": "TR",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TR.cs3",
-        "name": "TR"
-    },
-    {
-        "iconUrl": "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/trt.png",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 26535,
+        "fileSize": 30571,
         "status": 1,
         "language": "tr",
         "authors": [
             "kreastream"
         ],
         "version": 1,
-        "internalName": "TrtLive",
-        "description": "TRT Canl\u0131 yay\u0131n\u0131 ve TRT dizileri",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TrtLive.cs3",
-        "name": "TrtLive"
+        "internalName": "TurkTV",
+        "description": "T\u00fcrk TV Dizi ve Canl\u0131 Yay\u0131nlar\u0131",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
+        "name": "TurkTV"
     }
 ]
