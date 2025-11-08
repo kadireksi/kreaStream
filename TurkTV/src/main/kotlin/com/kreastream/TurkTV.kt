@@ -4,155 +4,131 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class TurkTV : MainAPI() {
-    // Use a dummy domain that ALL internal URLs will be rewritten to
-    override var mainUrl = "https://turktv.internal"
+    // --------------------------------------------------------------
+    //  Hub settings
+    // --------------------------------------------------------------
+    override var mainUrl = "https://turktv.internal"   // dummy domain – all URLs will start with it
     override var name = "Türk TV"
     override var hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
     override var lang = "tr"
 
-    // --------------------------------------------------------------------- //
-    //  All providers
-    // --------------------------------------------------------------------- //
+    // --------------------------------------------------------------
+    //  All sub-providers (add new ones here)
+    // --------------------------------------------------------------
     private val providers by lazy {
         listOf(
             Trt1(),
             TrtLive()
-            // Add: Atv(), ShowTv(), etc.
+            // Future: Atv(), ShowTv(), StarTv()
         )
     }
 
-    // --------------------------------------------------------------------- //
-    //  Main page
-    // --------------------------------------------------------------------- //
+    // --------------------------------------------------------------
+    //  Home-page sections
+    // --------------------------------------------------------------
     override val mainPage = mainPageOf(
-        "trt1_series" to "TRT 1 - Güncel Diziler",
-        "trt1_archive" to "TRT 1 - Eski Diziler",
-        "live_tv" to "TRT Canlı TV",
-        "live_radio" to "TRT Canlı Radyo"
+        "trt1_current" to "TRT 1 – Güncel Diziler",
+        "trt1_archive" to "TRT 1 – Eski Diziler",
+        "live_tv"      to "TRT Canlı TV",
+        "live_radio"   to "TRT Canlı Radyo"
     )
 
-    private val mainPageCache = mutableMapOf<String, List<SearchResponse>>()
+    private val cache = mutableMapOf<String, List<SearchResponse>>()
 
-    // --------------------------------------------------------------------- //
-    //  getMainPage
-    // --------------------------------------------------------------------- //
+    // --------------------------------------------------------------
+    //  getMainPage – delegate to the correct sub-provider
+    // --------------------------------------------------------------
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val cacheKey = "${request.data}_$page"
-        val cached = mainPageCache[cacheKey]
-        if (cached != null) {
-            return newHomePageResponse(
-                listOf(HomePageList(request.name, cached, isHorizontalImages = request.data.startsWith("live_")))
-            )
-        }
+        val key = "${request.data}_$page"
+        cache[key]?.let { return newHomePageResponse(listOf(HomePageList(request.name, it, request.data.startsWith("live_")))) }
 
         val items = when (request.data) {
-            "trt1_series" ->
-                getProviderSection(Trt1::class.java.name, "https://www.trt1.com.tr/diziler?archive=false&order=title_asc", page)
-            "trt1_archive" ->
-                getProviderSection(Trt1::class.java.name, "https://www.trt1.com.tr/diziler?archive=true&order=title_asc", page)
-            "live_tv" ->
-                getProviderSection(TrtLive::class.java.name, "tv", 1)
-            "live_radio" ->
-                getProviderSection(TrtLive::class.java.name, "radio", 1)
+            "trt1_current" -> delegate(Trt1::class.java, "https://www.trt1.com.tr/diziler?archive=false&order=title_asc", page)
+            "trt1_archive" -> delegate(Trt1::class.java, "https://www.trt1.com.tr/diziler?archive=true&order=title_asc", page)
+            "live_tv"      -> delegate(TrtLive::class.java, "tv", 1)
+            "live_radio"   -> delegate(TrtLive::class.java, "radio", 1)
             else -> emptyList()
         }
 
-        mainPageCache[cacheKey] = items
-        return newHomePageResponse(
-            listOf(HomePageList(request.name, items, isHorizontalImages = request.data.startsWith("live_")))
-        )
+        cache[key] = items
+        return newHomePageResponse(listOf(HomePageList(request.name, items, request.data.startsWith("live_"))))
     }
 
-    private suspend fun getProviderSection(
-        providerClassName: String,
-        url: String,
-        page: Int
-    ): List<SearchResponse> {
-        val provider = providers.find { it::class.java.name == providerClassName } ?: return emptyList()
+    private suspend fun delegate(clazz: Class<out MainAPI>, url: String, page: Int): List<SearchResponse> {
+        val provider = providers.find { it::class.java == clazz } ?: return emptyList()
         return try {
             provider.getMainPage(page, MainPageRequest("", url, false))
-                ?.items?.firstOrNull()?.list?.map { wrapUrl(it) } ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+                ?.items?.firstOrNull()?.list?.map { wrap(it) } ?: emptyList()
+        } catch (e: Exception) { emptyList() }
     }
 
-    // --------------------------------------------------------------------- //
-    //  Wrap ALL URLs with our internal domain
-    // --------------------------------------------------------------------- //
-    private fun wrapUrl(response: SearchResponse): SearchResponse {
-        return when (response) {
-            is TvSeriesSearchResponse -> {
-                newTvSeriesSearchResponse(response.name, "https://turktv.internal/trt1${response.url}", TvType.TvSeries) {
-                    this.posterUrl = response.posterUrl
-                }
-            }
-            is MovieSearchResponse -> {
-                newMovieSearchResponse(response.name, "https://turktv.internal/live${response.url}", TvType.Live) {
-                    this.posterUrl = response.posterUrl
-                }
-            }
-            else -> response
-        }
+    // --------------------------------------------------------------
+    //  URL wrapping – all URLs become https://turktv.internal/…
+    // --------------------------------------------------------------
+    private fun wrap(resp: SearchResponse): SearchResponse = when (resp) {
+        is TvSeriesSearchResponse -> newTvSeriesSearchResponse(
+            resp.name,
+            "https://turktv.internal/series/${resp.url}",
+            TvType.TvSeries
+        ) { posterUrl = resp.posterUrl }
+        is MovieSearchResponse -> newMovieSearchResponse(
+            resp.name,
+            "https://turktv.internal/live/${resp.url}",
+            TvType.Live
+        ) { posterUrl = resp.posterUrl }
+        else -> resp
     }
 
-    private fun unwrapUrl(wrapped: String): String {
-        return when {
-            wrapped.startsWith("https://turktv.internal/trt1") -> wrapped.removePrefix("https://turktv.internal/trt1")
-            wrapped.startsWith("https://turktv.internal/live") -> wrapped.removePrefix("https://turktv.internal/live")
-            else -> wrapped
-        }
+    private fun unwrap(wrapped: String): String = when {
+        wrapped.startsWith("https://turktv.internal/series/") -> wrapped.removePrefix("https://turktv.internal/series/")
+        wrapped.startsWith("https://turktv.internal/live/")   -> wrapped.removePrefix("https://turktv.internal/live/")
+        else -> wrapped
     }
 
-    // --------------------------------------------------------------------- //
-    //  load() – unwrap and delegate
-    // --------------------------------------------------------------------- //
+    // --------------------------------------------------------------
+    //  load – unwrap → delegate
+    // --------------------------------------------------------------
     override suspend fun load(url: String): LoadResponse {
-        val realUrl = unwrapUrl(url)
-        val provider = findProviderForUrl(realUrl)
-            ?: throw ErrorLoadingException("No provider for: $realUrl")
-
-        return provider.load(realUrl)!!
+        val real = unwrap(url)
+        val provider = findProvider(real)
+            ?: throw ErrorLoadingException("No provider for $real")
+        return provider.load(real)!!          // all providers return non-null
     }
 
-    // --------------------------------------------------------------------- //
-    //  loadLinks()
-    // --------------------------------------------------------------------- //
+    // --------------------------------------------------------------
+    //  loadLinks – unwrap → delegate
+    // --------------------------------------------------------------
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val realUrl = unwrapUrl(data)
-        val provider = findProviderForUrl(realUrl) ?: return false
-        return provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
+        val real = unwrap(data)
+        val provider = findProvider(real) ?: return false
+        return provider.loadLinks(real, isCasting, subtitleCallback, callback)
     }
 
-    // --------------------------------------------------------------------- //
-    //  search()
-    // --------------------------------------------------------------------- //
+    // --------------------------------------------------------------
+    //  search – wrap results
+    // --------------------------------------------------------------
     override suspend fun search(query: String): List<SearchResponse> {
-        val results = mutableListOf<SearchResponse>()
-        providers.forEach { provider ->
-            try {
-                results.addAll(provider.search(query).orEmpty().map { wrapUrl(it) })
-            } catch (_: Exception) {}
+        val all = mutableListOf<SearchResponse>()
+        providers.forEach { p ->
+            try { all.addAll(p.search(query).orEmpty().map { wrap(it) }) } catch (_: Exception) {}
         }
-        return results.distinctBy { it.url }
+        return all.distinctBy { it.url }
     }
 
-    // --------------------------------------------------------------------- //
-    //  Routing
-    // --------------------------------------------------------------------- //
-    private fun findProviderForUrl(url: String): MainAPI? {
-        return providers.find { provider ->
-            when (provider) {
-                is Trt1 -> url.contains("trt1.com.tr/diziler/")
-                is TrtLive -> url.contains(".m3u8") || url.contains(".aac") || url.contains("trt.net.tr")
-                else -> false
-            }
+    // --------------------------------------------------------------
+    //  routing helper
+    // --------------------------------------------------------------
+    private fun findProvider(url: String): MainAPI? = providers.find {
+        when (it) {
+            is Trt1    -> url.contains("trt1.com.tr/diziler/")
+            is TrtLive -> url.contains(".m3u8") || url.contains(".aac") || url.contains("trt.net.tr")
+            else -> false
         }
     }
 }

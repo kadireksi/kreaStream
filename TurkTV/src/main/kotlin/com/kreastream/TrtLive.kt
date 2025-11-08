@@ -231,7 +231,7 @@ class TrtLive : MainAPI() {
             }
             "tv" -> {
                 tvChannels.map { channel ->
-                    val mainStream = channel.streamUrls.firstOrNull() ?: ""
+                    val mainStream = channel.streamUrls.lastOrNull() ?: ""
                     newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
                         this.posterUrl = channel.logoUrl
                     }
@@ -239,7 +239,7 @@ class TrtLive : MainAPI() {
             }
             "radio" -> {
                 radioChannels.map { channel ->
-                    val mainStream = channel.streamUrls.firstOrNull() ?: ""
+                    val mainStream = channel.streamUrls.lastOrNull() ?: ""
                     newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
                         this.posterUrl = channel.logoUrl
                     }
