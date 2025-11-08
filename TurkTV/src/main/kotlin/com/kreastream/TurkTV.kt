@@ -10,20 +10,15 @@ class TurkTV : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
     override var lang = "tr"
 
-    // --------------------------------------------------------------------- //
-    //  All providers that belong to this hub
-    // --------------------------------------------------------------------- //
+    override fun isThisProviderUrl(url: String): Boolean = true
+
     private val providers by lazy {
         listOf(
             Trt1(),
             TrtLive()
-            // Add new providers here, e.g. Atv(), ShowTv(), StarTv()
         )
     }
 
-    // --------------------------------------------------------------------- //
-    //  Main-page sections
-    // --------------------------------------------------------------------- //
     override val mainPage = mainPageOf(
         "trt1_series" to "TRT 1 - Güncel Diziler",
         "trt1_archive" to "TRT 1 - Eski Diziler",
@@ -33,9 +28,6 @@ class TurkTV : MainAPI() {
 
     private val mainPageCache = mutableMapOf<String, List<SearchResponse>>()
 
-    // --------------------------------------------------------------------- //
-    //  getMainPage
-    // --------------------------------------------------------------------- //
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val cacheKey = "${request.data}_$page"
         val cached = mainPageCache[cacheKey]
@@ -83,9 +75,6 @@ class TurkTV : MainAPI() {
         )
     }
 
-    // --------------------------------------------------------------------- //
-    //  Helper – call provider.getMainPage()
-    // --------------------------------------------------------------------- //
     private suspend fun getProviderSection(
         providerClassName: String,
         url: String,
@@ -100,9 +89,6 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    //  load() – **non-null** LoadResponse required
-    // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse {
         val normalized = normalizeUrl(url)
         val provider = findProviderForUrl(normalized)
@@ -112,9 +98,6 @@ class TurkTV : MainAPI() {
         return provider.load(normalized)!!
     }
 
-    // --------------------------------------------------------------------- //
-    //  loadLinks()
-    // --------------------------------------------------------------------- //
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -126,9 +109,6 @@ class TurkTV : MainAPI() {
         return provider.loadLinks(normalized, isCasting, subtitleCallback, callback)
     }
 
-    // --------------------------------------------------------------------- //
-    //  search() – **non-null** List<SearchResponse> required
-    // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
         providers.forEach { provider ->
@@ -140,9 +120,6 @@ class TurkTV : MainAPI() {
         return results.distinctBy { it.url }
     }
 
-    // --------------------------------------------------------------------- //
-    //  URL → Provider routing
-    // --------------------------------------------------------------------- //
     private fun findProviderForUrl(url: String): MainAPI? {
         return providers.find { provider ->
             when (provider) {
@@ -153,9 +130,6 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // --------------------------------------------------------------------- //
-    //  URL normalisation
-    // --------------------------------------------------------------------- //
     private fun normalizeUrl(url: String): String {
         val base = when {
             url.startsWith("http") -> url
@@ -173,4 +147,5 @@ class TurkTV : MainAPI() {
             url
         }
     }
+
 }
