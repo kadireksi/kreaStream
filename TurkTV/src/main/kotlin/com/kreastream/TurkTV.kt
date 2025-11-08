@@ -22,20 +22,15 @@ class TurkTV : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  Main-page sections (add a line for every new provider you create)
+    //  Main-page sections
     // --------------------------------------------------------------------- //
     override val mainPage = mainPageOf(
         "trt1_series" to "TRT 1 - Güncel Diziler",
         "trt1_archive" to "TRT 1 - Eski Diziler",
         "live_tv" to "TRT Canlı TV",
         "live_radio" to "TRT Canlı Radyo"
-        // Example for a future provider:
-        // "atv_series" to "ATV Diziler"
     )
 
-    // --------------------------------------------------------------------- //
-    //  Cache for the home-page lists (optional but nice)
-    // --------------------------------------------------------------------- //
     private val mainPageCache = mutableMapOf<String, List<SearchResponse>>()
 
     // --------------------------------------------------------------------- //
@@ -89,7 +84,7 @@ class TurkTV : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  Helper that calls the correct provider’s getMainPage()
+    //  Helper – call provider.getMainPage()
     // --------------------------------------------------------------------- //
     private suspend fun getProviderSection(
         providerClassName: String,
@@ -106,14 +101,15 @@ class TurkTV : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  load() – must return a non-null LoadResponse
+    //  load() – **non-null** LoadResponse required
     // --------------------------------------------------------------------- //
     override suspend fun load(url: String): LoadResponse {
         val normalized = normalizeUrl(url)
         val provider = findProviderForUrl(normalized)
             ?: throw ErrorLoadingException("No provider supports URL: $normalized")
 
-        return provider.load(normalized)   // provider.load() is guaranteed non-null
+        // All real providers implement load() as non-null
+        return provider.load(normalized)!!
     }
 
     // --------------------------------------------------------------------- //
@@ -131,13 +127,14 @@ class TurkTV : MainAPI() {
     }
 
     // --------------------------------------------------------------------- //
-    //  search() – must return a non-null List
+    //  search() – **non-null** List<SearchResponse> required
     // --------------------------------------------------------------------- //
     override suspend fun search(query: String): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
         providers.forEach { provider ->
             try {
-                results.addAll(provider.search(query))
+                // Defensive: if a provider returns null (should not happen) we ignore it
+                results.addAll(provider.search(query).orEmpty())
             } catch (_: Exception) { /* ignore */ }
         }
         return results.distinctBy { it.url }
@@ -151,15 +148,13 @@ class TurkTV : MainAPI() {
             when (provider) {
                 is Trt1 -> url.contains("trt1.com.tr/diziler/")
                 is TrtLive -> url.contains(".m3u8") || url.contains(".aac") || url.contains("trt.net.tr")
-                // Future providers:
-                // is Atv -> url.contains("atv.com.tr")
                 else -> false
             }
         }
     }
 
     // --------------------------------------------------------------------- //
-    //  URL normalisation (always absolute)
+    //  URL normalisation
     // --------------------------------------------------------------------- //
     private fun normalizeUrl(url: String): String {
         val base = when {
