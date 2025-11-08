@@ -13,9 +13,9 @@ class TurkTV : MainAPI() {
     // Channel instances
     private val trt1 by lazy { Trt1() }
     private val trtLive by lazy { TrtLive() }
-    private val starTv by lazy { StarTv() }
-    private val atv by lazy { Atv() }
-    private val showTv by lazy { ShowTv() }
+    //private val starTv by lazy { StarTv() }
+    //private val atv by lazy { Atv() }
+    //private val showTv by lazy { ShowTv() }
 
     override val mainPage = mainPageOf(
         // TRT1 Sections - these will be handled by Trt1.kt
