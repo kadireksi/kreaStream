@@ -13,9 +13,6 @@ class TurkTV : MainAPI() {
     // Channel instances
     private val trt1 by lazy { Trt1() }
     private val trtLive by lazy { TrtLive() }
-    //private val starTv by lazy { StarTv() }
-    //private val atv by lazy { Atv() }
-    //private val showTv by lazy { ShowTv() }
 
     override val mainPage = mainPageOf(
         // TRT1 Sections - these will be handled by Trt1.kt
@@ -25,11 +22,6 @@ class TurkTV : MainAPI() {
         // Live TV Sections - handled by TrtLive.kt
         "live_tv" to "TRT Canlı TV",
         "live_radio" to "TRT Canlı Radyo",
-        
-        // Other Channels
-        //"startv" to "Star TV",
-        //"atv" to "ATV",
-        //"showtv" to "Show TV"
     )
 
     override suspend fun getMainPage(
@@ -38,40 +30,52 @@ class TurkTV : MainAPI() {
     ): HomePageResponse {
         val items = when (request.data) {
             // TRT1 Series - delegate to Trt1.kt
-            "trt1_series" -> getTrt1Section("$mainUrl/diziler?archive=false&order=title_asc")
-            "trt1_archive" -> getTrt1Section("$mainUrl/diziler?archive=true&order=title_asc")
+            "trt1_series" -> getTrt1Section("$mainUrl/diziler?archive=false&order=title_asc", page)
+            "trt1_archive" -> getTrt1Section("$mainUrl/diziler?archive=true&order=title_asc", page)
             
             // Live TV - delegate to TrtLive.kt
             "live_tv" -> getLiveTvChannels()
             "live_radio" -> getLiveRadioChannels()
             
-            // Other channels - delegate to respective parsers
-            // "startv" -> getChannelMainPage(starTv)
-            // "atv" -> getChannelMainPage(atv)
-            // "showtv" -> getChannelMainPage(showTv)
-            
             else -> emptyList()
         }
 
-        return newHomePageResponse(request.name, items)
+        return newHomePageResponse(
+            listOf(
+                HomePageList(
+                    name = request.name,
+                    list = items,
+                    isHorizontalImages = request.data.startsWith("live_") // Horizontal for live, vertical for series
+                )
+            )
+        )
     }
 
-    private suspend fun getTrt1Section(url: String): List<SearchResponse> {
-        return trt1.getMainPage(1, MainPageRequest("", url, false))?.items?.firstOrNull()?.list ?: emptyList()
-    }
-
-    private suspend fun getChannelMainPage(channel: MainAPI): List<SearchResponse> {
-        return channel.getMainPage(1, MainPageRequest("", "", false))?.items?.firstOrNull()?.list ?: emptyList()
+    private suspend fun getTrt1Section(url: String, page: Int): List<SearchResponse> {
+        return try {
+            trt1.getMainPage(page, MainPageRequest("", url, false))
+                ?.items?.firstOrNull()?.list ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     private suspend fun getLiveTvChannels(): List<SearchResponse> {
-        return trtLive.getMainPage(1, MainPageRequest("TV Kanalları", "tv", true))
-            ?.items?.firstOrNull()?.list ?: emptyList()
+        return try {
+            trtLive.getMainPage(1, MainPageRequest("TV Kanalları", "tv", false))
+                ?.items?.firstOrNull()?.list ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     private suspend fun getLiveRadioChannels(): List<SearchResponse> {
-        return trtLive.getMainPage(1, MainPageRequest("Radyo Kanalları", "radio", true))
-            ?.items?.firstOrNull()?.list ?: emptyList()
+        return try {
+            trtLive.getMainPage(1, MainPageRequest("Radyo Kanalları", "radio", false))
+                ?.items?.firstOrNull()?.list ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -79,9 +83,6 @@ class TurkTV : MainAPI() {
         return when {
             url.contains("trt1.com.tr") -> trt1.load(url)
             url.contains("trt.net.tr") || url.contains(".m3u8") || url.contains(".aac") -> trtLive.load(url)
-            //url.contains("startv.com.tr") -> starTv.load(url)
-            //url.contains("atv.com.tr") -> atv.load(url)
-            //url.contains("showtv.com.tr") -> showTv.load(url)
             else -> throw ErrorLoadingException("No provider found for URL: $url")
         }
     }
@@ -97,9 +98,6 @@ class TurkTV : MainAPI() {
             data.contains("trt1.com.tr") -> trt1.loadLinks(data, isCasting, subtitleCallback, callback)
             data.contains("trt.net.tr") || data.contains(".m3u8") || data.contains(".aac") -> 
                 trtLive.loadLinks(data, isCasting, subtitleCallback, callback)
-            //data.contains("startv.com.tr") -> starTv.loadLinks(data, isCasting, subtitleCallback, callback)
-            //data.contains("atv.com.tr") -> atv.loadLinks(data, isCasting, subtitleCallback, callback)
-            //data.contains("showtv.com.tr") -> showTv.loadLinks(data, isCasting, subtitleCallback, callback)
             else -> false
         }
     }
@@ -108,11 +106,17 @@ class TurkTV : MainAPI() {
         val results = mutableListOf<SearchResponse>()
         
         // Search across all providers
-        results.addAll(trt1.search(query))
-        results.addAll(trtLive.search(query))
-        //results.addAll(starTv.search(query))
-        //results.addAll(atv.search(query))
-        //results.addAll(showTv.search(query))
+        try {
+            results.addAll(trt1.search(query))
+        } catch (e: Exception) {
+            // Ignore search errors
+        }
+        
+        try {
+            results.addAll(trtLive.search(query))
+        } catch (e: Exception) {
+            // Ignore search errors
+        }
         
         return results.distinctBy { it.url }
     }

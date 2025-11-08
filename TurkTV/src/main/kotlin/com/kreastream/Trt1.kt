@@ -35,24 +35,30 @@ class Trt1 : MainAPI() {
             if (request.data.contains("archive=true")) {
                 "$mainUrl/diziler/$page?archive=true" + if (request.data.contains("order=title_asc")) "&order=title_asc" else ""
             } else {
-                request.data
+                // For current series, there might be no pagination
+                return newHomePageResponse(emptyList())
             }
         }
 
-        val document = app.get(url).document
-        val home = document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull {
-            it.toSearchResult()
-        }
+        try {
+            val document = app.get(url).document
+            val home = document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull {
+                it.toSearchResult()
+            }
 
-        return newHomePageResponse(
-            listOf(
-                HomePageList(
-                    name = request.name,
-                    list = home,
-                    isHorizontalImages = false
+            return newHomePageResponse(
+                listOf(
+                    HomePageList(
+                        name = request.name,
+                        list = home,
+                        isHorizontalImages = false
+                    )
                 )
             )
-        )
+        } catch (e: Exception) {
+            // Return empty list if page doesn't exist
+            return newHomePageResponse(emptyList())
+        }
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
