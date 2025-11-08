@@ -57,7 +57,7 @@ class TurkTV : MainAPI() {
     }
 
     private suspend fun getTrt1Section(url: String): List<SearchResponse> {
-        return trt1.getMainPage(1, MainPageRequest("", url))?.items?.firstOrNull()?.list ?: emptyList()
+        return trt1.getMainPage(1, MainPageRequest("", url, false))?.items?.firstOrNull()?.list ?: emptyList()
     }
 
     private suspend fun getChannelMainPage(channel: MainAPI): List<SearchResponse> {
@@ -65,12 +65,12 @@ class TurkTV : MainAPI() {
     }
 
     private suspend fun getLiveTvChannels(): List<SearchResponse> {
-        return trtLive.getMainPage(1, MainPageRequest("TV Kanalları", "tv"))
+        return trtLive.getMainPage(1, MainPageRequest("TV Kanalları", "tv", true))
             ?.items?.firstOrNull()?.list ?: emptyList()
     }
 
     private suspend fun getLiveRadioChannels(): List<SearchResponse> {
-        return trtLive.getMainPage(1, MainPageRequest("Radyo Kanalları", "radio"))
+        return trtLive.getMainPage(1, MainPageRequest("Radyo Kanalları", "radio", true))
             ?.items?.firstOrNull()?.list ?: emptyList()
     }
 
