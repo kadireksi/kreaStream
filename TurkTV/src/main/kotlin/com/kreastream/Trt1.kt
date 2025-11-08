@@ -63,13 +63,16 @@ class Trt1 : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return null
-        val href = this.attr("href")
+        var href = this.attr("href")
         var posterUrl = this.selectFirst("img")?.attr("src")
         
         // Fix poster URL for continue watching
         posterUrl = fixPosterUrl(posterUrl)
         
-        return newTvSeriesSearchResponse(title, fixUrl(href)) {
+        // Ensure href is an absolute URL
+        href = if (href.startsWith("http")) href else "https://www.trt1.com.tr$href"
+        
+        return newTvSeriesSearchResponse(title, href) {
             this.posterUrl = posterUrl
         }
     }
@@ -79,7 +82,12 @@ class Trt1 : MainAPI() {
     }
 
     private fun fixUrl(url: String): String {
-        return if (url.startsWith("http")) url else "$mainUrl$url"
+        return when {
+            url.startsWith("http") -> url
+            url.startsWith("//") -> "https:$url"
+            url.startsWith("/") -> "https://www.trt1.com.tr$url"
+            else -> "https://www.trt1.com.tr/$url"
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
@@ -106,20 +114,21 @@ class Trt1 : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
-        
-        val title = document.selectFirst("h1")?.text()?.trim() ?: throw ErrorLoadingException("Title not found")
-        val description = document.selectFirst("meta[name=description]")?.attr("content") ?: ""
-        var poster = document.selectFirst("meta[property=og:image]")?.attr("content")
-        
-        // Fix poster URL for better quality in continue watching
-        poster = fixPosterUrl(poster)
-        
-        val episodes = mutableListOf<Episode>()
-        
-        // Get episodes from the bolum page
-        val seriesSlug = url.removePrefix("$mainUrl/diziler/")
-        val episodesUrl = "$mainUrl/diziler/$seriesSlug/bolum"
+        try {
+            val document = app.get(url).document
+            
+            val title = document.selectFirst("h1")?.text()?.trim() ?: throw ErrorLoadingException("Title not found")
+            val description = document.selectFirst("meta[name=description]")?.attr("content") ?: ""
+            var poster = document.selectFirst("meta[property=og:image]")?.attr("content")
+            
+            // Fix poster URL for better quality in continue watching
+            poster = fixPosterUrl(poster)
+            
+            val episodes = mutableListOf<Episode>()
+            
+            // Get episodes from the bolum page
+            val seriesSlug = url.removePrefix("https://www.trt1.com.tr/diziler/").removeSuffix("/")
+            val episodesUrl = "https://www.trt1.com.tr/diziler/$seriesSlug/bolum"
         
         // Function to parse episodes from a page with proper pagination
         suspend fun parseEpisodesPage(pageUrl: String): List<Episode> {
@@ -199,9 +208,12 @@ class Trt1 : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-            this.posterUrl = poster
-            this.plot = description
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl = poster
+                this.plot = description
+            }
+        } catch (e: Exception) {
+            throw ErrorLoadingException("Failed to load TRT1 series: ${e.message}")
         }
     }
 

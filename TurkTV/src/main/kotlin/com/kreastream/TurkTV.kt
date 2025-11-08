@@ -30,8 +30,8 @@ class TurkTV : MainAPI() {
     ): HomePageResponse {
         val items = when (request.data) {
             // TRT1 Series - delegate to Trt1.kt
-            "trt1_series" -> getTrt1Section("$mainUrl/diziler?archive=false&order=title_asc", page)
-            "trt1_archive" -> getTrt1Section("$mainUrl/diziler?archive=true&order=title_asc", page)
+            "trt1_series" -> getTrt1Section("https://www.trt1.com.tr/diziler?archive=false&order=title_asc", page)
+            "trt1_archive" -> getTrt1Section("https://www.trt1.com.tr/diziler?archive=true&order=title_asc", page)
             
             // Live TV - delegate to TrtLive.kt
             "live_tv" -> getLiveTvChannels()
@@ -53,6 +53,7 @@ class TurkTV : MainAPI() {
 
     private suspend fun getTrt1Section(url: String, page: Int): List<SearchResponse> {
         return try {
+            // Use the actual TRT1 URL instead of the TurkTV URL
             trt1.getMainPage(page, MainPageRequest("", url, false))
                 ?.items?.firstOrNull()?.list ?: emptyList()
         } catch (e: Exception) {
