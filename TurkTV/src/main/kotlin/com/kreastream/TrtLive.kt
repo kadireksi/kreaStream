@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.utils.*
 class TrtLive : MainAPI() {
     override var mainUrl = "https://www.trt.net.tr"
     override var name = "TRT Canlı"
-    override var hasMainPage = true
     override val supportedTypes = setOf(TvType.Live)
     override var lang = "tr"
 

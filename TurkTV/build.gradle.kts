@@ -1,7 +1,6 @@
 version = 1
 
 cloudstream {
-    author = "kreastream"
     language = "tr"
     description = "Türk TV Dizi ve Canlı Yayınları"
     status = 1
