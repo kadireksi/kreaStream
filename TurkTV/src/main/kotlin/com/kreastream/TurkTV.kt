@@ -29,9 +29,9 @@ class TurkTV : MainAPI() {
         "live_radio" to "TRT Canlı Radyo",
         
         // Other Channels (will be populated when implemented)
-        "startv" to "Star TV",
-        "atv" to "ATV",
-        "showtv" to "Show TV"
+        //"startv" to "Star TV",
+        //"atv" to "ATV",
+        //"showtv" to "Show TV"
     )
 
     override suspend fun getMainPage(
@@ -48,9 +48,9 @@ class TurkTV : MainAPI() {
             "live_radio" -> getChannelSection(TrtLive::class, "radio")
             
             // Other channels
-            "startv" -> getChannelMainPage(StarTv::class)
-            "atv" -> getChannelMainPage(Atv::class)
-            "showtv" -> getChannelMainPage(ShowTv::class)
+            //"startv" -> getChannelMainPage(StarTv::class)
+            //"atv" -> getChannelMainPage(Atv::class)
+            //"showtv" -> getChannelMainPage(ShowTv::class)
             
             else -> emptyList()
         }
