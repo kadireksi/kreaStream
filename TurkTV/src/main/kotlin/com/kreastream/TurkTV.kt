@@ -61,7 +61,7 @@ class TurkTV : MainAPI() {
     }
 
     private suspend fun getChannelMainPage(channel: MainAPI): List<SearchResponse> {
-        return channel.getMainPage(1, MainPageRequest("", ""))?.items?.firstOrNull()?.list ?: emptyList()
+        return channel.getMainPage(1, MainPageRequest("", "", false))?.items?.firstOrNull()?.list ?: emptyList()
     }
 
     private suspend fun getLiveTvChannels(): List<SearchResponse> {
