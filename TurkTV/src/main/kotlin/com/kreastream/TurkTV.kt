@@ -13,16 +13,16 @@ class TurkTV : MainAPI() {
     // Channel instances
     private val trt1 by lazy { Trt1() }
     private val trtLive by lazy { TrtLive() }
-    //private val starTv by lazy { StarTv() }
-    //private val atv by lazy { Atv() }
-    //private val showTv by lazy { ShowTv() }
+    private val starTv by lazy { StarTv() }
+    private val atv by lazy { Atv() }
+    private val showTv by lazy { ShowTv() }
 
     override val mainPage = mainPageOf(
-        // TRT1 Sections
-        "trt1_series" to "TRT1 - Güncel Diziler",
-        "trt1_archive" to "TRT1 - Eski Diziler",
+        // TRT1 Sections - these will be handled by Trt1.kt
+        "trt1_series" to "TRT 1 - Güncel Diziler",
+        "trt1_archive" to "TRT 1 - Eski Diziler",
         
-        // Live TV Sections
+        // Live TV Sections - handled by TrtLive.kt
         "live_tv" to "TRT Canlı TV",
         "live_radio" to "TRT Canlı Radyo",
         
@@ -37,18 +37,18 @@ class TurkTV : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val items = when (request.data) {
-            // TRT1 Series
-            "trt1_series" -> loadTrt1Series("https://www.trt1.com.tr/diziler?archive=false&order=title_asc")
-            "trt1_archive" -> loadTrt1Series("https://www.trt1.com.tr/diziler?archive=true&order=title_asc")
+            // TRT1 Series - delegate to Trt1.kt
+            "trt1_series" -> getTrt1Section("$mainUrl/diziler?archive=false&order=title_asc")
+            "trt1_archive" -> getTrt1Section("$mainUrl/diziler?archive=true&order=title_asc")
             
-            // Live TV
+            // Live TV - delegate to TrtLive.kt
             "live_tv" -> getLiveTvChannels()
             "live_radio" -> getLiveRadioChannels()
             
-            // Other channels
-            //"startv" -> emptyList() // TODO: Implement
-            //"atv" -> emptyList() // TODO: Implement
-            //"showtv" -> emptyList() // TODO: Implement
+            // Other channels - delegate to respective parsers
+            // "startv" -> getChannelMainPage(starTv)
+            // "atv" -> getChannelMainPage(atv)
+            // "showtv" -> getChannelMainPage(showTv)
             
             else -> emptyList()
         }
@@ -56,35 +56,21 @@ class TurkTV : MainAPI() {
         return newHomePageResponse(request.name, items)
     }
 
-    private suspend fun loadTrt1Series(url: String): List<SearchResponse> {
-        return try {
-            val document = app.get(url).document
-            document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
-                val title = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
-                val href = element.attr("href")
-                var posterUrl = element.selectFirst("img")?.attr("src")
-                
-                // Fix poster URL
-                posterUrl = posterUrl?.replace("webp/w800/h450", "webp/w400/h600")?.replace("/q75/", "/q85/")
-                
-                val fullUrl = if (href.startsWith("http")) href else "https://www.trt1.com.tr$href"
-                
-                newTvSeriesSearchResponse(title, fullUrl) {
-                    this.posterUrl = posterUrl
-                }
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+    private suspend fun getTrt1Section(url: String): List<SearchResponse> {
+        return trt1.getMainPage(1, MainPageRequest("", url))?.items?.firstOrNull()?.list ?: emptyList()
+    }
+
+    private suspend fun getChannelMainPage(channel: MainAPI): List<SearchResponse> {
+        return channel.getMainPage(1, MainPageRequest("", ""))?.items?.firstOrNull()?.list ?: emptyList()
     }
 
     private suspend fun getLiveTvChannels(): List<SearchResponse> {
-        return trtLive.getMainPage(1, MainPageRequest("TV Kanalları", "tv", true))
+        return trtLive.getMainPage(1, MainPageRequest("TV Kanalları", "tv"))
             ?.items?.firstOrNull()?.list ?: emptyList()
     }
 
     private suspend fun getLiveRadioChannels(): List<SearchResponse> {
-        return trtLive.getMainPage(1, MainPageRequest("Radyo Kanalları", "radio", true))
+        return trtLive.getMainPage(1, MainPageRequest("Radyo Kanalları", "radio"))
             ?.items?.firstOrNull()?.list ?: emptyList()
     }
 
