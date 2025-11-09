@@ -14,7 +14,7 @@ import org.json.JSONObject
 class Trt1 : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
     override var name = "TRT1"
-    //override val hasMainPage = true
+    override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
     override var lang = "tr"
 
@@ -316,7 +316,7 @@ class Trt1 : MainAPI() {
             {
             "context": {
                 "client": {
-                "hl": "tr",
+                "hl": "en",
                 "clientName": "WEB",
                 "clientVersion": "2.20240725.00.00"
                 }
@@ -384,7 +384,7 @@ class Trt1 : MainAPI() {
                     source = "YouTube",
                     url = link.url
                 ) {
-                    this.quality = Qualities.P720.value
+                    this.quality = link.quality
                     this.referer = "https://www.youtube.com/"
                     //this.isM3u8 = link.isM3u8
                     this.headers = link.headers ?: mapOf("User-Agent" to "Mozilla/5.0")
