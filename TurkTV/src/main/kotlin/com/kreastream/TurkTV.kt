@@ -4,29 +4,14 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class TurkTV : MainAPI() {
-    // --------------------------------------------------------------
-    //  Hub settings
-    // --------------------------------------------------------------
-    override var mainUrl = "https://turktv.internal"   // dummy domain – all URLs will start with it
+    override var mainUrl = "https://turktv.internal"
     override var name = "Türk TV"
     override var hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
     override var lang = "tr"
 
-    // --------------------------------------------------------------
-    //  All sub-providers (add new ones here)
-    // --------------------------------------------------------------
-    private val providers by lazy {
-        listOf(
-            Trt1(),
-            TrtLive()
-            // Future: Atv(), ShowTv(), StarTv()
-        )
-    }
+    private val providers by lazy { listOf(Trt1(), TrtLive()) }
 
-    // --------------------------------------------------------------
-    //  Home-page sections
-    // --------------------------------------------------------------
     override val mainPage = mainPageOf(
         "trt1_current" to "TRT 1 – Güncel Diziler",
         "trt1_archive" to "TRT 1 – Eski Diziler",
@@ -36,12 +21,11 @@ class TurkTV : MainAPI() {
 
     private val cache = mutableMapOf<String, List<SearchResponse>>()
 
-    // --------------------------------------------------------------
-    //  getMainPage – delegate to the correct sub-provider
-    // --------------------------------------------------------------
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val key = "${request.data}_$page"
-        cache[key]?.let { return newHomePageResponse(listOf(HomePageList(request.name, it, request.data.startsWith("live_")))) }
+        cache[key]?.let {
+            return newHomePageResponse(listOf(HomePageList(request.name, it, request.data.startsWith("live_"))))
+        }
 
         val items = when (request.data) {
             "trt1_current" -> delegate(Trt1::class.java, "https://www.trt1.com.tr/diziler?archive=false&order=title_asc", page)
@@ -63,13 +47,11 @@ class TurkTV : MainAPI() {
         } catch (e: Exception) { emptyList() }
     }
 
-    // --------------------------------------------------------------
-    //  URL wrapping – all URLs become https://turktv.internal/…
-    // --------------------------------------------------------------
+    // ------------------- URL WRAPPING -------------------
     private fun wrap(resp: SearchResponse): SearchResponse = when (resp) {
         is TvSeriesSearchResponse -> newTvSeriesSearchResponse(
             resp.name,
-            "https://turktv.internal/series/${resp.url}",
+            "https://turktv.internal/series/${resp.url.removePrefix("https://www.trt1.com.tr")}",
             TvType.TvSeries
         ) { posterUrl = resp.posterUrl }
         is MovieSearchResponse -> newMovieSearchResponse(
@@ -81,38 +63,35 @@ class TurkTV : MainAPI() {
     }
 
     private fun unwrap(wrapped: String): String = when {
-        wrapped.startsWith("https://turktv.internal/series/") -> wrapped.removePrefix("https://turktv.internal/series/")
-        wrapped.startsWith("https://turktv.internal/live/")   -> wrapped.removePrefix("https://turktv.internal/live/")
+        wrapped.startsWith("https://turktv.internal/series/") ->
+            "https://www.trt1.com.tr${wrapped.removePrefix("https://turktv.internal/series/")}"
+        wrapped.startsWith("https://turktv.internal/live/") ->
+            wrapped.removePrefix("https://turktv.internal/live/")
         else -> wrapped
     }
 
-    // --------------------------------------------------------------
-    //  load – unwrap → delegate
-    // --------------------------------------------------------------
+    // ------------------- LOAD -------------------
     override suspend fun load(url: String): LoadResponse {
         val real = unwrap(url)
-        val provider = findProvider(real)
-            ?: throw ErrorLoadingException("No provider for $real")
-        return provider.load(real)!!          // all providers return non-null
+        val provider = findProvider(real) ?: throw ErrorLoadingException("No provider for $real")
+        return provider.load(real)!!
     }
 
-    // --------------------------------------------------------------
-    //  loadLinks – unwrap → delegate
-    // --------------------------------------------------------------
+    // ------------------- LOAD LINKS – UNWRAP FIRST -------------------
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val real = unwrap(data)
-        val provider = findProvider(real) ?: return false
-        return provider.loadLinks(real, isCasting, subtitleCallback, callback)
+        val realUrl = unwrap(data)
+        val provider = findProvider(realUrl) ?: return false
+
+        // CRITICAL: Use real URL for all network calls
+        return provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
     }
 
-    // --------------------------------------------------------------
-    //  search – wrap results
-    // --------------------------------------------------------------
+    // ------------------- SEARCH -------------------
     override suspend fun search(query: String): List<SearchResponse> {
         val all = mutableListOf<SearchResponse>()
         providers.forEach { p ->
@@ -121,9 +100,7 @@ class TurkTV : MainAPI() {
         return all.distinctBy { it.url }
     }
 
-    // --------------------------------------------------------------
-    //  routing helper
-    // --------------------------------------------------------------
+    // ------------------- ROUTING -------------------
     private fun findProvider(url: String): MainAPI? = providers.find {
         when (it) {
             is Trt1    -> url.contains("trt1.com.tr/diziler/")
