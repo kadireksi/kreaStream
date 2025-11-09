@@ -50,54 +50,12 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // ------------------- URL WRAPPING (IMPROVED) -------------------
-    private fun wrap(resp: SearchResponse): SearchResponse = when (resp) {
-        is TvSeriesSearchResponse -> {
-            // Extract the series slug from URL
-            val seriesSlug = resp.url.removePrefix("https://www.trt1.com.tr/diziler/")
-                .removeSuffix("/")
-            newTvSeriesSearchResponse(
-                resp.name,
-                "https://turktv.internal/series/$seriesSlug",
-                TvType.TvSeries
-            ) { 
-                posterUrl = resp.posterUrl 
-            }
-        }
-        is MovieSearchResponse -> {
-            // For live streams, encode the URL
-            val encodedUrl = java.net.URLEncoder.encode(resp.url, "UTF-8")
-            newMovieSearchResponse(
-                resp.name,
-                "https://turktv.internal/live/$encodedUrl",
-                TvType.Live
-            ) { 
-                posterUrl = resp.posterUrl 
-            }
-        }
-        else -> resp
-    }
-
-    // ------------------- URL UNWRAPPING (IMPROVED) -------------------
-    private fun unwrap(wrapped: String): String = when {
-        wrapped.startsWith("https://turktv.internal/series/") -> {
-            val seriesSlug = wrapped.removePrefix("https://turktv.internal/series/")
-            "https://www.trt1.com.tr/diziler/$seriesSlug"
-        }
-        wrapped.startsWith("https://turktv.internal/live/") -> {
-            val encodedUrl = wrapped.removePrefix("https://turktv.internal/live/")
-            java.net.URLDecoder.decode(encodedUrl, "UTF-8")
-        }
-        else -> wrapped
-    }
-
     // ------------------- LOAD -------------------
     override suspend fun load(url: String): LoadResponse {
-        val realUrl = unwrap(url)
-        val provider = findProvider(realUrl) ?: throw ErrorLoadingException("No provider for $realUrl")
+        val provider = findProvider(url) ?: throw ErrorLoadingException("No provider for $url")
         
         return try {
-            provider.load(realUrl) ?: throw ErrorLoadingException("Provider returned null response")
+            provider.load(url) ?: throw ErrorLoadingException("Provider returned null response")
         } catch (e: Exception) {
             e.printStackTrace()
             throw ErrorLoadingException("Failed to load: ${e.message}")
@@ -111,11 +69,10 @@ class TurkTV : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val realUrl = unwrap(data)
-        val provider = findProvider(realUrl) ?: return false
+        val provider = findProvider(data) ?: return false
         
         return try {
-            provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
+            provider.loadLinks(data, isCasting, subtitleCallback, callback)
         } catch (e: Exception) {
             e.printStackTrace()
             false
