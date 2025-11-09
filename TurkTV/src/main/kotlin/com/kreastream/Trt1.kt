@@ -14,9 +14,21 @@ import org.json.JSONObject
 class Trt1 : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
     override var name = "TRT 1"
-    override val hasMainPage = true
+    //override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
     override var lang = "tr"
+
+    companion object {
+        val info = ChannelRegistry.ChannelInfo(
+            id = "trt1",
+            title = "TRT 1",
+            sections = mapOf(
+                "current" to "https://www.trt1.com.tr/diziler?archive=false&order=title_asc",
+                "archive" to "https://www.trt1.com.tr/diziler?archive=true&order=title_asc",
+                "live" to "tv"
+            )
+        )
+    }
 
     override val mainPage = mainPageOf(
         "$mainUrl/diziler?archive=false&order=title_asc" to "Güncel Diziler",
