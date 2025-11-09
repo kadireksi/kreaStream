@@ -10,42 +10,39 @@ class TurkTV : MainAPI() {
     override var hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
-    // Dynamically find all channel providers under this package
+    // manually list your providers here; later you can add reflection
     private val providers: List<MainAPI> by lazy {
-        val all = listOf(
-            Trt1(),
-            TrtLive(),
-            // Later: Atv(), ShowTV(), StarTV(), etc.
-        )
-        all
+        listOf(Trt1(), TrtLive())
     }
 
-    // Gather metadata
-    private val channelInfos = providers.mapNotNull { provider ->
-        try {
-            val infoField = provider::class.java.getDeclaredField("Companion")
-            val companion = infoField.get(null)
-            val infoProp = companion::class.java.getDeclaredField("info")
-            val info = infoProp.get(companion) as? ChannelRegistry.ChannelInfo
-            if (info != null) info to provider else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    override val mainPage: HomePageList by lazy {
-        val sections = mutableListOf<Pair<String, String>>()
-        for ((info, _) in channelInfos) {
-            info.sections.forEach { (slug, _) ->
-                sections += "${info.id}_$slug" to "${info.title} – ${slug.capitalize()}"
+    // Load metadata dynamically
+    private val channelInfos: List<Pair<ChannelRegistry.ChannelInfo, MainAPI>> by lazy {
+        providers.mapNotNull { provider ->
+            try {
+                val companionField = provider::class.java.getDeclaredField("Companion")
+                val companion = companionField.get(null)
+                val infoField = companion::class.java.getDeclaredField("info")
+                val info = infoField.get(companion) as? ChannelRegistry.ChannelInfo
+                if (info != null) info to provider else null
+            } catch (_: Exception) {
+                null
             }
         }
-        mainPageOf(*sections.toTypedArray())
+    }
+
+    // Cloudstream expects List<MainPageData>
+    override val mainPage: List<MainPageData> by lazy {
+        channelInfos.flatMap { (info, _) ->
+            info.sections.map { (slug, _) ->
+                MainPageData("${info.id}_$slug", "${info.title} – ${slug.replaceFirstChar { it.uppercase() }}")
+            }
+        }
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val (provider, sectionUrl) = parseRequest(request.data)
         provider ?: return newHomePageResponse(emptyList())
+
         return provider.getMainPage(page, MainPageRequest(request.name, sectionUrl, false))
             ?: newHomePageResponse(emptyList())
     }

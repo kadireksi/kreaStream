@@ -9,6 +9,16 @@ class TrtLive : MainAPI() {
     override val supportedTypes = setOf(TvType.Live)
     override var lang = "tr"
 
+    companion object {
+        val info = ChannelRegistry.ChannelInfo(
+            id = "trtlive",
+            title = "TRT Canlı",
+            sections = mapOf(
+                "live" to "https://www.trt.net.tr/tv"
+            )
+        )
+    }
+
     private val mainLogo = "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/TV/trt.png"
 
     // TV Channels with multiple quality options
