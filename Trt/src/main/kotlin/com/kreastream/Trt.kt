@@ -11,17 +11,17 @@ class TrtProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
 
-    companion object {
-        val info = ChannelRegistry.ChannelInfo(
-            id = "trtprovider",
-            title = "TRT & Tabii",
-            sections = mapOf(
-                "live" to "Canlı Yayınlar",
-                "series" to "Güncel Diziler",
-                "archive" to "Eski Diziler"
-            )
-        )
-    }
+    //companion object {
+     //   val info = ChannelRegistry.ChannelInfo(
+     //       id = "trtprovider",
+    //        title = "TRT & Tabii",
+      //      sections = mapOf(
+     //           "live" to "Canlı Yayınlar",
+     //           "series" to "Güncel Diziler",
+     //           "archive" to "Eski Diziler"
+     //       )
+     //   )
+   // }
 
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
@@ -289,7 +289,7 @@ class TrtProvider : MainAPI() {
                     val mainStream = channel.streamUrls.firstOrNull() ?: ""
                     newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
                         this.posterUrl = channel.logoUrl
-                        this.plot = channel.description
+                       // this.plot = channel.description
                     }
                 }
             }
@@ -298,7 +298,7 @@ class TrtProvider : MainAPI() {
                 series.map { series ->
                     newTvSeriesSearchResponse(series.title, series.url) {
                         this.posterUrl = series.posterUrl
-                        this.plot = series.description
+                       // this.plot = series.description
                     }
                 }
             }
@@ -307,7 +307,7 @@ class TrtProvider : MainAPI() {
                 series.map { series ->
                     newTvSeriesSearchResponse(series.title, series.url) {
                         this.posterUrl = series.posterUrl
-                        this.plot = series.description
+                       // this.plot = series.description
                     }
                 }
             }
