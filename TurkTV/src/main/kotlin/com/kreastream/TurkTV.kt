@@ -14,16 +14,13 @@ class TurkTV : MainAPI() {
         listOf(
             Trt1(),
             TrtLive()
-            // Later: Atv(), ShowTV(), KanalD(), etc.
         )
     }
 
-    // -------------------- MAIN PAGE --------------------
     override val mainPage = mainPageOf(
         "trt1_current" to "TRT 1 – Güncel Diziler",
         "trt1_archive" to "TRT 1 – Eski Diziler",
         "trt_live"     to "TRT Canlı Yayınlar"
-        // Later: add other channels dynamically
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -31,6 +28,7 @@ class TurkTV : MainAPI() {
         provider ?: return newHomePageResponse(emptyList())
 
         return provider.getMainPage(page, MainPageRequest(request.name, section, false))
+            ?: newHomePageResponse(emptyList())
     }
 
     private fun parseRequest(data: String): Pair<MainAPI?, String> {
@@ -42,13 +40,12 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // -------------------- LOAD --------------------
     override suspend fun load(url: String): LoadResponse {
         val provider = findProvider(url) ?: throw ErrorLoadingException("Provider not found for $url")
         return provider.load(url)
+            ?: throw ErrorLoadingException("Provider returned null for $url")
     }
 
-    // -------------------- LINKS --------------------
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -59,12 +56,12 @@ class TurkTV : MainAPI() {
         return provider.loadLinks(data, isCasting, subtitleCallback, callback)
     }
 
-    // -------------------- SEARCH --------------------
     override suspend fun search(query: String): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
         for (p in providers) {
             try {
-                results += p.search(query)
+                val res = p.search(query)
+                if (res != null) results.addAll(res)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -72,7 +69,6 @@ class TurkTV : MainAPI() {
         return results.distinctBy { it.url }
     }
 
-    // -------------------- ROUTING --------------------
     private fun findProvider(url: String): MainAPI? {
         return providers.find { p ->
             when (p) {
