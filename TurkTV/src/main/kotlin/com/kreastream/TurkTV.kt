@@ -44,43 +44,64 @@ class TurkTV : MainAPI() {
         return try {
             provider.getMainPage(page, MainPageRequest("", url, false))
                 ?.items?.firstOrNull()?.list?.map { wrap(it) } ?: emptyList()
-        } catch (e: Exception) { emptyList() }
+        } catch (e: Exception) { 
+            e.printStackTrace()
+            emptyList() 
+        }
     }
 
-    // ------------------- URL WRAPPING (FIXED) -------------------
+    // ------------------- URL WRAPPING (IMPROVED) -------------------
     private fun wrap(resp: SearchResponse): SearchResponse = when (resp) {
         is TvSeriesSearchResponse -> {
-            val cleanPath = resp.url.removePrefix("https://www.trt1.com.tr").removePrefix("http://www.trt1.com.tr")
+            // Extract the series slug from URL
+            val seriesSlug = resp.url.removePrefix("https://www.trt1.com.tr/diziler/")
+                .removeSuffix("/")
             newTvSeriesSearchResponse(
                 resp.name,
-                "https://turktv.internal/series$cleanPath",
+                "https://turktv.internal/series/$seriesSlug",
                 TvType.TvSeries
-            ) { posterUrl = resp.posterUrl }
+            ) { 
+                posterUrl = resp.posterUrl 
+            }
         }
         is MovieSearchResponse -> {
+            // For live streams, encode the URL
+            val encodedUrl = java.net.URLEncoder.encode(resp.url, "UTF-8")
             newMovieSearchResponse(
                 resp.name,
-                "https://turktv.internal/live/${resp.url}",
+                "https://turktv.internal/live/$encodedUrl",
                 TvType.Live
-            ) { posterUrl = resp.posterUrl }
+            ) { 
+                posterUrl = resp.posterUrl 
+            }
         }
         else -> resp
     }
 
-    // ------------------- URL UNWRAPPING (FIXED) -------------------
+    // ------------------- URL UNWRAPPING (IMPROVED) -------------------
     private fun unwrap(wrapped: String): String = when {
-        wrapped.startsWith("https://turktv.internal/series") ->
-            "https://www.trt1.com.tr${wrapped.removePrefix("https://turktv.internal/series")}"
-        wrapped.startsWith("https://turktv.internal/live") ->
-            wrapped.removePrefix("https://turktv.internal/live/")
+        wrapped.startsWith("https://turktv.internal/series/") -> {
+            val seriesSlug = wrapped.removePrefix("https://turktv.internal/series/")
+            "https://www.trt1.com.tr/diziler/$seriesSlug"
+        }
+        wrapped.startsWith("https://turktv.internal/live/") -> {
+            val encodedUrl = wrapped.removePrefix("https://turktv.internal/live/")
+            java.net.URLDecoder.decode(encodedUrl, "UTF-8")
+        }
         else -> wrapped
     }
 
     // ------------------- LOAD -------------------
     override suspend fun load(url: String): LoadResponse {
-        val real = unwrap(url)
-        val provider = findProvider(real) ?: throw ErrorLoadingException("No provider for $real")
-        return provider.load(real)!!
+        val realUrl = unwrap(url)
+        val provider = findProvider(realUrl) ?: throw ErrorLoadingException("No provider for $realUrl")
+        
+        return try {
+            provider.load(realUrl) ?: throw ErrorLoadingException("Provider returned null response")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw ErrorLoadingException("Failed to load: ${e.message}")
+        }
     }
 
     // ------------------- LOAD LINKS -------------------
@@ -92,24 +113,35 @@ class TurkTV : MainAPI() {
     ): Boolean {
         val realUrl = unwrap(data)
         val provider = findProvider(realUrl) ?: return false
-        return provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
+        
+        return try {
+            provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     // ------------------- SEARCH -------------------
     override suspend fun search(query: String): List<SearchResponse> {
         val all = mutableListOf<SearchResponse>()
         providers.forEach { p ->
-            try { all.addAll(p.search(query).orEmpty().map { wrap(it) }) } catch (_: Exception) {}
+            try { 
+                val results = p.search(query).orEmpty()
+                all.addAll(results.map { wrap(it) }) 
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
         return all.distinctBy { it.url }
     }
 
-    // ------------------- ROUTING -------------------
-    private fun findProvider(url: String): MainAPI? = providers.find {
-        when (it) {
-            is Trt1    -> url.contains("trt1.com.tr/diziler/")
-            is TrtLive -> url.contains(".m3u8") || url.contains(".aac") || url.contains("trt.net.tr")
-            else -> false
+    // ------------------- ROUTING (IMPROVED) -------------------
+    private fun findProvider(url: String): MainAPI? {
+        return when {
+            url.contains("trt1.com.tr/diziler/") -> providers.find { it is Trt1 }
+            url.contains(".m3u8") || url.contains(".aac") || url.contains("medya.trt.com.tr") -> providers.find { it is TrtLive }
+            else -> null
         }
     }
 }
