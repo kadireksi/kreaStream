@@ -10,7 +10,12 @@ class TurkTV : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
     override var lang = "tr"
 
-    private val providers by lazy { listOf(Trt1(), TrtLive()) }
+    private val providers by lazy {
+        APIHolder.apis.filterIsInstance<MainAPI>().filter {
+            it.name.equals("TRT1", ignoreCase = true) ||
+            it.name.equals("TRT Canlı", ignoreCase = true)
+        }
+    }
 
     override val mainPage = mainPageOf(
         "trt1_current" to "TRT 1 – Güncel Diziler",
@@ -137,10 +142,14 @@ class TurkTV : MainAPI() {
 
     // ------------------- ROUTING (IMPROVED) -------------------
     private fun findProvider(url: String): MainAPI? {
-        return when {
-            url.contains("trt1.com.tr") -> providers.find { it is Trt1 }
-            url.contains("medya.trt.com.tr") || url.endsWith(".m3u8") || url.endsWith(".aac") -> providers.find { it is TrtLive }
+        val p = when {
+            url.contains("trt1.com.tr") -> providers.find { it.name.contains("TRT1", true) }
+            url.contains("medya.trt.com.tr") || url.endsWith(".m3u8") || url.endsWith(".aac") ->
+                providers.find { it.name.contains("Canlı", true) }
             else -> null
         }
+        println("🔹 TurkTV routed $url → provider=${p?.name}")
+        return p
     }
+
 }
