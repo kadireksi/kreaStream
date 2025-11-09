@@ -243,27 +243,96 @@ class Trt1 : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        // First, look for m3u8 streams in JSON data
-        val m3u8Url = findM3u8Url(document)
+        // Method 1: Try to find video in embedded players
+        val videoSources = document.select("video source")
+        for (source in videoSources) {
+            val src = source.attr("src")
+            if (src.contains(".m3u8")) {
+                M3u8Helper.generateM3u8(
+                    name,
+                    src,
+                    "$mainUrl/",
+                    headers = mapOf(
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Referer" to "$mainUrl/",
+                        "Origin" to mainUrl
+                    )
+                ).forEach(callback)
+                return true
+            }
+        }
+        
+        // Method 2: Look for m3u8 in script tags with better patterns
+        val m3u8Url = findM3u8UrlImproved(document)
         if (m3u8Url != null) {
-            // For m3u8 streams, we need to use M3u8Helper to get quality options
             M3u8Helper.generateM3u8(
                 name,
                 m3u8Url,
                 "$mainUrl/",
-                headers = mapOf("Referer" to "$mainUrl/")
+                headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer" to "$mainUrl/",
+                    "Origin" to mainUrl
+                )
             ).forEach(callback)
             return true
         }
         
-        // If no m3u8 found, look for YouTube embed
+        // Method 3: Try YouTube
         val youtubeUrl = findYouTubeUrl(document)
         if (youtubeUrl != null) {
-            // For YouTube, we need to extract the video ID and use it directly
-            return handleYouTubeVideo(youtubeUrl, subtitleCallback, callback)
+            return loadExtractor(youtubeUrl, "$mainUrl/", subtitleCallback, callback)
         }
+        
+        // Method 4: Try generic extractor as fallback
+        return loadExtractor(data, "$mainUrl/", subtitleCallback, callback)
+    }
 
-        return false
+    private fun findM3u8UrlImproved(document: org.jsoup.nodes.Document): String? {
+        val scripts = document.select("script")
+        
+        // Look for JSON data with video sources
+        for (script in scripts) {
+            val scriptContent = script.html()
+            
+            // Pattern 1: Look for video sources in JSON
+            val jsonPattern = Regex("""(?i)"(?:video|file|url|src)"\s*:\s*"([^"]+\.m3u8[^"]*)""")
+            val matches = jsonPattern.findAll(scriptContent)
+            for (match in matches) {
+                val url = match.groupValues[1]
+                if (url.contains("trt") && url.contains(".m3u8")) {
+                    return url
+                }
+            }
+            
+            // Pattern 2: Look for base64 encoded JSON
+            if (scriptContent.contains("base64") || scriptContent.contains("JSON.parse")) {
+                try {
+                    // Try to extract URLs from complex JSON structures
+                    val urlPattern = Regex("""https://[^"\s]+\.m3u8[^"\s]*""")
+                    val urlMatches = urlPattern.findAll(scriptContent)
+                    for (urlMatch in urlMatches) {
+                        val url = urlMatch.value
+                        if (url.contains("trt") && url.endsWith(".m3u8")) {
+                            return url
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Continue to next pattern
+                }
+            }
+        }
+        
+        // Look for data attributes
+        val videoElements = document.select("[data-video-src], [data-src]")
+        for (element in videoElements) {
+            val src = element.attr("data-video-src") ?: element.attr("data-src")
+            if (src.contains(".m3u8")) {
+                return src
+            }
+        }
+        
+        return null
     }
 
     private fun findM3u8Url(document: org.jsoup.nodes.Document): String? {
@@ -436,6 +505,37 @@ class Trt1 : MainAPI() {
         }
 
         return true
+    }
+
+    private suspend fun debugPage(url: String) {
+        try {
+            val document = app.get(url).document
+            println("=== DEBUG PAGE: $url ===")
+            println("Title: ${document.title()}")
+            
+            // Log all script tags that might contain video data
+            val scripts = document.select("script")
+            scripts.forEachIndexed { index, script ->
+                val content = script.html()
+                if (content.contains("m3u8") || content.contains("youtube") || content.contains("video")) {
+                    println("Script $index contains video references")
+                }
+            }
+            
+            // Log all video elements
+            val videos = document.select("video")
+            println("Found ${videos.size} video elements")
+            
+            videos.forEachIndexed { index, video ->
+                println("Video $index sources:")
+                video.select("source").forEach { source ->
+                    println("  - ${source.attr("src")}")
+                }
+            }
+            
+        } catch (e: Exception) {
+            println("Debug error: ${e.message}")
+        }
     }
 
 }
