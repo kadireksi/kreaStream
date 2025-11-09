@@ -47,25 +47,31 @@ class TurkTV : MainAPI() {
         } catch (e: Exception) { emptyList() }
     }
 
-    // ------------------- URL WRAPPING -------------------
+    // ------------------- URL WRAPPING (FIXED) -------------------
     private fun wrap(resp: SearchResponse): SearchResponse = when (resp) {
-        is TvSeriesSearchResponse -> newTvSeriesSearchResponse(
-            resp.name,
-            "https://turktv.internal/series/${resp.url.removePrefix("https://www.trt1.com.tr")}",
-            TvType.TvSeries
-        ) { posterUrl = resp.posterUrl }
-        is MovieSearchResponse -> newMovieSearchResponse(
-            resp.name,
-            "https://turktv.internal/live/${resp.url}",
-            TvType.Live
-        ) { posterUrl = resp.posterUrl }
+        is TvSeriesSearchResponse -> {
+            val cleanPath = resp.url.removePrefix("https://www.trt1.com.tr").removePrefix("http://www.trt1.com.tr")
+            newTvSeriesSearchResponse(
+                resp.name,
+                "https://turktv.internal/series$cleanPath",
+                TvType.TvSeries
+            ) { posterUrl = resp.posterUrl }
+        }
+        is MovieSearchResponse -> {
+            newMovieSearchResponse(
+                resp.name,
+                "https://turktv.internal/live/${resp.url}",
+                TvType.Live
+            ) { posterUrl = resp.posterUrl }
+        }
         else -> resp
     }
 
+    // ------------------- URL UNWRAPPING (FIXED) -------------------
     private fun unwrap(wrapped: String): String = when {
-        wrapped.startsWith("https://turktv.internal/series/") ->
-            "https://www.trt1.com.tr${wrapped.removePrefix("https://turktv.internal/series/")}"
-        wrapped.startsWith("https://turktv.internal/live/") ->
+        wrapped.startsWith("https://turktv.internal/series") ->
+            "https://www.trt1.com.tr${wrapped.removePrefix("https://turktv.internal/series")}"
+        wrapped.startsWith("https://turktv.internal/live") ->
             wrapped.removePrefix("https://turktv.internal/live/")
         else -> wrapped
     }
@@ -77,7 +83,7 @@ class TurkTV : MainAPI() {
         return provider.load(real)!!
     }
 
-    // ------------------- LOAD LINKS – UNWRAP FIRST -------------------
+    // ------------------- LOAD LINKS -------------------
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -86,8 +92,6 @@ class TurkTV : MainAPI() {
     ): Boolean {
         val realUrl = unwrap(data)
         val provider = findProvider(realUrl) ?: return false
-
-        // CRITICAL: Use real URL for all network calls
         return provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
     }
 
