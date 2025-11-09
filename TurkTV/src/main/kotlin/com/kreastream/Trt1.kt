@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 class Trt1 : MainAPI() {
     override var mainUrl = "https://www.trt1.com.tr"
-    override var name = "TRT1"
+    override var name = "TRT 1"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
     override var lang = "tr"
