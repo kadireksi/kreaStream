@@ -5,9 +5,9 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 
-class TrtProvider : MainAPI() {
+class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
-    override var name = "TRT & Tabii"
+    override var name = "TRT"
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
 
