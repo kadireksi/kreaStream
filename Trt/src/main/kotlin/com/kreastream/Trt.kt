@@ -4,6 +4,11 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
+//import kotlinx.serialization.json.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
@@ -11,9 +16,7 @@ class Trt : MainAPI() {
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
     override val hasMainPage = true
-    override val hasSearch = true
-    override val hasDownloads = true
-    override val horizontalImages = true
+
     
     // companion object {
     //     val info = ChannelRegistry.ChannelInfo(
