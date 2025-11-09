@@ -4,7 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class TurkTV : MainAPI() {
-    override var mainUrl = "https://turktv.internal"
+    override var mainUrl = ""
     override var name = "Türk TV"
     override var hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
