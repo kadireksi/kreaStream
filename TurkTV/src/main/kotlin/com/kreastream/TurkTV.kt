@@ -44,18 +44,59 @@ class TurkTV : MainAPI() {
         return try {
             provider.getMainPage(page, MainPageRequest("", url, false))
                 ?.items?.firstOrNull()?.list?.map { wrap(it) } ?: emptyList()
-        } catch (e: Exception) { 
+        } catch (e: Exception) {
             e.printStackTrace()
-            emptyList() 
+            emptyList()
         }
+    }
+
+    // ------------------- URL WRAPPING (FIXED) -------------------
+    private fun wrap(resp: SearchResponse): SearchResponse = when (resp) {
+        is TvSeriesSearchResponse -> {
+            // Preserve full relative path
+            val fullPath = resp.url.removePrefix("https://www.trt1.com.tr/")
+            newTvSeriesSearchResponse(
+                resp.name,
+                "https://turktv.internal/trt1/$fullPath",
+                TvType.TvSeries
+            ) {
+                posterUrl = resp.posterUrl
+            }
+        }
+        is MovieSearchResponse -> {
+            // For live streams, encode the URL
+            val encodedUrl = java.net.URLEncoder.encode(resp.url, "UTF-8")
+            newMovieSearchResponse(
+                resp.name,
+                "https://turktv.internal/live/$encodedUrl",
+                TvType.Live
+            ) {
+                posterUrl = resp.posterUrl
+            }
+        }
+        else -> resp
+    }
+
+    // ------------------- URL UNWRAPPING (FIXED) -------------------
+    private fun unwrap(wrapped: String): String = when {
+        wrapped.startsWith("https://turktv.internal/trt1/") -> {
+            val fullPath = wrapped.removePrefix("https://turktv.internal/trt1/")
+            "https://www.trt1.com.tr/$fullPath"
+        }
+        wrapped.startsWith("https://turktv.internal/live/") -> {
+            val encodedUrl = wrapped.removePrefix("https://turktv.internal/live/")
+            java.net.URLDecoder.decode(encodedUrl, "UTF-8")
+        }
+        else -> wrapped
     }
 
     // ------------------- LOAD -------------------
     override suspend fun load(url: String): LoadResponse {
-        val provider = findProvider(url) ?: throw ErrorLoadingException("No provider for $url")
-        
+        val realUrl = unwrap(url)
+        val provider = findProvider(realUrl) ?: throw ErrorLoadingException("No provider for $realUrl")
+
         return try {
-            provider.load(url) ?: throw ErrorLoadingException("Provider returned null response")
+            provider.load(realUrl) ?: throw ErrorLoadingException("Provider returned null response")
         } catch (e: Exception) {
             e.printStackTrace()
             throw ErrorLoadingException("Failed to load: ${e.message}")
@@ -69,10 +110,11 @@ class TurkTV : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val provider = findProvider(data) ?: return false
-        
+        val realUrl = unwrap(data)
+        val provider = findProvider(realUrl) ?: return false
+
         return try {
-            provider.loadLinks(data, isCasting, subtitleCallback, callback)
+            provider.loadLinks(realUrl, isCasting, subtitleCallback, callback)
         } catch (e: Exception) {
             e.printStackTrace()
             false
@@ -83,9 +125,9 @@ class TurkTV : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val all = mutableListOf<SearchResponse>()
         providers.forEach { p ->
-            try { 
+            try {
                 val results = p.search(query).orEmpty()
-                all.addAll(results.map { wrap(it) }) 
+                all.addAll(results.map { wrap(it) })
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -96,8 +138,8 @@ class TurkTV : MainAPI() {
     // ------------------- ROUTING (IMPROVED) -------------------
     private fun findProvider(url: String): MainAPI? {
         return when {
-            url.contains("trt1.com.tr/diziler/") -> providers.find { it is Trt1 }
-            url.contains(".m3u8") || url.contains(".aac") || url.contains("medya.trt.com.tr") -> providers.find { it is TrtLive }
+            url.contains("trt1.com.tr") -> providers.find { it is Trt1 }
+            url.contains("medya.trt.com.tr") || url.endsWith(".m3u8") || url.endsWith(".aac") -> providers.find { it is TrtLive }
             else -> null
         }
     }
