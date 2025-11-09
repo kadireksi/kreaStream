@@ -185,7 +185,7 @@ class Trt : MainAPI() {
                     val mainStream = channel.streamUrls.firstOrNull() ?: ""
                     newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
                         this.posterUrl = channel.logoUrl
-                        this.plot = channel.description
+                        //this.plot = channel.description
                     }
                 }
             }
@@ -194,7 +194,7 @@ class Trt : MainAPI() {
                 series.map { series ->
                     newTvSeriesSearchResponse(series.title, series.url) {
                         this.posterUrl = series.posterUrl
-                        this.plot = series.description
+                        //this.plot = series.description
                     }
                 }
             }
@@ -203,7 +203,7 @@ class Trt : MainAPI() {
                 series.map { series ->
                     newTvSeriesSearchResponse(series.title, series.url) {
                         this.posterUrl = series.posterUrl
-                        this.plot = series.description
+                        //this.plot = series.description
                     }
                 }
             }
