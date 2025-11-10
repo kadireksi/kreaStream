@@ -110,7 +110,7 @@ class Trt : MainAPI() {
     }
 
     private fun determineChannelFromLogo(altText: String, logoUrl: String): String {
-        val text = "$altText $logoUrl".toLowerCase()
+        val text = "$altText $logoUrl".lowercase()
         
         return when {
             text.contains("trt 1") || text.contains("trt1") -> "TRT 1"
