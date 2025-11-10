@@ -37,9 +37,10 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
-    /* ---------------------------------------------------------
-       Get all channels from JSON in __NEXT_DATA__
-       --------------------------------------------------------- */
+/* ---------------------------------------------------------
+   Get all channels from JSON in __NEXT_DATA__
+   NOW WITH REAL LOGOS FROM CORRECT CDN
+   --------------------------------------------------------- */
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
         channelCache["live"]?.let { return it }
 
@@ -53,29 +54,32 @@ class Trt : MainAPI() {
             val nextData = doc.selectFirst("#__NEXT_DATA__")?.data() ?: return emptyList()
 
             val json = JSONObject(nextData)
-            val liveChannels = json.getJSONObject("props").getJSONObject("pageProps").getJSONArray("liveChannels")
+            val liveChannels = json.getJSONObject("props")
+                .getJSONObject("pageProps")
+                .getJSONArray("liveChannels")
 
             for (i in 0 until liveChannels.length()) {
                 val ch = liveChannels.getJSONObject(i)
                 val name = ch.getString("title")
                 val slug = ch.getString("slug")
 
-                // Logo
-                val images = ch.getJSONArray("images")
+                // === LOGO: Use correct CDN ===
                 var logoUrl = ""
+                val images = ch.getJSONArray("images")
                 for (j in 0 until images.length()) {
                     val img = images.getJSONObject(j)
                     if (img.getString("imageType") == "logo") {
                         val imgName = img.getString("name")
-                        logoUrl = "https://cms-tabii-assets.tabii.com/thumbnails/$imgName"
+                        // CORRECT URL
+                        logoUrl = "https://cms-tabii-public-image.tabii.com/int/$imgName"
                         break
                     }
                 }
-                if (logoUrl.isBlank()) continue  // Skip if no logo
+                if (logoUrl.isBlank()) continue
 
-                // Stream
-                val media = ch.getJSONArray("media")
+                // === STREAM: Clear HLS only ===
                 var streamUrl = ""
+                val media = ch.getJSONArray("media")
                 for (j in 0 until media.length()) {
                     val m = media.getJSONObject(j)
                     if (m.getString("type") == "hls" && m.getString("drmSchema") == "clear") {
@@ -83,12 +87,18 @@ class Trt : MainAPI() {
                         break
                     }
                 }
-                if (streamUrl.isBlank()) continue  // Skip if no clear stream
+                if (streamUrl.isBlank()) continue
 
-                result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name canlı yayın")
+                result += TabiiChannel(
+                    name = name,
+                    slug = slug,
+                    streamUrl = streamUrl,
+                    logoUrl = logoUrl,
+                    description = "$name canlı yayın"
+                )
             }
         } catch (e: Exception) {
-            // Skip error
+            // Silent fallback
         }
 
         if (result.isNotEmpty()) channelCache["live"] = result
