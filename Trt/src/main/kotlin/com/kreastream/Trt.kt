@@ -61,127 +61,41 @@ class Trt : MainAPI() {
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
         val channels = mutableListOf<TabiiChannel>()
         
-        try {
-            // Get the main tabii page with all live channels
-            val mainDocument = app.get("$tabiiUrl/canli-yayin").document
-            
-            // Look for channel cards or items in the live TV section
-            val channelElements = mainDocument.select("""
-                [data-testid*="channel"],
-                [class*="channel"],
-                [class*="live"],
-                .channel-card,
-                .live-channel,
-                a[href*="/watch/live/"]
-            """.trimIndent())
-            
-            println("DEBUG: Found ${channelElements.size} channel elements")
-            
-            // Extract channel information
-            for (element in channelElements) {
-                try {
-                    // Get channel name
-                    val channelName = element.select("""
-                        h1, h2, h3, h4,
-                        [class*="title"],
-                        [class*="name"],
-                        .channel-title,
-                        .channel-name
-                    """.trimIndent()).text().trim()
-                    
-                    // Get channel logo
-                    val logoUrl = element.select("img").attr("src")
-                    
-                    // Get channel URL
-                    var channelUrl = element.attr("href")
-                    if (channelUrl.isBlank()) {
-                        val link = element.select("a[href*='/watch/live/']").attr("href")
-                        channelUrl = link
-                    }
-                    
-                    if (channelUrl.isNotBlank() && channelName.isNotBlank()) {
-                        // Make URL absolute if relative
-                        if (!channelUrl.startsWith("http")) {
-                            channelUrl = "$tabiiUrl$channelUrl"
-                        }
-                        
-                        // Get the stream URL from the channel page
-                        val streamUrl = getStreamUrlFromChannelPage(channelUrl)
-                        
-                        if (streamUrl != null) {
-                            val streamUrls = generateQualityVariants(streamUrl)
-                            val fixedLogoUrl = if (logoUrl.isNotBlank()) fixLogoUrl(logoUrl) else getFallbackLogo(channelName)
-                            
-                            channels.add(
-                                TabiiChannel(
-                                    name = channelName,
-                                    streamUrls = streamUrls,
-                                    logoUrl = fixedLogoUrl,
-                                    description = "$channelName canlı yayın"
-                                )
-                            )
-                            println("DEBUG: Added channel: $channelName with logo: $fixedLogoUrl")
-                        }
-                    }
-                    
-                } catch (e: Exception) {
-                    println("DEBUG: Error processing channel element: ${e.message}")
-                }
-            }
-            
-            // If no channels found, try alternative approach
-            if (channels.isEmpty()) {
-                return getTabiiChannelsAlternative()
-            }
-            
-        } catch (e: Exception) {
-            println("DEBUG: Error fetching main tabii page: ${e.message}")
-            return getTabiiChannelsAlternative()
-        }
+        // First get all available logos from TRT's official page
+        val logoMap = getTrtLogos()
         
-        println("DEBUG: Total channels found: ${channels.size}")
-        return channels
-    }
-
-    // Alternative method if main approach fails
-    private suspend fun getTabiiChannelsAlternative(): List<TabiiChannel> {
-        val channels = mutableListOf<TabiiChannel>()
-        
-        // Known TRT channel slugs
-        val channelSlugs = listOf(
-            "trt1", "trt2", "trt3", "trthaber", "trtspor", "trtsporyildiz",
-            "trtbelgesel", "trtcocuk", "trtmuzik", "trtarabi", "trtavaz",
-            "trtturk", "trtworld", "trtkurdi"
+        // Direct list of TRT channels with their tabii slugs
+        val channelData = listOf(
+            "TRT 1" to "trt1",
+            "TRT 2" to "trt2", 
+            "TRT 3" to "trt3",
+            "TRT Haber" to "trthaber",
+            "TRT Spor" to "trtspor",
+            "TRT Spor Yıldız" to "trtsporyildiz",
+            "TRT Belgesel" to "trtbelgesel",
+            "TRT Çocuk" to "trtcocuk",
+            "TRT Müzik" to "trtmuzik",
+            "TRT Arabi" to "trtarabi",
+            "TRT Avaz" to "trtavaz",
+            "TRT Türk" to "trtturk",
+            "TRT World" to "trtworld",
+            "TRT Kurdi" to "trtkurdi"
         )
         
-        for (slug in channelSlugs) {
+        for ((channelName, channelSlug) in channelData) {
             try {
-                val watchUrl = "$tabiiUrl/canli-yayin/$slug"
-                println("DEBUG: Trying alternative URL: $watchUrl")
+                val channelUrl = "$tabiiUrl/canli-yayin/$channelSlug"
+                println("DEBUG: Processing channel: $channelName from $channelUrl")
                 
-                val document = app.get(watchUrl).document
-                
-                // Extract channel name from page title
-                val channelName = document.selectFirst("title, h1")?.text()
-                    ?.substringBefore("|")
-                    ?.substringBefore("-")
-                    ?.trim()
-                    ?: "TRT ${slug.replace("trt", "").replaceFirstChar { it.uppercase() }}"
-                
-                // Extract logo
-                val logoUrl = document.selectFirst("""
-                    meta[property="og:image"],
-                    img[src*="logo"],
-                    img[alt*="$slug"],
-                    img[class*="logo"]
-                """.trimIndent())?.attr("src")?.let { fixLogoUrl(it) } 
-                    ?: getFallbackLogo(channelName)
-                
-                // Extract stream URL
-                val streamUrl = getStreamUrlFromChannelPage(watchUrl)
+                // Get stream URL from the channel page
+                val streamUrl = getStreamUrlFromChannelPage(channelUrl)
                 
                 if (streamUrl != null) {
+                    // Generate quality variants
                     val streamUrls = generateQualityVariants(streamUrl)
+                    
+                    // Find the best matching logo
+                    val logoUrl = findBestLogoForChannel(channelName, logoMap)
                     
                     channels.add(
                         TabiiChannel(
@@ -191,51 +105,129 @@ class Trt : MainAPI() {
                             description = "$channelName canlı yayın"
                         )
                     )
-                    println("DEBUG: Added channel (alt): $channelName")
+                    println("DEBUG: Successfully added channel: $channelName")
+                } else {
+                    println("DEBUG: No stream URL found for: $channelName")
                 }
                 
+                // Add delay to avoid rate limiting
                 kotlinx.coroutines.delay(100)
                 
             } catch (e: Exception) {
-                println("DEBUG: Error processing $slug: ${e.message}")
+                println("DEBUG: Error processing channel $channelName: ${e.message}")
             }
         }
         
+        println("DEBUG: Total channels found: ${channels.size}")
         return channels
     }
 
-    // Function to get stream URL from channel page
+    // Update the getStreamUrlFromChannelPage function to be more robust:
     private suspend fun getStreamUrlFromChannelPage(channelUrl: String): String? {
         try {
             val document = app.get(channelUrl).document
             
-            // Look for m3u8 in scripts
+            // Look for m3u8 in scripts - more specific patterns
             val scripts = document.select("script")
             for (script in scripts) {
                 val content = script.html()
                 
-                // Look for TRT-specific m3u8 patterns
+                // More specific TRT m3u8 patterns
                 val patterns = listOf(
-                    Regex("""(https://[^"']*trt[^"']*\.medya\.trt\.com\.tr[^"']*\.m3u8[^"']*)"""),
-                    Regex("""(https://[^"']*tv-trt[^"']*\.m3u8[^"']*)"""),
-                    Regex("""["']streamUrl["']\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
-                    Regex("""["']url["']\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
-                    Regex("""(https://[^"']*\.medya\.trt\.com\.tr/master[^"']*\.m3u8[^"']*)""")
+                    Regex("""(https://tv-trt[^"']*\.medya\.trt\.com\.tr/[^"']*\.m3u8)"""),
+                    Regex("""(https://[^"']*trt[^"']*\.medya\.trt\.com\.tr/[^"']*\.m3u8)"""),
+                    Regex("""(https://[^"']*\.daioncdn\.net/[^"']*\.m3u8)"""),
+                    Regex("""["']?streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                    Regex("""["']?url["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                    Regex("""["']?src["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                    Regex("""(https://[^"']*master[^"']*\.m3u8)""")
                 )
                 
                 for (pattern in patterns) {
-                    val match = pattern.find(content)
-                    if (match != null) {
-                        val url = match.groupValues[1]
-                        println("DEBUG: Found stream URL: $url")
-                        return url
+                    val matches = pattern.findAll(content)
+                    matches.forEach { match ->
+                        val url = match.groupValues.getOrNull(1) ?: match.value
+                        if (url.contains("m3u8")) {
+                            println("DEBUG: Found stream URL: $url")
+                            return url
+                        }
                     }
                 }
             }
+            
+            // Also check for video elements
+            val videoSources = document.select("video source[src*=.m3u8], source[src*=.m3u8]")
+            for (source in videoSources) {
+                val src = source.attr("src")
+                if (src.isNotBlank()) {
+                    println("DEBUG: Found stream in source element: $src")
+                    return src
+                }
+            }
+            
         } catch (e: Exception) {
             println("DEBUG: Error getting stream from $channelUrl: ${e.message}")
         }
-        return null
+        
+        // Fallback: Use direct TRT URLs if tabii.com fails
+        return getDirectTrtStreamUrl(channelUrl)
+    }
+
+    // Fallback function with direct TRT stream URLs
+    private fun getDirectTrtStreamUrl(channelUrl: String): String? {
+        return when {
+            channelUrl.contains("trt1") -> "https://tv-trt1.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trt2") -> "https://tv-trt2.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trt3") -> "https://tv-trt3.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trthaber") -> "https://tv-trthaber.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtspor") && channelUrl.contains("yildiz") -> "https://trtspor2.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtspor") -> "https://tv-trtspor1.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtbelgesel") -> "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtcocuk") -> "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtmuzik") -> "https://tv-trtmuzik.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtarabi") -> "https://tv-trtarabi.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtavaz") -> "https://tv-trtavaz.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtturk") -> "https://tv-trtturk.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtworld") -> "https://tv-trtworld.medya.trt.com.tr/master.m3u8"
+            channelUrl.contains("trtkurdi") -> "https://tv-trtkurdi.medya.trt.com.tr/master.m3u8"
+            else -> null
+        }
+    }
+
+    // Update the generateQualityVariants function:
+    private fun generateQualityVariants(baseUrl: String): List<String> {
+        val variants = mutableListOf(baseUrl)
+        
+        try {
+            // For TRT URLs, generate quality variants
+            if (baseUrl.contains("trt.com.tr") || baseUrl.contains("daioncdn.net")) {
+                val basePath = baseUrl.substringBeforeLast(".").removeSuffix("_master").removeSuffix("_360").removeSuffix("_480").removeSuffix("_720").removeSuffix("_1080").removeSuffix("_1440")
+                val qualities = listOf("360", "480", "720", "1080", "1440")
+                
+                qualities.forEach { quality ->
+                    try {
+                        val variantUrl = "${basePath}_${quality}.m3u8"
+                        variants.add(variantUrl)
+                    } catch (e: Exception) {
+                        // Skip if variant generation fails
+                    }
+                }
+                
+                // Also add master without quality suffix
+                try {
+                    val masterUrl = "${basePath}.m3u8"
+                    if (masterUrl != baseUrl) {
+                        variants.add(masterUrl)
+                    }
+                } catch (e: Exception) {
+                    // Skip if master URL generation fails
+                }
+            }
+        } catch (e: Exception) {
+            println("DEBUG: Error generating quality variants: ${e.message}")
+        }
+        
+        return variants.distinct()
     }
 
     // Fallback logo function
@@ -327,34 +319,6 @@ class Trt : MainAPI() {
         }
         
         return null
-    }
-
-    // Update the generateQualityVariants function:
-    private fun generateQualityVariants(baseUrl: String): List<String> {
-        val variants = mutableListOf(baseUrl)
-        
-        try {
-            // Only generate variants for TRT URLs
-            if (baseUrl.contains("trt.com.tr")) {
-                val basePath = baseUrl.substringBeforeLast(".").removeSuffix("_master").removeSuffix("_360").removeSuffix("_480").removeSuffix("_720").removeSuffix("_1080").removeSuffix("_1440")
-                val qualities = listOf("360", "480", "720", "1080", "1440")
-                
-                qualities.forEach { quality ->
-                    val variantUrl = "${basePath}_${quality}.m3u8"
-                    variants.add(variantUrl)
-                }
-                
-                // Also try the master URL without quality suffix
-                val masterUrl = "${basePath}.m3u8"
-                if (masterUrl != baseUrl) {
-                    variants.add(masterUrl)
-                }
-            }
-        } catch (e: Exception) {
-            println("DEBUG: Error generating quality variants: ${e.message}")
-        }
-        
-        return variants.distinct()
     }
 
     private fun findLogoUrlInTabii(document: org.jsoup.nodes.Document, channelName: String): String {
