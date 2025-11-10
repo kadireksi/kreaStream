@@ -16,6 +16,9 @@ class Trt : MainAPI() {
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
+    // Dummy URL that CloudStream will request – it **must** be a real page
+    private val dummyLiveUrl = "$tabiiUrl/live"
+
     override val mainPage = mainPageOf(
         "live"    to "TRT Canlı",
         "series"  to "Güncel Diziler",
@@ -92,7 +95,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       3. Quality variants (master → _360, _480, _720, _1080)
+       3. Quality variants
        --------------------------------------------------------- */
     private fun generateQualityVariants(base: String): List<String> {
         val list = mutableListOf(base)
@@ -108,7 +111,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       4. Series list (current / archive)
+       4. Series list
        --------------------------------------------------------- */
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         val url = if (page == 1) {
@@ -137,14 +140,14 @@ class Trt : MainAPI() {
         if (url.startsWith("http")) url else "$trt1Url$url"
 
     /* ---------------------------------------------------------
-       5. Main page – ONE live entry
+       5. Main page – ONE live entry (real URL)
        --------------------------------------------------------- */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
                     name = "TRT Canlı",
-                    url = "trt://live",           // <-- dummy URL, no mainUrl prefix
+                    url = dummyLiveUrl,           // <-- real page, CloudStream will request it
                     type = TvType.TvSeries
                 ) {
                     this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
@@ -158,17 +161,17 @@ class Trt : MainAPI() {
         val hasNext = request.data in listOf("series", "archive") && items.isNotEmpty()
 
         return newHomePageResponse(
-            listOf(HomePageList(request.name, items, true)), // isHorizontal = true
+            listOf(HomePageList(request.name, items, true)),
             hasNext = hasNext
         )
     }
 
     /* ---------------------------------------------------------
-       6. Load – dummy series → list of live-channel episodes
+       6. Load – intercept the dummy URL, skip HTML request
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
-        // ---- LIVE “series” -------------------------------------------------
-        if (url == "trt://live") {                 // <-- exact match, no prefix
+        // ---- LIVE “series” (our dummy page) ----
+        if (url == dummyLiveUrl) {
             val channels = getTabiiChannels()
             val episodes = channels.mapIndexed { i, ch ->
                 newEpisode(ch.streamUrl) {
@@ -191,7 +194,7 @@ class Trt : MainAPI() {
             }
         }
 
-        // ---- Direct m3u8 fallback -----------------------------------------
+        // ---- Direct m3u8 fallback ----
         if (url.contains(".m3u8", ignoreCase = true)) {
             val chanName = getAllLiveChannels()
                 .find { url.contains(it.second, true) }?.first
@@ -201,7 +204,7 @@ class Trt : MainAPI() {
             }
         }
 
-        // ---- Normal TV-Series / Episode page -------------------------------
+        // ---- Normal TV-Series / Episode page ----
         val doc = app.get(url).document
         val title = doc.selectFirst("h1")?.text()?.trim()
             ?: throw ErrorLoadingException("Title not found")
@@ -262,7 +265,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       7. Load links – m3u8 (with variants) or YouTube
+       7. Load links
        --------------------------------------------------------- */
     override suspend fun loadLinks(
         data: String,
@@ -270,7 +273,6 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // direct m3u8
         if (data.contains(".m3u8", ignoreCase = true)) {
             generateQualityVariants(data).forEach { u ->
                 M3u8Helper.generateM3u8(
@@ -286,7 +288,6 @@ class Trt : MainAPI() {
             return true
         }
 
-        // episode page → playerConfig
         val doc = app.get(data).document
         val script = doc.select("script")
             .find { it.html().contains("playerConfig") }
@@ -308,7 +309,6 @@ class Trt : MainAPI() {
             return true
         }
 
-        // YouTube fallback
         val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
             ?.attr("src")
             ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
@@ -325,12 +325,11 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       8. Search – live channels + series
+       8. Search
        --------------------------------------------------------- */
     override suspend fun search(query: String): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
 
-        // live channels
         getTabiiChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
@@ -339,7 +338,6 @@ class Trt : MainAPI() {
                 }
             }
 
-        // series
         try {
             val sUrl = "$trt1Url/arama/$query?contenttype=series"
             app.get(sUrl).document
