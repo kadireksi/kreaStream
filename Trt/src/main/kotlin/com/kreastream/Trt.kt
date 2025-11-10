@@ -36,15 +36,13 @@ class Trt : MainAPI() {
     )
 
     /* ---------------------------------------------------------
-       1. Get channel list – BLOCK BODY (fixed)
+       1. Get channel list – BLOCK BODY
        --------------------------------------------------------- */
     private suspend fun getAllLiveChannels(): List<Pair<String, String>> {
         return try {
             val sample = "$liveBase/trt1?trackId=150002"
             val response = app.get(sample, timeout = 10)
-            if (!response.isSuccessful) {
-                return emptyList()
-            }
+            if (!response.isSuccessful) return emptyList()
 
             val doc = response.document
             val script = doc.select("script")
@@ -69,7 +67,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       2. Scrape per channel – with fallback logos
+       2. Scrape per channel
        --------------------------------------------------------- */
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
         channelCache["live"]?.let { return it }
@@ -132,7 +130,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       4. Series list – BLOCK BODY (fixed)
+       4. Series list – BLOCK BODY
        --------------------------------------------------------- */
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
@@ -192,14 +190,13 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       6. Load – intercept homepage → build live list
+       6. Load – intercept homepage
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
         // LIVE SERIES
         if (url == dummyLiveUrl) {
             val channels = getTabiiChannels()
             return if (channels.isEmpty()) {
-                // Fallback: TRT 1
                 buildLiveResponse(
                     listOf(
                         TabiiChannel(
@@ -223,7 +220,7 @@ class Trt : MainAPI() {
             }
         }
 
-        // Normal series
+        // Normal series – FULL try-catch
         return try {
             val doc = app.get(url, timeout = 15).document
             val title = doc.selectFirst("h1")?.text()?.trim()
@@ -287,7 +284,7 @@ class Trt : MainAPI() {
         }
     }
 
-    // SUSPEND FUNCTION – fixes build error
+    // LOCAL SUSPEND FUNCTION – NO override
     private suspend fun buildLiveResponse(channels: List<TabiiChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
