@@ -10,19 +10,7 @@ class Trt : MainAPI() {
     override var name = "TRT"
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
-override val hasMainPage = true
-
-    //companion object {
-     //   val info = ChannelRegistry.ChannelInfo(
-     //       id = "trtprovider",
-    //        title = "TRT & Tabii",
-      //      sections = mapOf(
-     //           "live" to "Canlı Yayınlar",
-     //           "series" to "Güncel Diziler",
-     //           "archive" to "Eski Diziler"
-     //       )
-     //   )
-   // }
+    override var hasMainPage = true
 
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
@@ -33,8 +21,24 @@ override val hasMainPage = true
         "archive" to "Eski Diziler"
     )
 
-    // Cache for tabii channels
-    private var cachedTabiiChannels: List<TabiiChannel>? = null
+    // TRT Channel list with their tabii watch URLs
+    private val trtChannels = listOf(
+        "TRT 1" to "trt1",
+        "TRT 2" to "trt2", 
+        "TRT 3" to "trt3",
+        "TRT Haber" to "trthaber",
+        "TRT Spor" to "trtspor",
+        "TRT Spor Yıldız" to "trtsporyildiz",
+        "TRT Belgesel" to "trtbelgesel",
+        "TRT Çocuk" to "trtcocuk",
+        "TRT Çocuk Diyanet" to "trtdiyanetcocuk",
+        "TRT Müzik" to "trtmuzik",
+        "TRT Arabi" to "trtarabi",
+        "TRT Avaz" to "trtavaz",
+        "TRT Türk" to "trtturk",
+        "TRT World" to "trtworld",
+        "TRT Kurdi" to "trtkurdi"
+    )
 
     data class TabiiChannel(
         val name: String,
@@ -51,206 +55,236 @@ override val hasMainPage = true
     )
 
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
-        cachedTabiiChannels?.let { return it }
-
         val channels = mutableListOf<TabiiChannel>()
-        try {
-            val document = app.get(tabiiUrl).document
-            val scriptElement = document.selectFirst("script#__NEXT_DATA__")
-            val jsonContent = scriptElement?.html() ?: return emptyList()
-
-            println("DEBUG: Found JSON data, length: ${jsonContent.length}")
-
-            // Parse the JSON data to extract channel information
-            val jsonObject = AppUtils.tryParseJson<Map<String, Any>>(jsonContent)
-            val props = jsonObject?.get("props") as? Map<*, *>
-            val pageProps = props?.get("pageProps") as? Map<*, *>
-            
-            // Try multiple possible JSON structures for channels
-            val blocks = pageProps?.get("blocks") as? List<Map<*, *>>
-            val initialData = pageProps?.get("initialData") as? Map<*, *>
-            val channelsData = pageProps?.get("channels") as? List<Map<*, *>>
-
-            println("DEBUG: Blocks found: ${blocks?.size}")
-            println("DEBUG: InitialData found: ${initialData != null}")
-            println("DEBUG: ChannelsData found: ${channelsData?.size}")
-
-            // Method 1: Parse from blocks
-            blocks?.forEach { block ->
-                val items = block["items"] as? List<Map<*, *>>
-                items?.forEach { item ->
-                    parseChannelFromItem(item, channels)
+        
+        for ((channelName, channelSlug) in trtChannels) {
+            try {
+                val watchUrl = "$tabiiUrl/watch/live/$channelSlug?trackId=150002"
+                println("DEBUG: Fetching channel: $channelName from $watchUrl")
+                
+                val document = app.get(watchUrl).document
+                
+                // Try to find m3u8 URL in the page
+                val m3u8Url = findM3u8UrlInTabii(document)
+                
+                // Try to find logo URL in the page
+                val logoUrl = findLogoUrlInTabii(document, channelName)
+                
+                if (m3u8Url != null) {
+                    // Generate multiple quality variants
+                    val streamUrls = generateQualityVariants(m3u8Url)
+                    
+                    channels.add(
+                        TabiiChannel(
+                            name = channelName,
+                            streamUrls = streamUrls,
+                            logoUrl = logoUrl,
+                            description = "$channelName canlı yayın"
+                        )
+                    )
+                    println("DEBUG: Successfully added channel: $channelName with ${streamUrls.size} quality variants, logo: $logoUrl")
+                } else {
+                    println("DEBUG: No m3u8 URL found for: $channelName")
                 }
+                
+                // Add delay to avoid rate limiting
+                kotlinx.coroutines.delay(100)
+                
+            } catch (e: Exception) {
+                println("DEBUG: Error fetching channel $channelName: ${e.message}")
             }
-
-            // Method 2: Parse from channels data
-            channelsData?.forEach { channelData ->
-                parseChannelData(channelData, channels)
-            }
-
-            // Method 3: Parse from initialData
-            initialData?.let { data ->
-                val dataBlocks = data["blocks"] as? List<Map<*, *>>
-                dataBlocks?.forEach { block ->
-                    val items = block["items"] as? List<Map<*, *>>
-                    items?.forEach { item ->
-                        parseChannelFromItem(item, channels)
-                    }
-                }
-            }
-
-            // Method 4: If still no channels, try direct string extraction
-            if (channels.isEmpty()) {
-                extractChannelsFromJsonString(jsonContent, channels)
-            }
-
-            println("DEBUG: Total channels found: ${channels.size}")
-
-        } catch (e: Exception) {
-            println("DEBUG: Error getting tabii channels: ${e.message}")
-            e.printStackTrace()
         }
-
-        cachedTabiiChannels = channels
+        
+        println("DEBUG: Total channels found: ${channels.size}")
         return channels
     }
 
-    private fun parseChannelFromItem(item: Map<*, *>, channels: MutableList<TabiiChannel>) {
-        try {
-            // Try different channel data structures
-            val channelData = item["channel"] as? Map<*, *>
-            if (channelData != null) {
-                parseChannelData(channelData, channels)
-            } else {
-                // Try direct item parsing
-                val name = item["name"] as? String ?: item["title"] as? String ?: ""
-                val logo = item["logo"] as? String ?: item["image"] as? String ?: item["poster"] as? String ?: ""
-                val streamUrl = item["streamUrl"] as? String ?: item["url"] as? String ?: item["source"] as? String
-
-                if (name.isNotEmpty() && streamUrl != null && streamUrl.isNotEmpty()) {
-                    val streamUrls = mutableListOf(streamUrl)
-                    
-                    // Add multiple quality variants if it's an m3u8 stream
-                    if (streamUrl.contains(".m3u8")) {
-                        // Generate quality variants
-                        val baseUrl = streamUrl.substringBeforeLast("_")
-                        val qualities = listOf("360", "480", "720", "1080", "1440")
-                        qualities.forEach { quality ->
-                            val qualityUrl = "${baseUrl}_${quality}.m3u8"
-                            streamUrls.add(qualityUrl)
-                        }
-                    }
-
-                    channels.add(
-                        TabiiChannel(
-                            name = name,
-                            streamUrls = streamUrls,
-                            logoUrl = if (logo.startsWith("http")) logo else "$mainUrl$logo"
-                        )
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun parseChannelData(channelData: Map<*, *>, channels: MutableList<TabiiChannel>) {
-        try {
-            val name = channelData["name"] as? String ?: channelData["title"] as? String ?: ""
-            val logo = channelData["logo"] as? String ?: channelData["image"] as? String ?: channelData["poster"] as? String ?: ""
-            var streamUrl = channelData["streamUrl"] as? String ?: channelData["url"] as? String ?: channelData["source"] as? String
-
-            // Try to find stream URL in nested structures
-            if (streamUrl == null) {
-                val sources = channelData["sources"] as? List<Map<*, *>>
-                sources?.forEach { source ->
-                    streamUrl = source["url"] as? String ?: source["src"] as? String
-                }
-            }
-
-            if (streamUrl == null) {
-                val video = channelData["video"] as? Map<*, *>
-                streamUrl = video?.get("url") as? String ?: video?.get("src") as? String
-            }
-
-            if (name.isNotEmpty() && streamUrl != null && streamUrl.isNotEmpty()) {
-                val streamUrls = mutableListOf(streamUrl)
-                
-                // Add multiple quality variants for m3u8 streams
-                if (streamUrl.contains(".m3u8")) {
-                    val baseUrl = streamUrl.substringBeforeLast("_")
-                    val qualities = listOf("360", "480", "720", "1080", "1440")
-                    qualities.forEach { quality ->
-                        val qualityUrl = "${baseUrl}_${quality}.m3u8"
-                        streamUrls.add(qualityUrl)
-                    }
-                }
-
-                channels.add(
-                    TabiiChannel(
-                        name = name,
-                        streamUrls = streamUrls,
-                        logoUrl = if (logo.startsWith("http")) logo else "$mainUrl$logo"
-                    )
-                )
-                println("DEBUG: Added channel: $name")
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun extractChannelsFromJsonString(jsonContent: String, channels: MutableList<TabiiChannel>) {
-        try {
-            // Look for channel patterns in the JSON string
-            val channelPatterns = listOf(
-                Regex(""""channel"\s*:\s*\{[^}]+"name"\s*:\s*"([^"]+)"[^}]+"logo"\s*:\s*"([^"]*)"[^}]+"streamUrl"\s*:\s*"([^"]*)"""),
-                Regex(""""name"\s*:\s*"([^"]+)"[^}]+"logo"\s*:\s*"([^"]*)"[^}]+"streamUrl"\s*:\s*"([^"]*)"""),
-                Regex(""""title"\s*:\s*"([^"]+)"[^}]+"logo"\s*:\s*"([^"]*)"[^}]+"url"\s*:\s*"([^"]*)""")
+    private fun findM3u8UrlInTabii(document: org.jsoup.nodes.Document): String? {
+        // Method 1: Look for m3u8 in script tags with JSON data
+        val scripts = document.select("script")
+        for (script in scripts) {
+            val scriptContent = script.html()
+            
+            // Look for m3u8 URLs in various JSON patterns
+            val patterns = listOf(
+                Regex("""["']?url["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                Regex("""["']?src["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                Regex("""["']?streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                Regex("""["']?source["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                Regex("""https://[^"'\s]+\.m3u8[^"'\s]*""")
             )
             
-            channelPatterns.forEach { pattern ->
-                val matches = pattern.findAll(jsonContent)
+            for (pattern in patterns) {
+                val matches = pattern.findAll(scriptContent)
                 matches.forEach { match ->
-                    val name = match.groupValues[1]
-                    val logo = match.groupValues[2]
-                    val streamUrl = match.groupValues[3]
-                    
-                    if (name.isNotEmpty() && streamUrl.isNotEmpty() && streamUrl.contains("m3u8")) {
-                        val streamUrls = mutableListOf(streamUrl)
-                        
-                        // Add quality variants
-                        if (streamUrl.contains(".m3u8")) {
-                            val baseUrl = streamUrl.substringBeforeLast("_")
-                            val qualities = listOf("360", "480", "720", "1080", "1440")
-                            qualities.forEach { quality ->
-                                val qualityUrl = "${baseUrl}_${quality}.m3u8"
-                                streamUrls.add(qualityUrl)
-                            }
-                        }
-
-                        channels.add(
-                            TabiiChannel(
-                                name = name,
-                                streamUrls = streamUrls,
-                                logoUrl = if (logo.startsWith("http")) logo else "$mainUrl$logo"
-                            )
-                        )
-                        println("DEBUG: Added channel from regex: $name")
+                    val url = match.groupValues.getOrNull(1) ?: match.value
+                    if (url.contains("m3u8") && (url.contains("trt.com.tr") || url.contains("tabii.com"))) {
+                        println("DEBUG: Found m3u8 URL: $url")
+                        return url
                     }
                 }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
+        
+        // Method 2: Look for video elements
+        val videoElement = document.selectFirst("video")
+        val sourceElements = document.select("source[src*=.m3u8]")
+        
+        sourceElements.forEach { source ->
+            val src = source.attr("src")
+            if (src.isNotEmpty()) {
+                println("DEBUG: Found m3u8 in source element: $src")
+                return src
+            }
+        }
+        
+        // Method 3: Look for iframe with m3u8
+        val iframes = document.select("iframe[src*=.m3u8]")
+        iframes.forEach { iframe ->
+            val src = iframe.attr("src")
+            if (src.isNotEmpty()) {
+                println("DEBUG: Found m3u8 in iframe: $src")
+                return src
+            }
+        }
+        
+        return null
     }
 
-    private suspend fun getTrtSeries(archive: Boolean = false): List<TrtSeries> {
-        val url = "$trt1Url/diziler?archive=$archive&order=title_asc"
+    private fun findLogoUrlInTabii(document: org.jsoup.nodes.Document, channelName: String): String {
+        // Method 1: Look for logo in meta tags
+        val metaLogo = document.selectFirst("meta[property='og:image']")?.attr("content")
+        if (!metaLogo.isNullOrEmpty() && metaLogo.contains("logo", ignoreCase = true)) {
+            return fixLogoUrl(metaLogo)
+        }
+
+        // Method 2: Look for logo in JSON-LD structured data
+        val jsonLdScripts = document.select("script[type='application/ld+json']")
+        for (script in jsonLdScripts) {
+            val jsonContent = script.html()
+            try {
+                val logoPattern = Regex(""""logo"\s*:\s*"([^"]+)""")
+                val match = logoPattern.find(jsonContent)
+                if (match != null) {
+                    val logoUrl = match.groupValues[1]
+                    if (logoUrl.isNotEmpty()) {
+                        return fixLogoUrl(logoUrl)
+                    }
+                }
+            } catch (e: Exception) {
+                // Continue to next method if parsing fails
+            }
+        }
+
+        // Method 3: Look for logo in image tags with specific classes or attributes
+        val logoImages = document.select("img[src*='logo'], img[alt*='${channelName}'], img[class*='logo'], img[class*='channel']")
+        for (img in logoImages) {
+            val src = img.attr("src")
+            if (src.isNotEmpty() && (src.contains("logo", ignoreCase = true) || src.contains(channelName, ignoreCase = true))) {
+                return fixLogoUrl(src)
+            }
+        }
+
+        // Method 4: Look for logo in header or specific sections
+        val headerLogo = document.selectFirst("header img, .header img, .logo img, .channel-logo img")?.attr("src")
+        if (!headerLogo.isNullOrEmpty()) {
+            return fixLogoUrl(headerLogo)
+        }
+
+        // Method 5: Look for any image that might be a logo based on common patterns
+        val allImages = document.select("img")
+        for (img in allImages) {
+            val src = img.attr("src")
+            val alt = img.attr("alt")
+            val srcLower = src.toLowerCase()
+            
+            // Check if this looks like a logo based on common patterns
+            if (src.isNotEmpty() && (
+                srcLower.contains("logo") ||
+                srcLower.contains("channel") ||
+                srcLower.contains("trt") ||
+                alt.contains(channelName, ignoreCase = true) ||
+                srcLower.contains(channelName.toLowerCase().replace(" ", ""))
+            )) {
+                return fixLogoUrl(src)
+            }
+        }
+
+        // Method 6: Look for logo in CSS background images
+        val elementsWithBackground = document.select("[style*='background-image']")
+        for (element in elementsWithBackground) {
+            val style = element.attr("style")
+            val bgPattern = Regex("""background-image\s*:\s*url\(['"]?([^'")]+)['"]?\)""")
+            val match = bgPattern.find(style)
+            if (match != null) {
+                val bgUrl = match.groupValues[1]
+                if (bgUrl.contains("logo", ignoreCase = true) || bgUrl.contains("trt", ignoreCase = true)) {
+                    return fixLogoUrl(bgUrl)
+                }
+            }
+        }
+
+        // Fallback: Use default TRT logo if nothing found
+        return "https://www.tabii.com/static/images/trt-logo.png"
+    }
+
+    private fun fixLogoUrl(url: String): String {
+        var fixedUrl = url
+        // Ensure the URL is absolute
+        if (fixedUrl.startsWith("//")) {
+            fixedUrl = "https:$fixedUrl"
+        } else if (fixedUrl.startsWith("/")) {
+            fixedUrl = "$tabiiUrl$fixedUrl"
+        }
+        
+        // Remove any query parameters that might affect image quality
+        fixedUrl = fixedUrl.substringBefore("?")
+        
+        // Ensure we're getting a good quality version
+        if (fixedUrl.contains("w=") || fixedUrl.contains("width=")) {
+            // Replace with higher quality parameters if possible
+            fixedUrl = fixedUrl.replace(Regex("w=\\d+"), "w=400")
+                .replace(Regex("width=\\d+"), "width=400")
+                .replace(Regex("h=\\d+"), "h=400")
+                .replace(Regex("height=\\d+"), "height=400")
+        }
+        
+        return fixedUrl
+    }
+
+    private fun generateQualityVariants(baseUrl: String): List<String> {
+        val variants = mutableListOf(baseUrl)
+        
+        try {
+            // If it's a TRT stream, generate quality variants
+            if (baseUrl.contains("trt.com.tr")) {
+                val basePath = baseUrl.substringBeforeLast("_")
+                val qualities = listOf("360", "480", "720", "1080", "1440")
+                
+                qualities.forEach { quality ->
+                    val variantUrl = "${basePath}_${quality}.m3u8"
+                    variants.add(variantUrl)
+                }
+            }
+        } catch (e: Exception) {
+            // If variant generation fails, just use the base URL
+            println("DEBUG: Error generating quality variants: ${e.message}")
+        }
+        
+        return variants.distinct()
+    }
+
+    private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<TrtSeries> {
+        val url = if (page == 1) {
+            "$trt1Url/diziler?archive=$archive&order=title_asc"
+        } else {
+            "$trt1Url/diziler/$page?archive=$archive&order=title_asc"
+        }
+        
+        println("DEBUG: Fetching series from: $url")
         val document = app.get(url).document
         
-        return document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
+        val series = document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
             val title = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
             val href = element.attr("href")
             var posterUrl = element.selectFirst("img")?.attr("src")
@@ -264,11 +298,14 @@ override val hasMainPage = true
                 posterUrl = posterUrl
             )
         }
+        
+        println("DEBUG: Found ${series.size} series on page $page")
+        return series
     }
 
     private fun fixPosterUrlHorizontal(url: String?): String? {
-        return url?.replace("webp/w800/h450", "webp/w600/h338") // 16:9 aspect ratio
-            ?.replace("webp/w400/h600", "webp/w600/h338") // Change vertical to horizontal
+        return url?.replace("webp/w800/h450", "webp/w600/h338")
+            ?.replace("webp/w400/h600", "webp/w600/h338")
             ?.replace("/q75/", "/q85/")
             ?.replace("w800/h450", "w600/h338")
             ?.replace("w400/h600", "w600/h338")
@@ -285,60 +322,75 @@ override val hasMainPage = true
         val items = when (request.data) {
             "live" -> {
                 val channels = getTabiiChannels()
-                println("DEBUG: MainPage - Found ${channels.size} live channels")
+                println("DEBUG: MainPage Live - Found ${channels.size} channels")
                 channels.map { channel ->
                     val mainStream = channel.streamUrls.firstOrNull() ?: ""
                     newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
                         this.posterUrl = channel.logoUrl
-                       // this.plot = channel.description
+                        this.plot = channel.description
                     }
                 }
             }
             "series" -> {
-                val series = getTrtSeries(false)
-                series.map { series ->
-                    newTvSeriesSearchResponse(series.title, series.url) {
-                        this.posterUrl = series.posterUrl
-                       // this.plot = series.description
+                getTrtSeries(archive = false, page = page)
+                    .map { series ->
+                        newTvSeriesSearchResponse(series.title, series.url) {
+                            this.posterUrl = series.posterUrl
+                            this.plot = series.description
+                        }
                     }
-                }
             }
             "archive" -> {
-                val series = getTrtSeries(true)
-                series.map { series ->
-                    newTvSeriesSearchResponse(series.title, series.url) {
-                        this.posterUrl = series.posterUrl
-                       // this.plot = series.description
+                getTrtSeries(archive = true, page = page)
+                    .map { series ->
+                        newTvSeriesSearchResponse(series.title, series.url) {
+                            this.posterUrl = series.posterUrl
+                            this.plot = series.description
+                        }
                     }
-                }
             }
             else -> emptyList()
         }
 
-        println("DEBUG: MainPage - ${request.name} has ${items.size} items")
+        println("DEBUG: MainPage - ${request.name} page $page has ${items.size} items")
+
+        // Check if there are more pages (for series only)
+        val hasNext = when (request.data) {
+            "series", "archive" -> {
+                // For now, we'll assume there are more pages if we found items
+                // In a real implementation, you'd check for pagination elements
+                items.isNotEmpty()
+            }
+            else -> false
+        }
 
         return newHomePageResponse(
             listOf(
                 HomePageList(
                     name = request.name,
                     list = items,
-                    isHorizontalImages = true // Force horizontal layout
+                    isHorizontalImages = true,
+                    nextPage = if (hasNext) page + 1 else null
                 )
-            )
+            ),
+            hasNext = hasNext
         )
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // Check if it's a live channel
-        val tabiiChannels = getTabiiChannels()
-        val liveChannel = tabiiChannels.find { channel ->
-            channel.streamUrls.contains(url) || url.contains(channel.name, ignoreCase = true)
-        }
+        // Check if it's a live channel URL
+        if (url.contains("m3u8") || trtChannels.any { url.contains(it.second, ignoreCase = true) }) {
+            // Find the channel that matches this URL
+            val channels = getTabiiChannels()
+            val liveChannel = channels.find { channel ->
+                channel.streamUrls.contains(url) || url.contains(channel.name, ignoreCase = true)
+            }
 
-        if (liveChannel != null) {
-            return newMovieLoadResponse(liveChannel.name, url, TvType.Live, url) {
-                this.posterUrl = liveChannel.logoUrl
-                this.plot = "${liveChannel.name} canlı yayın"
+            if (liveChannel != null) {
+                return newMovieLoadResponse(liveChannel.name, url, TvType.Live, url) {
+                    this.posterUrl = liveChannel.logoUrl
+                    this.plot = liveChannel.description
+                }
             }
         }
 
@@ -353,53 +405,61 @@ override val hasMainPage = true
         
         val episodes = mutableListOf<Episode>()
         
-        // Get episodes from the bolum page
-        val seriesSlug = url.removePrefix("$trt1Url/diziler/")
-        val episodesUrl = "$trt1Url/diziler/$seriesSlug/bolum"
+        // Get episodes from the bolum page with pagination
+        val seriesSlug = url.removePrefix("$trt1Url/diziler/").substringBefore("?")
+        var currentPage = 1
+        var hasMoreEpisodes = true
         
-        // Parse episodes
-        suspend fun parseEpisodesPage(pageUrl: String): List<Episode> {
-            val episodeDoc = app.get(pageUrl).document
-            return episodeDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
-                val epTitle = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
-                val epHref = element.attr("href")
-                var epPoster = element.selectFirst("img")?.attr("src")
-                val epDescription = element.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
-                
-                epPoster = fixPosterUrlHorizontal(epPoster)
-                
-                val episodeNumber = epTitle.replace(Regex("[^0-9]"), "").toIntOrNull()
-                
-                newEpisode(fixTrtUrl(epHref)) {
-                    this.name = epTitle
-                    this.posterUrl = epPoster
-                    this.episode = episodeNumber
-                    this.description = epDescription
+        while (hasMoreEpisodes && currentPage <= 50) { // Safety limit
+            try {
+                val episodesUrl = if (currentPage == 1) {
+                    "$trt1Url/diziler/$seriesSlug/bolum"
+                } else {
+                    "$trt1Url/diziler/$seriesSlug/bolum/$currentPage"
                 }
-            }
-        }
-
-        // Get first page episodes
-        try {
-            episodes.addAll(parseEpisodesPage(episodesUrl))
-        } catch (e: Exception) {
-            // Alternative episode structure
-            val alternativeEpisodes = document.select("a[href*='/bolum/']").mapNotNull { element ->
-                val epHref = element.attr("href")
-                if (epHref.contains("/bolum/") && !epHref.contains("/bolum/1")) {
-                    val epTitle = element.selectFirst("div, span, h3")?.text()?.trim() ?: "Bölüm"
-                    val epPoster = element.selectFirst("img")?.attr("src")?.let { fixPosterUrlHorizontal(it) }
+                
+                println("DEBUG: Loading episodes from: $episodesUrl")
+                val episodeDoc = app.get(episodesUrl).document
+                
+                val pageEpisodes = episodeDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a").mapNotNull { element ->
+                    val epTitle = element.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
+                    val epHref = element.attr("href")
+                    var epPoster = element.selectFirst("img")?.attr("src")
+                    val epDescription = element.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
+                    
+                    epPoster = fixPosterUrlHorizontal(epPoster)
+                    
+                    val episodeNumber = epTitle.replace(Regex("[^0-9]"), "").toIntOrNull() ?: currentPage
                     
                     newEpisode(fixTrtUrl(epHref)) {
                         this.name = epTitle
                         this.posterUrl = epPoster
+                        this.episode = episodeNumber
+                        this.description = epDescription
                     }
-                } else {
-                    null
                 }
+                
+                if (pageEpisodes.isNotEmpty()) {
+                    episodes.addAll(pageEpisodes)
+                    currentPage++
+                    // Add small delay to avoid rate limiting
+                    kotlinx.coroutines.delay(100)
+                } else {
+                    hasMoreEpisodes = false
+                }
+                
+                // Safety check: don't load too many pages if there are many episodes
+                if (episodes.size > 200) {
+                    hasMoreEpisodes = false
+                }
+                
+            } catch (e: Exception) {
+                println("DEBUG: Error loading episode page $currentPage: ${e.message}")
+                hasMoreEpisodes = false
             }
-            episodes.addAll(alternativeEpisodes)
         }
+
+        println("DEBUG: Loaded ${episodes.size} episodes for series: $title")
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
@@ -414,41 +474,17 @@ override val hasMainPage = true
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         // Check if it's a live stream URL
-        val tabiiChannels = getTabiiChannels()
-        val liveChannel = tabiiChannels.find { channel ->
-            channel.streamUrls.contains(data)
-        }
-
-        if (liveChannel != null) {
-            // Handle live stream with multiple quality options
-            liveChannel.streamUrls.forEach { streamUrl ->
-                // Only add valid URLs
-                if (streamUrl.isNotEmpty() && streamUrl.startsWith("http")) {
-                    val quality = when {
-                        streamUrl.contains("1440") -> Qualities.P1440.value
-                        streamUrl.contains("1080") -> Qualities.P1080.value
-                        streamUrl.contains("720") -> Qualities.P720.value
-                        streamUrl.contains("480") -> Qualities.P480.value
-                        streamUrl.contains("360") -> Qualities.P360.value
-                        else -> Qualities.Unknown.value
-                    }
-
-                    callback(
-                        newExtractorLink(
-                            name = "${liveChannel.name} ${getQualityName(quality)}",
-                            source = name,
-                            url = streamUrl
-                        ) {
-                            this.referer = tabiiUrl
-                            this.quality = quality
-                            this.headers = mapOf(
-                                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                                "Referer" to tabiiUrl
-                            )
-                        }
-                    )
-                }
-            }
+        if (data.contains("m3u8")) {
+            // For m3u8 streams, use M3u8Helper to get all quality variants
+            M3u8Helper.generateM3u8(
+                name,
+                data,
+                "$tabiiUrl/",
+                headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer" to tabiiUrl
+                )
+            ).forEach(callback)
             return true
         }
 
@@ -456,7 +492,7 @@ override val hasMainPage = true
         val document = app.get(data).document
         
         // Look for m3u8 streams
-        val m3u8Url = findM3u8Url(document)
+        val m3u8Url = findM3u8UrlInTabii(document)
         if (m3u8Url != null) {
             M3u8Helper.generateM3u8(
                 name,
@@ -474,27 +510,6 @@ override val hasMainPage = true
         }
 
         return false
-    }
-
-    private fun findM3u8Url(document: org.jsoup.nodes.Document): String? {
-        val scripts = document.select("script")
-        for (script in scripts) {
-            val scriptContent = script.html()
-            
-            val patterns = listOf(
-                Regex(""""mediaSrc"\s*:\s*\[\s*\{[^}]*"url"\s*:\s*"([^"]+\.m3u8[^"]*)"""),
-                Regex(""""media"\s*:\s*\{[^}]*"src"\s*:\s*"([^"]+\.m3u8[^"]*)"""),
-                Regex("""https://[^"\s]+\.m3u8[^"\s]*""")
-            )
-            
-            patterns.forEach { pattern ->
-                val match = pattern.find(scriptContent)
-                if (match != null && (match.value.contains("trt.com.tr") || match.groupValues.getOrNull(1)?.contains("trt.com.tr") == true)) {
-                    return match.groupValues.getOrNull(1) ?: match.value
-                }
-            }
-        }
-        return null
     }
 
     private fun findYouTubeUrl(document: org.jsoup.nodes.Document): String? {
@@ -567,17 +582,6 @@ override val hasMainPage = true
         }
 
         return true
-    }
-
-    private fun getQualityName(quality: Int): String {
-        return when (quality) {
-            Qualities.P480.value -> "480p"
-            Qualities.P360.value -> "360p"
-            Qualities.P720.value -> "720p"
-            Qualities.P1080.value -> "1080p"
-            Qualities.P1440.value -> "1440p"
-            else -> "Unknown"
-        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
