@@ -17,7 +17,7 @@ class Trt : MainAPI() {
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
-    private val dummyLiveUrl = tabiiUrl  // https://www.tabii.com/tr
+    private val dummyLiveUrl = tabiiUrl  // "https://www.tabii.com/tr"
 
     private val channelCache = ConcurrentHashMap<String, List<TabiiChannel>>()
 
@@ -36,7 +36,7 @@ class Trt : MainAPI() {
     )
 
     /* ---------------------------------------------------------
-       1. Get channel list – BLOCK BODY + proper try/catch
+       1. Get channel list – BLOCK BODY
        --------------------------------------------------------- */
     private suspend fun getAllLiveChannels(): List<Pair<String, String>> {
         try {
@@ -67,7 +67,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       2. Scrape channels
+       2. Scrape per channel
        --------------------------------------------------------- */
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
         channelCache["live"]?.let { return it }
@@ -106,9 +106,7 @@ class Trt : MainAPI() {
                     result += TabiiChannel(name, slug, stream, logo, "$name canlı yayın")
                 }
                 delay(120)
-            } catch (e: Exception) {
-                // skip
-            }
+            } catch (e: Exception) { /* skip */ }
         }
 
         if (result.isNotEmpty()) channelCache["live"] = result
@@ -132,17 +130,17 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       4. Series list – BLOCK BODY + proper try/catch
+       4. Series list
        --------------------------------------------------------- */
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
-        try {
+        return try {
             val url = if (page == 1) {
                 "$trt1Url/diziler?archive=$archive&order=title_asc"
             } else {
                 "$trt1Url/diziler/$page?archive=$archive&order=title_asc"
             }
 
-            return app.get(url, timeout = 15).document
+            app.get(url, timeout = 15).document
                 .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
                 .mapNotNull { el ->
                     val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
@@ -157,12 +155,11 @@ class Trt : MainAPI() {
                     }
                 }
         } catch (e: Exception) {
-            return emptyList()
+            emptyList()
         }
     }
 
-    private fun fixTrtUrl(url: String): String =
-        if (url.startsWith("http")) url else "$trt1Url$url"
+    private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     /* ---------------------------------------------------------
        5. Main page
@@ -192,10 +189,9 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       6. Load – intercept dummy URL
+       6. Load
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
-        // LIVE SERIES
         if (url == dummyLiveUrl) {
             val channels = getTabiiChannels()
             return if (channels.isEmpty()) {
@@ -215,14 +211,12 @@ class Trt : MainAPI() {
             }
         }
 
-        // Direct m3u8
         if (url.contains(".m3u8", ignoreCase = true)) {
             return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
                 this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
             }
         }
 
-        // Normal series – FULL try/catch
         try {
             val doc = app.get(url, timeout = 15).document
             val title = doc.selectFirst("h1")?.text()?.trim()
@@ -269,9 +263,7 @@ class Trt : MainAPI() {
                         pageNum++
                         delay(100)
                     } else more = false
-                } catch (e: Exception) {
-                    more = false
-                }
+                } catch (e: Exception) { more = false }
             }
 
             return newTvSeriesLoadResponse(
@@ -288,7 +280,6 @@ class Trt : MainAPI() {
         }
     }
 
-    // LOCAL FUNCTION – NO override
     private suspend fun buildLiveResponse(channels: List<TabiiChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
@@ -350,7 +341,7 @@ class Trt : MainAPI() {
                         referer = trt1Url,
                         headers = mapOf("Referer" to trt1Url)
                     ).forEach(callback)
-                )
+                }
                 return true
             }
 
