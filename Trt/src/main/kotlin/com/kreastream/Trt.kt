@@ -330,7 +330,6 @@ class Trt : MainAPI() {
                     val mainStream = channel.streamUrls.firstOrNull() ?: ""
                     newMovieSearchResponse(channel.name, mainStream, TvType.Live) {
                         this.posterUrl = channel.logoUrl
-                        this.plot = channel.description
                     }
                 }
             }
@@ -339,7 +338,6 @@ class Trt : MainAPI() {
                     .map { series ->
                         newTvSeriesSearchResponse(series.title, series.url) {
                             this.posterUrl = series.posterUrl
-                            this.plot = series.description
                         }
                     }
             }
@@ -348,7 +346,6 @@ class Trt : MainAPI() {
                     .map { series ->
                         newTvSeriesSearchResponse(series.title, series.url) {
                             this.posterUrl = series.posterUrl
-                            this.plot = series.description
                         }
                     }
             }
@@ -357,11 +354,8 @@ class Trt : MainAPI() {
 
         println("DEBUG: MainPage - ${request.name} page $page has ${items.size} items")
 
-        // Check if there are more pages (for series only)
         val hasNext = when (request.data) {
             "series", "archive" -> {
-                // For now, we'll assume there are more pages if we found items
-                // In a real implementation, you'd check for pagination elements
                 items.isNotEmpty()
             }
             else -> false
@@ -372,8 +366,7 @@ class Trt : MainAPI() {
                 HomePageList(
                     name = request.name,
                     list = items,
-                    isHorizontalImages = true,
-                    nextPage = if (hasNext) page + 1 else null
+                    isHorizontalImages = true
                 )
             ),
             hasNext = hasNext
