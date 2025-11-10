@@ -17,7 +17,7 @@ class Trt : MainAPI() {
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
-    private val dummyLiveUrl = tabiiUrl  // "https://www.tabii.com/tr"
+    private val dummyLiveUrl = tabiiUrl
 
     private val channelCache = ConcurrentHashMap<String, List<TabiiChannel>>()
 
@@ -36,7 +36,7 @@ class Trt : MainAPI() {
     )
 
     /* ---------------------------------------------------------
-       1. Get channel list – BLOCK BODY
+       1. Get channel list
        --------------------------------------------------------- */
     private suspend fun getAllLiveChannels(): List<Pair<String, String>> {
         return try {
@@ -67,7 +67,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       2. Scrape per channel
+       2. Scrape channels
        --------------------------------------------------------- */
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
         channelCache["live"]?.let { return it }
@@ -130,7 +130,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       4. Series list – BLOCK BODY
+       4. Series list
        --------------------------------------------------------- */
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
@@ -190,10 +190,10 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       6. Load – intercept homepage
+       6. Load – intercept dummy URL
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
-        // LIVE SERIES
+        // LIVE
         if (url == dummyLiveUrl) {
             val channels = getTabiiChannels()
             return if (channels.isEmpty()) {
@@ -220,7 +220,7 @@ class Trt : MainAPI() {
             }
         }
 
-        // Normal series – FULL try-catch
+        // Series – FULL try-catch
         return try {
             val doc = app.get(url, timeout = 15).document
             val title = doc.selectFirst("h1")?.text()?.trim()
@@ -284,7 +284,7 @@ class Trt : MainAPI() {
         }
     }
 
-    // LOCAL SUSPEND FUNCTION – NO override
+    // LOCAL FUNCTION – NO override
     private suspend fun buildLiveResponse(channels: List<TabiiChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
