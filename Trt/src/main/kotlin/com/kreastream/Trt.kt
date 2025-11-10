@@ -2,7 +2,7 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import kotlinx.coroutines.delay
 
 class Trt : MainAPI() {
@@ -13,12 +13,12 @@ class Trt : MainAPI() {
     override var hasMainPage = true
 
     private val tabiiUrl = "https://www.tabii.com/tr"
-    private val trt1Url = "https://www.trt1.com.tr"
-    private val liveBaseUrl = "$tabiiUrl/watch/live"
+    private val trt1Url   = "https://www.trt1.com.tr"
+    private val liveBase  = "$tabiiUrl/watch/live"
 
     override val mainPage = mainPageOf(
-        "live" to "TRT Canlı",
-        "series" to "Güncel Diziler",
+        "live"    to "TRT Canlı",
+        "series"  to "Güncel Diziler",
         "archive" to "Eski Diziler"
     )
 
@@ -30,40 +30,36 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
-    /* -------------------------------------------------------------
-       1. Dynamically read the full channel list from the JSON block
-       ------------------------------------------------------------- */
-    private suspend fun getAllLiveChannels(): List<Pair<String, String>> {
-        return try {
-            val sample = "$liveBaseUrl/trt1?trackId=150002"
-            val doc = app.get(sample).document
-            val script = doc.select("script")
-                .find { it.html().contains("windowObject") && it.html().contains("channels") }
-                ?.html() ?: return emptyList()
+    /* ---------------------------------------------------------
+       1. Get channel list (name + slug) from JSON on any live page
+       --------------------------------------------------------- */
+    private suspend fun getAllLiveChannels(): List<Pair<String, String>> = try {
+        val sample = "$liveBase/trt1?trackId=150002"
+        val doc = app.get(sample).document
+        val script = doc.select("script")
+            .find { it.html().contains("windowObject") && it.html().contains("channels") }
+            ?.html() ?: return emptyList()
 
-            val json = Regex("""["']channels["']\s*:\s*\[(.*?)\]""").find(script)
-                ?.groupValues?.get(1) ?: return emptyList()
+        val json = Regex("""["']channels["']\s*:\s*\[(.*?)\]""")
+            .find(script)?.groupValues?.get(1) ?: return emptyList()
 
-            Regex("""\{"name":"([^"]+)","slug":"([^"]+)""").findAll(json)
-                .map { it.groupValues[1] to it.groupValues[2] }
-                .toList()
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
+        Regex("""\{"name":"([^"]+)","slug":"([^"]+)""")
+            .findAll(json)
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toList()
+    } catch (e: Exception) { emptyList() }
 
-    /* -------------------------------------------------------------
-       2. For every channel scrape logo + m3u8 from its own page
-       ------------------------------------------------------------- */
+    /* ---------------------------------------------------------
+       2. For each channel fetch logo + m3u8 from its own page
+       --------------------------------------------------------- */
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
         val pairs = getAllLiveChannels()
         if (pairs.isEmpty()) return emptyList()
 
         val result = mutableListOf<TabiiChannel>()
-
         for ((name, slug) in pairs) {
             try {
-                val url = "$liveBaseUrl/$slug?trackId=150002"
+                val url = "$liveBase/$slug?trackId=150002"
                 val doc = app.get(url).document
 
                 // logo
@@ -89,35 +85,31 @@ class Trt : MainAPI() {
                         description = "$name canlı yayın"
                     )
                 }
-
-                delay(150)               // be nice to the server
-            } catch (e: Exception) {
-                // skip broken channel
-            }
+                delay(150)
+            } catch (e: Exception) { /* skip */ }
         }
         return result
     }
 
-    /* -------------------------------------------------------------
+    /* ---------------------------------------------------------
        3. Quality variants (master → _360, _480, _720, _1080)
-       ------------------------------------------------------------- */
+       --------------------------------------------------------- */
     private fun generateQualityVariants(base: String): List<String> {
         val list = mutableListOf(base)
         try {
             if (base.contains("medya.trt.com.tr")) {
-                // example: https://tv-trt1.medya.trt.com.tr/master.m3u8
                 val prefix = base.substringBeforeLast("/").removeSuffix("_master")
                 listOf("360", "480", "720", "1080").forEach { q ->
-                    list += "$prefix" + "_" + "$q.m3u8"
+                    list += "$prefix_$q.m3u8"
                 }
             }
         } catch (_: Exception) {}
         return list.distinct()
     }
 
-    /* -------------------------------------------------------------
+    /* ---------------------------------------------------------
        4. Series list (current / archive)
-       ------------------------------------------------------------- */
+       --------------------------------------------------------- */
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         val url = if (page == 1) {
             "$trt1Url/diziler?archive=$archive&order=title_asc"
@@ -144,22 +136,22 @@ class Trt : MainAPI() {
     private fun fixTrtUrl(url: String): String =
         if (url.startsWith("http")) url else "$trt1Url$url"
 
-    /* -------------------------------------------------------------
-       5. Main page – only ONE live entry
-       ------------------------------------------------------------- */
+    /* ---------------------------------------------------------
+       5. Main page – ONE live entry
+       --------------------------------------------------------- */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
                     name = "TRT Canlı",
-                    url = "trt://live",
+                    url = "trt://live",           // <-- dummy URL, no mainUrl prefix
                     type = TvType.TvSeries
                 ) {
                     this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
                 }
             )
-            "series" -> getTrtSeries(archive = false, page = page)
-            "archive" -> getTrtSeries(archive = true, page = page)
+            "series"  -> getTrtSeries(archive = false, page = page)
+            "archive" -> getTrtSeries(archive = true,  page = page)
             else -> emptyList()
         }
 
@@ -171,12 +163,12 @@ class Trt : MainAPI() {
         )
     }
 
-    /* -------------------------------------------------------------
-       6. Load – turn the dummy URL into a TvSeries of episodes
-       ------------------------------------------------------------- */
+    /* ---------------------------------------------------------
+       6. Load – dummy series → list of live-channel episodes
+       --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
         // ---- LIVE “series” -------------------------------------------------
-        if (url == "trt://live") {
+        if (url == "trt://live") {                 // <-- exact match, no prefix
             val channels = getTabiiChannels()
             val episodes = channels.mapIndexed { i, ch ->
                 newEpisode(ch.streamUrl) {
@@ -254,12 +246,8 @@ class Trt : MainAPI() {
                     episodes += pageEps
                     pageNum++
                     delay(100)
-                } else {
-                    more = false
-                }
-            } catch (e: Exception) {
-                more = false
-            }
+                } else more = false
+            } catch (e: Exception) { more = false }
         }
 
         return newTvSeriesLoadResponse(
@@ -273,9 +261,9 @@ class Trt : MainAPI() {
         }
     }
 
-    /* -------------------------------------------------------------
+    /* ---------------------------------------------------------
        7. Load links – m3u8 (with variants) or YouTube
-       ------------------------------------------------------------- */
+       --------------------------------------------------------- */
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -298,7 +286,7 @@ class Trt : MainAPI() {
             return true
         }
 
-        // episode page → look for playerConfig
+        // episode page → playerConfig
         val doc = app.get(data).document
         val script = doc.select("script")
             .find { it.html().contains("playerConfig") }
@@ -336,9 +324,9 @@ class Trt : MainAPI() {
         return false
     }
 
-    /* -------------------------------------------------------------
+    /* ---------------------------------------------------------
        8. Search – live channels + series
-       ------------------------------------------------------------- */
+       --------------------------------------------------------- */
     override suspend fun search(query: String): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
 
