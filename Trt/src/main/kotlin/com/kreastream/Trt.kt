@@ -16,8 +16,8 @@ class Trt : MainAPI() {
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
-    // Dummy URL that CloudStream will request – it **must** be a real page
-    private val dummyLiveUrl = "$tabiiUrl/live"
+    // Internal dummy URL – CloudStream will NEVER request it
+    private val dummyLiveUrl = "internal://trt-live"
 
     override val mainPage = mainPageOf(
         "live"    to "TRT Canlı",
@@ -34,7 +34,7 @@ class Trt : MainAPI() {
     )
 
     /* ---------------------------------------------------------
-       1. Get channel list (name + slug) from JSON on any live page
+       1. Get channel list from JSON on any live page
        --------------------------------------------------------- */
     private suspend fun getAllLiveChannels(): List<Pair<String, String>> = try {
         val sample = "$liveBase/trt1?trackId=150002"
@@ -53,7 +53,7 @@ class Trt : MainAPI() {
     } catch (e: Exception) { emptyList() }
 
     /* ---------------------------------------------------------
-       2. For each channel fetch logo + m3u8 from its own page
+       2. Scrape logo + m3u8 per channel
        --------------------------------------------------------- */
     private suspend fun getTabiiChannels(): List<TabiiChannel> {
         val pairs = getAllLiveChannels()
@@ -65,12 +65,10 @@ class Trt : MainAPI() {
                 val url = "$liveBase/$slug?trackId=150002"
                 val doc = app.get(url).document
 
-                // logo
                 val logo = doc.selectFirst("img.channel-logo")?.absUrl("src")
                     ?: doc.selectFirst("img[alt*='$name']")?.absUrl("src")
                     ?: ""
 
-                // stream
                 val script = doc.select("script")
                     .find { it.html().contains("playerConfig") }
                     ?.html()
@@ -140,17 +138,17 @@ class Trt : MainAPI() {
         if (url.startsWith("http")) url else "$trt1Url$url"
 
     /* ---------------------------------------------------------
-       5. Main page – ONE live entry (real URL)
+       5. Main page – use internal dummy URL
        --------------------------------------------------------- */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
                     name = "TRT Canlı",
-                    url = dummyLiveUrl,           // <-- real page, CloudStream will request it
+                    url = dummyLiveUrl,           // internal://trt-live → never requested
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
@@ -167,12 +165,16 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       6. Load – intercept the dummy URL, skip HTML request
+       6. Load – intercept internal URL, build episodes in-memory
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
-        // ---- LIVE “series” (our dummy page) ----
+        // LIVE SERIES – internal URL
         if (url == dummyLiveUrl) {
             val channels = getTabiiChannels()
+            if (channels.isEmpty()) {
+                throw ErrorLoadingException("Canlı yayınlar yüklenemedi. Lütfen tekrar deneyin.")
+            }
+
             val episodes = channels.mapIndexed { i, ch ->
                 newEpisode(ch.streamUrl) {
                     name = ch.name
@@ -189,25 +191,25 @@ class Trt : MainAPI() {
                 type = TvType.TvSeries,
                 episodes = episodes
             ) {
-                this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                 this.plot = "Tüm TRT kanalları canlı yayın – Tabii"
             }
         }
 
-        // ---- Direct m3u8 fallback ----
+        // Direct m3u8 fallback
         if (url.contains(".m3u8", ignoreCase = true)) {
             val chanName = getAllLiveChannels()
                 .find { url.contains(it.second, true) }?.first
                 ?: "TRT Canlı"
             return newMovieLoadResponse(chanName, url, TvType.Live, url) {
-                this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
             }
         }
 
-        // ---- Normal TV-Series / Episode page ----
+        // Normal series/episode page
         val doc = app.get(url).document
         val title = doc.selectFirst("h1")?.text()?.trim()
-            ?: throw ErrorLoadingException("Title not found")
+            ?: throw ErrorLoadingException("Başlık bulunamadı")
         val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
         var poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
         poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
