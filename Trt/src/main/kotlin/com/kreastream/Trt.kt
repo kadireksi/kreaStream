@@ -2,6 +2,8 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import org.json.JSONArray
+import org.json.JSONObject
 import org.jsoup.nodes.Document
 import kotlinx.coroutines.delay
 import java.util.concurrent.ConcurrentHashMap
@@ -36,77 +38,57 @@ class Trt : MainAPI() {
     )
 
     /* ---------------------------------------------------------
-       1. Get channel list – BLOCK BODY
+       Get all channels from JSON in __NEXT_DATA__
        --------------------------------------------------------- */
-    private suspend fun getAllLiveChannels(): List<Pair<String, String>> {
+    private suspend fun getTabiiChannels(): List<TabiiChannel> {
+        channelCache["live"]?.let { return it }
+
+        val result = mutableListOf<TabiiChannel>()
         try {
             val sample = "$liveBase/trt1?trackId=150002"
             val response = app.get(sample, timeout = 10)
             if (!response.isSuccessful) return emptyList()
 
             val doc = response.document
-            val script = doc.select("script")
-                .find { it.html().contains("channels") && it.html().contains("slug") }
-                ?: return emptyList()
+            val nextData = doc.selectFirst("#__NEXT_DATA__")?.data() ?: return emptyList()
 
-            val html = script.html()
-            val json = Regex("""channels:\s*\[(.*?)\]""")
-                .find(html)?.groupValues?.get(1)
-                ?: Regex("""["']channels["']\s*:\s*\[(.*?)\]""")
-                    .find(html)?.groupValues?.get(1)
-                ?: return emptyList()
+            val json = JSONObject(nextData)
+            val liveChannels = json.getJSONObject("props").getJSONObject("pageProps").getJSONArray("liveChannels")
 
-            return Regex("""\{"name":"([^"]+)","slug":"([^"]+)""")
-                .findAll(json)
-                .map { it.groupValues[1] to it.groupValues[2] }
-                .toList()
-                .takeIf { it.isNotEmpty() } ?: emptyList()
-        } catch (e: Exception) {
-            return emptyList()
-        }
-    }
+            for (i in 0 until liveChannels.length()) {
+                val ch = liveChannels.getJSONObject(i)
+                val name = ch.getString("title")
+                val slug = ch.getString("slug")
 
-    /* ---------------------------------------------------------
-       2. Scrape per channel
-       --------------------------------------------------------- */
-    private suspend fun getTabiiChannels(): List<TabiiChannel> {
-        channelCache["live"]?.let { return it }
-
-        val pairs = getAllLiveChannels()
-        if (pairs.isEmpty()) return emptyList()
-
-        val result = mutableListOf<TabiiChannel>()
-        for ((name, slug) in pairs) {
-            try {
-                val url = "$liveBase/$slug?trackId=150002"
-                val doc = app.get(url, timeout = 10).document
-
-                var logo = doc.selectFirst("img.channel-logo")?.absUrl("src")
-                    ?: doc.selectFirst("img[alt*='$name']")?.absUrl("src")
-
-                if (logo.isNullOrBlank()) {
-                    logo = when {
-                        name.contains("TRT 1", true) -> "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png"
-                        name.contains("TRT Haber", true) -> "https://upload.wikimedia.org/wikipedia/tr/6/6e/TRT_Haber_logo.png"
-                        name.contains("TRT Spor", true) -> "https://upload.wikimedia.org/wikipedia/tr/8/8f/TRT_Spor_logo.png"
-                        name.contains("TRT Çocuk", true) -> "https://upload.wikimedia.org/wikipedia/tr/7/7e/TRT_%C3%87ocuk_logo.png"
-                        else -> "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                // Logo
+                val images = ch.getJSONArray("images")
+                var logoUrl = ""
+                for (j in 0 until images.length()) {
+                    val img = images.getJSONObject(j)
+                    if (img.getString("imageType") == "logo") {
+                        val imgName = img.getString("name")
+                        logoUrl = "https://cms-tabii-assets.tabii.com/thumbnails/$imgName"
+                        break
                     }
                 }
+                if (logoUrl.isBlank()) continue  // Skip if no logo
 
-                val script = doc.select("script")
-                    .find { it.html().contains("playerConfig") }
-                    ?.html()
-                val stream = script?.let {
-                    Regex("""streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""")
-                        .find(it)?.groupValues?.get(1)
+                // Stream
+                val media = ch.getJSONArray("media")
+                var streamUrl = ""
+                for (j in 0 until media.length()) {
+                    val m = media.getJSONObject(j)
+                    if (m.getString("type") == "hls" && m.getString("drmSchema") == "clear") {
+                        streamUrl = m.getString("url")
+                        break
+                    }
                 }
+                if (streamUrl.isBlank()) continue  // Skip if no clear stream
 
-                if (!stream.isNullOrBlank()) {
-                    result += TabiiChannel(name, slug, stream, logo, "$name canlı yayın")
-                }
-                delay(120)
-            } catch (e: Exception) { /* skip */ }
+                result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name canlı yayın")
+            }
+        } catch (e: Exception) {
+            // Skip error
         }
 
         if (result.isNotEmpty()) channelCache["live"] = result
@@ -189,7 +171,7 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       6. Load
+       6. Load – intercept dummy URL
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
         if (url == dummyLiveUrl) {
@@ -201,7 +183,7 @@ class Trt : MainAPI() {
                             name = "TRT 1",
                             slug = "trt1",
                             streamUrl = "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-                            logoUrl = "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png",
+                            logoUrl = "https://www.trt.net.tr/_nuxt/img/trt-1-televizyon-kanali.4c9c3dd.png",
                             description = "TRT 1 canlı yayın"
                         )
                     )
@@ -297,7 +279,7 @@ class Trt : MainAPI() {
             type = TvType.TvSeries,
             episodes = episodes
         ) {
-            this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+            this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
             this.plot = "Tüm TRT kanalları canlı yayın – Tabii"
         }
     }
