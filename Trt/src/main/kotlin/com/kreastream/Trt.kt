@@ -41,7 +41,9 @@ class Trt : MainAPI() {
     private suspend fun getAllLiveChannels(): List<Pair<String, String>> = try {
         val sample = "$liveBase/trt1?trackId=150002"
         val response = app.get(sample, timeout = 10)
-        if (!response.isSuccessful) return emptyList()
+        if (!response.isSuccessful) {
+            return emptyList()
+        }
 
         val doc = response.document
         val script = doc.select("script")
@@ -86,7 +88,7 @@ class Trt : MainAPI() {
                         name.contains("TRT Haber", true) -> "https://upload.wikimedia.org/wikipedia/tr/6/6e/TRT_Haber_logo.png"
                         name.contains("TRT Spor", true) -> "https://upload.wikimedia.org/wikipedia/tr/8/8f/TRT_Spor_logo.png"
                         name.contains("TRT Çocuk", true) -> "https://upload.wikimedia.org/wikipedia/tr/7/7e/TRT_%C3%87ocuk_logo.png"
-                        else -> "https://www.trt.net.tr/images/trt-logo.png"
+                        else -> "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                     }
                 }
 
