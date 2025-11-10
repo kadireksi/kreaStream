@@ -10,6 +10,7 @@ class Trt : MainAPI() {
     override var name = "TRT"
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
+override val hasMainPage = true
 
     //companion object {
      //   val info = ChannelRegistry.ChannelInfo(
