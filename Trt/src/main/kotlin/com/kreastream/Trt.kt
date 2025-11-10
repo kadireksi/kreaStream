@@ -20,8 +20,8 @@ class Trt : MainAPI() {
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
 
     override val mainPage = mainPageOf(
-        "tv" to "TRT TV",
-        "radio" to "TRT Radyo",
+        "live" to "TRT Canlı Yayınlar",
+        //"radio" to "TRT Radyo",
         "series"  to "Güncel Diziler",
         "archive" to "Eski Diziler"
     )
@@ -162,22 +162,20 @@ class Trt : MainAPI() {
        --------------------------------------------------------- */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
-            "tv" -> listOf(
+            "live" -> listOf(
                 newTvSeriesSearchResponse(
                     name = "TRT TV",
                     url = dummyTvUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
-                }
-            )
-            "radio" -> listOf(
-                newTvSeriesSearchResponse(
+                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                },
+                 newTvSeriesSearchResponse(
                     name = "TRT Radyo",
                     url = dummyRadioUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
