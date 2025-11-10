@@ -1,9 +1,12 @@
 package com.kreastream
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
@@ -196,7 +199,7 @@ class Trt : MainAPI() {
         for (img in allImages) {
             val src = img.attr("src")
             val alt = img.attr("alt")
-            val srcLower = src.toLowerCase()
+            val srcLower = src.lowercase()
             
             // Check if this looks like a logo based on common patterns
             if (src.isNotEmpty() && (
@@ -204,7 +207,7 @@ class Trt : MainAPI() {
                 srcLower.contains("channel") ||
                 srcLower.contains("trt") ||
                 alt.contains(channelName, ignoreCase = true) ||
-                srcLower.contains(channelName.toLowerCase().replace(" ", ""))
+                srcLower.contains(channelName.lowercase().replace(" ", ""))
             )) {
                 return fixLogoUrl(src)
             }
