@@ -100,7 +100,7 @@ class Trt : MainAPI() {
             if (base.contains("medya.trt.com.tr")) {
                 val prefix = base.substringBeforeLast("/").removeSuffix("_master")
                 listOf("360", "480", "720", "1080").forEach { q ->
-                    list += "$prefix_$q.m3u8"
+                    list += "$prefix" + "_" + "$q.m3u8"
                 }
             }
         } catch (_: Exception) {}
