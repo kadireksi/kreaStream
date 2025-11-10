@@ -16,8 +16,8 @@ class Trt : MainAPI() {
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
-    // Internal dummy URL – CloudStream will NEVER request it
-    private val dummyLiveUrl = "internal://trt-live"
+    // Use REAL homepage as dummy – it exists, no 404
+    private val dummyLiveUrl = tabiiUrl  // "https://www.tabii.com/tr"
 
     override val mainPage = mainPageOf(
         "live"    to "TRT Canlı",
@@ -138,17 +138,17 @@ class Trt : MainAPI() {
         if (url.startsWith("http")) url else "$trt1Url$url"
 
     /* ---------------------------------------------------------
-       5. Main page – use internal dummy URL
+       5. Main page – use homepage as dummy URL
        --------------------------------------------------------- */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
                     name = "TRT Canlı",
-                    url = dummyLiveUrl,           // internal://trt-live → never requested
+                    url = dummyLiveUrl,           // https://www.tabii.com/tr
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
@@ -165,14 +165,14 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       6. Load – intercept internal URL, build episodes in-memory
+       6. Load – intercept homepage URL → skip app.get()
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
-        // LIVE SERIES – internal URL
+        // LIVE SERIES – intercept homepage
         if (url == dummyLiveUrl) {
             val channels = getTabiiChannels()
             if (channels.isEmpty()) {
-                throw ErrorLoadingException("Canlı yayınlar yüklenemedi. Lütfen tekrar deneyin.")
+                throw ErrorLoadingException("Canlı yayınlar yüklenemedi.")
             }
 
             val episodes = channels.mapIndexed { i, ch ->
@@ -191,22 +191,22 @@ class Trt : MainAPI() {
                 type = TvType.TvSeries,
                 episodes = episodes
             ) {
-                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
                 this.plot = "Tüm TRT kanalları canlı yayın – Tabii"
             }
         }
 
-        // Direct m3u8 fallback
+        // Direct m3u8
         if (url.contains(".m3u8", ignoreCase = true)) {
             val chanName = getAllLiveChannels()
                 .find { url.contains(it.second, true) }?.first
                 ?: "TRT Canlı"
             return newMovieLoadResponse(chanName, url, TvType.Live, url) {
-                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
             }
         }
 
-        // Normal series/episode page
+        // Normal series page
         val doc = app.get(url).document
         val title = doc.selectFirst("h1")?.text()?.trim()
             ?: throw ErrorLoadingException("Başlık bulunamadı")
@@ -281,10 +281,7 @@ class Trt : MainAPI() {
                     source = name,
                     streamUrl = u,
                     referer = tabiiUrl,
-                    headers = mapOf(
-                        "User-Agent" to "Mozilla/5.0",
-                        "Referer" to tabiiUrl
-                    )
+                    headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
                 ).forEach(callback)
             }
             return true
