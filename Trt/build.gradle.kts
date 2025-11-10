@@ -6,6 +6,6 @@ cloudstream {
     description = "TRT Canlı Yayın ve Diziler"
     status  = 1
     tvTypes = listOf("TvSeries", "Live")
-    iconUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+    iconUrl = "https://cdn-s.pr.trt.com.tr/trt1/icons/svg/trt-logo.svg"
 }
 

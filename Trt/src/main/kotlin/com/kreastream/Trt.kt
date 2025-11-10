@@ -168,14 +168,14 @@ class Trt : MainAPI() {
                     url = dummyTvUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.posterUrl = "https://cdn-s.pr.trt.com.tr/trt1/icons/svg/trt-logo.svg"
                 },
                  newTvSeriesSearchResponse(
                     name = "TRT Radyo",
                     url = dummyRadioUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.posterUrl = "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h480/q70/12467415.jpeg"
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
