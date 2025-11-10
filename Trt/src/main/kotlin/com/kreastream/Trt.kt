@@ -2,11 +2,8 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.json.JSONArray
 import org.json.JSONObject
-import org.jsoup.nodes.Document
 import kotlinx.coroutines.delay
-import java.util.concurrent.ConcurrentHashMap
 
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
@@ -19,12 +16,12 @@ class Trt : MainAPI() {
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
-    private val dummyLiveUrl = tabiiUrl  // "https://www.tabii.com/tr"
-
-    private val channelCache = ConcurrentHashMap<String, List<TabiiChannel>>()
+    private val dummyTvUrl = tabiiUrl
+    private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
 
     override val mainPage = mainPageOf(
-        "live"    to "TRT Canlı",
+        "tv" to "TRT TV",
+        "radio" to "TRT Radyo",
         "series"  to "Güncel Diziler",
         "archive" to "Eski Diziler"
     )
@@ -37,47 +34,39 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
-/* ---------------------------------------------------------
-   Get all channels from JSON in __NEXT_DATA__
-   NOW WITH REAL LOGOS FROM CORRECT CDN
-   --------------------------------------------------------- */
-    private suspend fun getTabiiChannels(): List<TabiiChannel> {
-        channelCache["live"]?.let { return it }
-
+    /* ---------------------------------------------------------
+       Get TV channels from Tabii JSON
+       --------------------------------------------------------- */
+    private suspend fun getTvChannels(): List<TabiiChannel> {
         val result = mutableListOf<TabiiChannel>()
         try {
             val sample = "$liveBase/trt1?trackId=150002"
-            val response = app.get(sample, timeout = 10)
-            if (!response.isSuccessful) return emptyList()
-
+            val response = app.get(sample)
             val doc = response.document
             val nextData = doc.selectFirst("#__NEXT_DATA__")?.data() ?: return emptyList()
 
             val json = JSONObject(nextData)
-            val liveChannels = json.getJSONObject("props")
-                .getJSONObject("pageProps")
-                .getJSONArray("liveChannels")
+            val liveChannels = json.getJSONObject("props").getJSONObject("pageProps").getJSONArray("liveChannels")
 
             for (i in 0 until liveChannels.length()) {
                 val ch = liveChannels.getJSONObject(i)
                 val name = ch.getString("title")
                 val slug = ch.getString("slug")
 
-                // === LOGO: Use correct CDN ===
+                // Logo
                 var logoUrl = ""
                 val images = ch.getJSONArray("images")
                 for (j in 0 until images.length()) {
                     val img = images.getJSONObject(j)
                     if (img.getString("imageType") == "logo") {
                         val imgName = img.getString("name")
-                        // CORRECT URL
                         logoUrl = "https://cms-tabii-public-image.tabii.com/int/$imgName"
                         break
                     }
                 }
                 if (logoUrl.isBlank()) continue
 
-                // === STREAM: Clear HLS only ===
+                // Stream
                 var streamUrl = ""
                 val media = ch.getJSONArray("media")
                 for (j in 0 until media.length()) {
@@ -89,19 +78,34 @@ class Trt : MainAPI() {
                 }
                 if (streamUrl.isBlank()) continue
 
-                result += TabiiChannel(
-                    name = name,
-                    slug = slug,
-                    streamUrl = streamUrl,
-                    logoUrl = logoUrl,
-                    description = "$name canlı yayın"
-                )
+                result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name canlı yayın")
             }
-        } catch (e: Exception) {
-            // Silent fallback
-        }
+        } catch (e: Exception) {}
 
-        if (result.isNotEmpty()) channelCache["live"] = result
+        return result
+    }
+
+    /* ---------------------------------------------------------
+       Get Radio channels from TRT Dinle
+       --------------------------------------------------------- */
+    private suspend fun getRadioChannels(): List<TabiiChannel> {
+        val result = mutableListOf<TabiiChannel>()
+        try {
+            val doc = app.get("https://www.trtdinle.com/radyolar").document
+            val channels = doc.select("div.channel-item") // Adjust if needed, based on class
+
+            for (el in channels) {
+                val a = el.selectFirst("a") ?: continue
+                val slug = a.attr("href").substringAfterLast("/")
+                val name = el.text().trim() // or selectFirst("span.title")?.text()
+                val logo = el.selectFirst("img")?.absUrl("src") ?: continue
+
+                val streamUrl = "https://radio-$slug.medya.trt.com.tr/master.m3u8"
+
+                result += TabiiChannel(name, slug, streamUrl, logo, "$name canlı yayın")
+            }
+        } catch (e: Exception) {}
+
         return result
     }
 
@@ -114,7 +118,7 @@ class Trt : MainAPI() {
             if (base.contains("medya.trt.com.tr")) {
                 val prefix = base.substringBeforeLast("/").removeSuffix("_master")
                 listOf("360", "480", "720", "1080").forEach { q ->
-                    list += "$prefix" + "_$q.m3u8"
+                    list += "$prefix_$q.m3u8"
                 }
             }
         } catch (_: Exception) {}
@@ -158,13 +162,22 @@ class Trt : MainAPI() {
        --------------------------------------------------------- */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
-            "live" -> listOf(
+            "tv" -> listOf(
                 newTvSeriesSearchResponse(
-                    name = "TRT Canlı",
-                    url = dummyLiveUrl,
+                    name = "TRT TV",
+                    url = dummyTvUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+                }
+            )
+            "radio" -> listOf(
+                newTvSeriesSearchResponse(
+                    name = "TRT Radyo",
+                    url = dummyRadioUrl,
+                    type = TvType.TvSeries
+                ) {
+                    this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
@@ -181,11 +194,12 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       6. Load – intercept dummy URL
+       6. Load – intercept dummy URLs for TV and Radio
        --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
-        if (url == dummyLiveUrl) {
-            val channels = getTabiiChannels()
+        // TV
+        if (url == dummyTvUrl) {
+            val channels = getTvChannels()
             return if (channels.isEmpty()) {
                 buildLiveResponse(
                     listOf(
@@ -193,7 +207,7 @@ class Trt : MainAPI() {
                             name = "TRT 1",
                             slug = "trt1",
                             streamUrl = "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-                            logoUrl = "https://www.trt.net.tr/_nuxt/img/trt-1-televizyon-kanali.4c9c3dd.png",
+                            logoUrl = "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png",
                             description = "TRT 1 canlı yayın"
                         )
                     )
@@ -203,12 +217,34 @@ class Trt : MainAPI() {
             }
         }
 
-        if (url.contains(".m3u8", ignoreCase = true)) {
-            return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
-                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+        // Radio
+        if (url == dummyRadioUrl) {
+            val channels = getRadioChannels()
+            return if (channels.isEmpty()) {
+                buildLiveResponse(
+                    listOf(
+                        TabiiChannel(
+                            name = "TRT FM",
+                            slug = "trt-fm",
+                            streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
+                            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/f_channel_b9f3c65ea803a398ff11f759fb5b59bc.jpeg",
+                            description = "TRT FM canlı yayın"
+                        )
+                    )
+                )
+            } else {
+                buildLiveResponse(channels)
             }
         }
 
+        // Direct m3u8
+        if (url.contains(".m3u8", ignoreCase = true)) {
+            return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
+                this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+            }
+        }
+
+        // Series
         try {
             val doc = app.get(url, timeout = 15).document
             val title = doc.selectFirst("h1")?.text()?.trim()
@@ -289,7 +325,7 @@ class Trt : MainAPI() {
             type = TvType.TvSeries,
             episodes = episodes
         ) {
-            this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+            this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
             this.plot = "Tüm TRT kanalları canlı yayın – Tabii"
         }
     }
@@ -359,7 +395,15 @@ class Trt : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
 
-        getTabiiChannels()
+        getTvChannels()
+            .filter { it.name.contains(query, ignoreCase = true) }
+            .forEach { ch ->
+                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                    this.posterUrl = ch.logoUrl
+                }
+            }
+
+        getRadioChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
                 out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
