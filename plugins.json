@@ -1,14 +1,21 @@
 [
     {
+        "iconUrl": "https://trt.net.tr/favicon.ico",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
         "fileSize": 22153,
         "status": 1,
+        "language": "tr",
         "authors": [
             "kreastream"
         ],
+        "tvTypes": [
+            "TvSeries",
+            "Live"
+        ],
         "version": 1,
         "internalName": "Trt",
+        "description": "TRT Canl\u0131 Yay\u0131n ve Diziler",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Trt.cs3",
         "name": "Trt"
     }
