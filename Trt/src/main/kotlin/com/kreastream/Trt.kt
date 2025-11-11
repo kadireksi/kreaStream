@@ -78,7 +78,7 @@ class Trt : MainAPI() {
                 }
                 if (streamUrl.isBlank()) continue
 
-                result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name canlı yayın")
+                result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name")
             }
         } catch (e: Exception) {}
 
@@ -86,26 +86,54 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-       Get Radio channels from TRT Dinle
-       --------------------------------------------------------- */
+    Get Radio channels from __NUXT__ JSON
+    --------------------------------------------------------- */
     private suspend fun getRadioChannels(): List<TabiiChannel> {
         val result = mutableListOf<TabiiChannel>()
         try {
-            val doc = app.get("https://www.trtdinle.com/radyolar").document
-            val channels = doc.select("div.channel-item") // Adjust if needed, based on class
+            val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
+            val html = response.text
 
-            for (el in channels) {
-                val a = el.selectFirst("a") ?: continue
-                val slug = a.attr("href").substringAfterLast("/")
-                val name = el.text().trim() // or selectFirst("span.title")?.text()
-                val logo = el.selectFirst("img")?.absUrl("src") ?: continue
+            // Extract __NUXT__ = (...)
+            val nuxtScript = Regex("""window\.__NUXT__\s*=\s*(\(function\s*\([^)]*\)\s*\{[\s\S]*?\}\))""")
+                .find(html)?.groupValues?.get(1) ?: return emptyList()
 
-                val streamUrl = "https://radio-$slug.medya.trt.com.tr/master.m3u8"
+            // Clean and parse JSON
+            val jsonStr = nuxtScript
+                .removePrefix("(function")
+                .substringAfter("{")
+                .removeSuffix("});")
+                .trim()
 
-                result += TabiiChannel(name, slug, streamUrl, logo, "$name canlı yayın")
+            // This is minified – we need to extract `channels` array
+            val channelsMatch = Regex("""channels:\s*\[([\s\S]*?)\]""").find(jsonStr)
+                ?: return emptyList()
+            val channelsJson = "[" + channelsMatch.groupValues[1] + "]"
+
+            val jsonArray = JSONObject("{\"list\":$channelsJson}").getJSONArray("list")
+
+            for (i in 0 until jsonArray.length()) {
+                val ch = jsonArray.getJSONObject(i)
+                val name = ch.optString("title", "").takeIf { it.isNotBlank() } ?: continue
+                val audio = ch.optString("audio", "").takeIf { it.contains("http") } ?: continue
+                val cover = ch.optString("cover", "").takeIf { it.contains("cdn-i.pr.trt.com.tr") }
+                    ?: continue
+
+                // Extract slug from path
+                val path = ch.optString("path", "")
+                val slug = path.substringAfterLast("/").ifBlank { name.lowercase().replace(" ", "-") }
+
+                result += TabiiChannel(
+                    name = name,
+                    slug = slug,
+                    streamUrl = audio,
+                    logoUrl = cover,
+                    description = "$name - TRT Radyo"
+                )
             }
-        } catch (e: Exception) {}
-
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         return result
     }
 
@@ -206,7 +234,7 @@ class Trt : MainAPI() {
                             slug = "trt1",
                             streamUrl = "https://tv-trt1.medya.trt.com.tr/master.m3u8",
                             logoUrl = "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png",
-                            description = "TRT 1 canlı yayın"
+                            description = "TRT 1"
                         )
                     )
                 )
@@ -226,7 +254,7 @@ class Trt : MainAPI() {
                             slug = "trt-fm",
                             streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
                             logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/f_channel_b9f3c65ea803a398ff11f759fb5b59bc.jpeg",
-                            description = "TRT FM canlı yayın"
+                            description = "TRT FM"
                         )
                     )
                 )
@@ -238,7 +266,7 @@ class Trt : MainAPI() {
         // Direct m3u8
         if (url.contains(".m3u8", ignoreCase = true)) {
             return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
-                this.posterUrl = "https://www.trt.net.tr/images/trt-logo.png"
+                this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             }
         }
 
@@ -323,7 +351,7 @@ class Trt : MainAPI() {
             type = TvType.TvSeries,
             episodes = episodes
         ) {
-            this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             this.plot = "Tüm TRT kanalları canlı yayın – Tabii"
         }
     }
