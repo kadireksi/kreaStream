@@ -85,53 +85,53 @@ class Trt : MainAPI() {
         return result
     }
 
-    /* ---------------------------------------------------------
-    Get Radio channels - Simple string parsing approach
-    --------------------------------------------------------- */
-    private suspend fun getRadioChannels(): List<TabiiChannel> {
-        val result = mutableListOf<TabiiChannel>()
-        try {
-            val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
-            val html = response.text
+private suspend fun getRadioChannels(): List<TabiiChannel> {
+    val result = mutableListOf<TabiiChannel>()
+    try {
+        val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
+        val html = response.text
 
-            // Look for audio URLs directly in the HTML/JSON
-            val audioRegex = Regex(""""audio"\s*:\s*"([^"]+\.m3u8[^"]*)""")
-            val titleRegex = Regex(""""title"\s*:\s*"([^"]+)""")
-            val coverRegex = Regex("""(?:cover|imageUrl|featuredImage)"\s*:\s*"([^"]+)""")
-            
-            val audioMatches = audioRegex.findAll(html).toList()
-            val titleMatches = titleRegex.findAll(html).toList()
-            val coverMatches = coverRegex.findAll(html).toList()
+        // 1. Extract JSON inside window.__NUXT__ = { ... }
+        val nuxtData = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})\s*</script>""", RegexOption.DOT_MATCHES_ALL)
+            .find(html)?.groupValues?.get(1) ?: return emptyList()
 
-            // Create a simple mapping - this is a basic approach
-            for (i in audioMatches.indices) {
-                try {
-                    val audio = audioMatches[i].groupValues[1]
-                    val title = titleMatches.getOrNull(i)?.groupValues?.get(1) ?: "TRT Radyo ${i + 1}"
-                    val cover = coverMatches.getOrNull(i)?.groupValues?.get(1) ?: "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h480/q70/12467415.jpeg"
-                    
-                    // Basic validation
-                    if (audio.contains("medya.trt.com.tr") || audio.contains("trt.radyotvonline.net")) {
-                        result.add(
-                            TabiiChannel(
-                                name = title,
-                                slug = title.lowercase().replace(" ", "-"),
-                                streamUrl = audio,
-                                logoUrl = cover,
-                                description = "$title - TRT Radyo"
-                            )
-                        )
-                    }
-                } catch (e: Exception) {
-                    continue
-                }
+        // 2. Parse JSON
+        val json = JSONObject(nuxtData)
+
+        // 3. Navigate down to the radio list
+        val radios = json.optJSONObject("state")?.optJSONObject("radios")
+            ?: json.optJSONObject("data")?.optJSONArray("radyolar")
+            ?: json.optJSONObject("radyolar")?.optJSONArray("list")
+            ?: return emptyList()
+
+        // 4. Iterate through radios
+        for (i in 0 until radios.length()) {
+            val item = radios.getJSONObject(i)
+            val title = item.optString("title", "TRT Radyo ${i + 1}")
+            val streamUrl = item.optString("streamUrl")
+            val imageUrl = item.optString("imageUrl", "")
+                .ifBlank { item.optString("cover") }
+                .ifBlank { "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h480/q70/12467415.jpeg" }
+
+            if (streamUrl.isNotBlank() && (streamUrl.contains(".m3u8") || streamUrl.contains("trt"))) {
+                result.add(
+                    TabiiChannel(
+                        name = title,
+                        slug = title.lowercase().replace(" ", "-"),
+                        streamUrl = streamUrl,
+                        logoUrl = imageUrl,
+                        description = "$title - TRT Radyo"
+                    )
+                )
             }
-
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
-        return result.distinctBy { it.name }
+
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
+
+    return result.distinctBy { it.name }
+}
 
     /* ---------------------------------------------------------
        3. Quality variants
