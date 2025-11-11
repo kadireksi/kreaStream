@@ -85,53 +85,51 @@ class Trt : MainAPI() {
         return result
     }
 
-private suspend fun getRadioChannels(): List<TabiiChannel> {
-    val result = mutableListOf<TabiiChannel>()
-    try {
-        val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
-        val html = response.text
+    private suspend fun getRadioChannels(): List<TabiiChannel> {
+        val result = mutableListOf<TabiiChannel>()
+        try {
+            val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
+            val html = response.text
 
-        // 1. Extract JSON inside window.__NUXT__ = { ... }
-        val nuxtData = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})\s*</script>""", RegexOption.DOT_MATCHES_ALL)
-            .find(html)?.groupValues?.get(1) ?: return emptyList()
+            // Extract the large JSON from window.__NUXT__
+            val match = Regex("""window\.__NUXT__=\(function.*?return\s*(\{.*?});?\)\(\)""", RegexOption.DOT_MATCHES_ALL)
+                .find(html) ?: return emptyList()
 
-        // 2. Parse JSON
-        val json = JSONObject(nuxtData)
+            val jsonText = match.groupValues[1]
 
-        // 3. Navigate down to the radio list
-        val radios = json.optJSONObject("state")?.optJSONObject("radios")
-            ?: json.optJSONObject("data")?.optJSONArray("radyolar")
-            ?: json.optJSONObject("radyolar")?.optJSONArray("list")
-            ?: return emptyList()
+            // Parse safely
+            val root = JSONObject(jsonText)
+            val radios = root.getJSONArray("data")
+                .getJSONObject(0)
+                .getJSONObject("radios")
+                .getJSONArray("list")
 
-        // 4. Iterate through radios
-        for (i in 0 until radios.length()) {
-            val item = radios.getJSONObject(i)
-            val title = item.optString("title", "TRT Radyo ${i + 1}")
-            val streamUrl = item.optString("streamUrl")
-            val imageUrl = item.optString("imageUrl", "")
-                .ifBlank { item.optString("cover") }
-                .ifBlank { "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h480/q70/12467415.jpeg" }
+            for (i in 0 until radios.length()) {
+                val r = radios.getJSONObject(i)
+                val title = r.optString("title")
+                val url = r.optString("streamUrl")
+                val image = r.optString("imageUrl")
+                val slug = r.optString("slug", title.lowercase().replace(" ", "-"))
 
-            if (streamUrl.isNotBlank() && (streamUrl.contains(".m3u8") || streamUrl.contains("trt"))) {
-                result.add(
-                    TabiiChannel(
-                        name = title,
-                        slug = title.lowercase().replace(" ", "-"),
-                        streamUrl = streamUrl,
-                        logoUrl = imageUrl,
-                        description = "$title - TRT Radyo"
+                if (url.isNotBlank()) {
+                    result.add(
+                        TabiiChannel(
+                            name = title,
+                            slug = slug,
+                            streamUrl = url,
+                            logoUrl = image,
+                            description = "TRT Radyo - $title"
+                        )
                     )
-                )
+                }
             }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
-    } catch (e: Exception) {
-        e.printStackTrace()
+        return result.distinctBy { it.name }
     }
-
-    return result.distinctBy { it.name }
-}
 
     /* ---------------------------------------------------------
        3. Quality variants
