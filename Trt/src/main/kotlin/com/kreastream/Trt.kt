@@ -99,10 +99,10 @@ class Trt : MainAPI() {
             val nuxtMatch = nuxtRegex.find(html) ?: return emptyList()
             
             val nuxtJsonStr = nuxtMatch.groupValues[1]
-            val nuxtJson = JSONObject(nuxtJsonStr)
+            val json = JSONObject(nuxtJsonStr)
 
             // Navigate through the JSON structure to find channels
-            val fetchData = nuxtJson.optJSONObject("fetch")
+            val fetchData = json.optJSONObject("fetch")
             if (fetchData != null) {
                 // Look for the data key containing channels
                 val dataKeys = fetchData.keys()
@@ -110,26 +110,9 @@ class Trt : MainAPI() {
                     val key = dataKeys.next()
                     if (key.contains("data-v-")) {
                         val pageData = fetchData.getJSONObject(key)
-                        if (pageData.has("channels")) {
-                            val channelsArray = pageData.getJSONArray("channels")
-                            parseChannelsFromArray(channelsArray, result)
-                        }
                         
-                        // Also check groupContent and noGroupContent
-                        if (pageData.has("groupContent")) {
-                            val groupContent = pageData.getJSONObject("groupContent")
-                            val groupKeys = groupContent.keys()
-                            while (groupKeys.hasNext()) {
-                                val groupKey = groupKeys.next()
-                                val groupArray = groupContent.getJSONArray(groupKey)
-                                parseChannelsFromArray(groupArray, result)
-                            }
-                        }
-                        
-                        if (pageData.has("noGroupContent")) {
-                            val noGroupArray = pageData.getJSONArray("noGroupContent")
-                            parseChannelsFromArray(noGroupArray, result)
-                        }
+                        // Parse channels from different possible locations
+                        parseChannelsFromData(pageData, result)
                     }
                 }
             }
@@ -140,47 +123,80 @@ class Trt : MainAPI() {
         return result.distinctBy { it.name } // Remove duplicates
     }
 
-    private fun parseChannelsFromArray(channelsArray: JSONArray, result: MutableList<TabiiChannel>) {
-        for (i in 0 until channelsArray.length()) {
-            try {
-                val channel = channelsArray.getJSONObject(i)
-                val name = channel.optString("title", "").takeIf { it.isNotBlank() } ?: continue
-                val audio = channel.optString("audio", "").takeIf { it.isNotBlank() } ?: continue
-                
-                // Get cover image - try different possible fields
-                var cover = channel.optString("cover", "")
-                if (cover.isBlank()) {
-                    cover = channel.optString("imageUrl", "")
+    private fun parseChannelsFromData(pageData: JSONObject, result: MutableList<TabiiChannel>) {
+        try {
+            // Parse channels array
+            if (pageData.has("channels")) {
+                val channelsArray = pageData.getJSONArray("channels")
+                for (i in 0 until channelsArray.length()) {
+                    parseSingleChannel(channelsArray.getJSONObject(i), result)
                 }
-                if (cover.isBlank()) {
-                    cover = channel.optString("featuredImage", "")
-                }
-                
-                if (cover.isBlank()) continue
-
-                // Extract slug from path or generate from title
-                val path = channel.optString("path", "")
-                val slug = if (path.isNotBlank()) {
-                    path.substringAfterLast("/").ifBlank { 
-                        name.lowercase().replace(" ", "-").replace("[^a-z0-9-]".toRegex(), "")
+            }
+            
+            // Parse groupContent
+            if (pageData.has("groupContent")) {
+                val groupContent = pageData.getJSONObject("groupContent")
+                val groupKeys = groupContent.keys()
+                while (groupKeys.hasNext()) {
+                    val groupKey = groupKeys.next()
+                    val groupArray = groupContent.getJSONArray(groupKey)
+                    for (i in 0 until groupArray.length()) {
+                        parseSingleChannel(groupArray.getJSONObject(i), result)
                     }
-                } else {
+                }
+            }
+            
+            // Parse noGroupContent
+            if (pageData.has("noGroupContent")) {
+                val noGroupArray = pageData.getJSONArray("noGroupContent")
+                for (i in 0 until noGroupArray.length()) {
+                    parseSingleChannel(noGroupArray.getJSONObject(i), result)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun parseSingleChannel(channel: JSONObject, result: MutableList<TabiiChannel>) {
+        try {
+            val name = channel.optString("title", "").takeIf { it.isNotBlank() } ?: return
+            val audio = channel.optString("audio", "").takeIf { it.isNotBlank() } ?: return
+            
+            // Get cover image - try different possible fields
+            var cover = channel.optString("cover", "")
+            if (cover.isBlank()) {
+                cover = channel.optString("imageUrl", "")
+            }
+            if (cover.isBlank()) {
+                cover = channel.optString("featuredImage", "")
+            }
+            
+            if (cover.isBlank()) return
+
+            // Extract slug from path or generate from title
+            val path = channel.optString("path", "")
+            val slug = if (path.isNotBlank()) {
+                path.substringAfterLast("/").ifBlank { 
                     name.lowercase().replace(" ", "-").replace("[^a-z0-9-]".toRegex(), "")
                 }
+            } else {
+                name.lowercase().replace(" ", "-").replace("[^a-z0-9-]".toRegex(), "")
+            }
 
-                val description = channel.optString("description", name)
+            val description = channel.optString("description", name)
 
-                result += TabiiChannel(
+            result.add(
+                TabiiChannel(
                     name = name,
                     slug = slug,
                     streamUrl = audio,
                     logoUrl = cover,
                     description = "$description - TRT Radyo"
                 )
-            } catch (e: Exception) {
-                // Skip this channel if there's any parsing error
-                continue
-            }
+            )
+        } catch (e: Exception) {
+            // Skip this channel if there's any parsing error
         }
     }
 
