@@ -307,21 +307,7 @@ class Trt : MainAPI() {
                 } catch (e: Exception) { more = false }
             }
 
-            return newTvSeriesLoadResponse(
-                name = title,
-                url = url,
-                type = TvType.TvSeries,
-                episodes = episodes
-            ) {
-                this.posterUrl = poster
-                this.plot = plot
-            }
-            return newRadioSeriesLoadResponse(
-                name = title,
-                url = url,
-                type = TvType.TvSeries,
-                episodes = episodes
-            ) {
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
                 this.plot = plot
             }
@@ -341,12 +327,7 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse(
-            name = "TRT Tv",
-            url = dummyTvUrl,
-            type = TvType.TvSeries,
-            episodes = episodes
-        ) {
+        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             this.plot = "TRT kanalları canlı yayın"
         }
@@ -363,12 +344,7 @@ class Trt : MainAPI() {
             }
         }
 
-        return newRadioSeriesLoadResponse(
-            name = "TRT Radyo",
-            url = dummyRadioUrl,
-            type = TvType.TvSeries,
-            episodes = episodes
-        ) {
+        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             this.plot = "TRT kanalları canlı yayın"
         }
