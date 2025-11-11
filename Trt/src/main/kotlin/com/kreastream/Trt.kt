@@ -82,7 +82,7 @@ class Trt : MainAPI() {
                 }
                 if (streamUrl.isBlank()) continue
                 if(!name.contains("tabii")) {
-                    result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name")
+                    result += TvChannel(name, slug, streamUrl, logoUrl, "$name")
                 } 
             }
         } catch (e: Exception) {}
@@ -214,7 +214,7 @@ class Trt : MainAPI() {
         if (url == dummyTvUrl) {
             val channels = getTvChannels()
             return if (channels.isEmpty()) {
-                buildLiveResponse(
+                buildLiveTVResponse(
                     listOf(
                         TvChannel(
                             name = "TRT 1",
@@ -226,7 +226,7 @@ class Trt : MainAPI() {
                     )
                 )
             } else {
-                buildLiveResponse(channels)
+                buildLiveTVResponse(channels)
             }
         }
 
@@ -234,7 +234,7 @@ class Trt : MainAPI() {
         if (url == dummyRadioUrl) {
             val channels = getRadioChannels()
             return if (channels.isEmpty()) {
-                buildLiveResponse(
+                buildLiveRadioResponse(
                     listOf(
                         RadioChannel(
                             name = "TRT FM",
@@ -246,7 +246,7 @@ class Trt : MainAPI() {
                     )
                 )
             } else {
-                buildLiveResponse(channels)
+                buildLiveRadioResponse(channels)
             }
         }
 
@@ -321,7 +321,7 @@ class Trt : MainAPI() {
         }
     }
 
-    private suspend fun buildLiveResponse(channels: List<TvChannel>): LoadResponse {
+    private suspend fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
                 name = ch.name
@@ -339,7 +339,29 @@ class Trt : MainAPI() {
             episodes = episodes
         ) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "Tüm TRT kanalları canlı yayın – Tabii"
+            this.plot = "TRT kanalları canlı yayın"
+        }
+    }
+
+        private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
+        val episodes = channels.mapIndexed { i, ch ->
+            newEpisode(ch.streamUrl) {
+                name = ch.name
+                posterUrl = ch.logoUrl
+                episode = i + 1
+                season = 1
+                description = ch.description
+            }
+        }
+
+        return newTvSeriesLoadResponse(
+            name = "TRT Canlı Yayınlar",
+            url = dummyTvUrl,
+            type = TvType.TvSeries,
+            episodes = episodes
+        ) {
+            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+            this.plot = "TRT kanalları canlı yayın"
         }
     }
 
