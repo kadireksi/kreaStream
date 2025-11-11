@@ -168,7 +168,7 @@ class Trt : MainAPI() {
                     url = dummyTvUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://cdn-s.pr.trt.com.tr/trt1/icons/svg/trt-logo.svg"
+                    this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
                 },
                  newTvSeriesSearchResponse(
                     name = "TRT Radyo",
