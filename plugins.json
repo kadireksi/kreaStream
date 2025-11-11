@@ -1,22 +1,22 @@
 [
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
+        "iconUrl": "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 24642,
+        "fileSize": 24620,
         "status": 1,
         "language": "tr",
         "authors": [
             "kreastream"
         ],
         "tvTypes": [
-            "Movie",
-            "TvSeries"
+            "TvSeries",
+            "Live"
         ],
         "version": 1,
-        "internalName": "HDFilmCehennemi",
-        "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
-        "name": "HDFilmCehennemi"
+        "internalName": "Trt",
+        "description": "TRT Canl\u0131 Yay\u0131n ve Diziler",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Trt.cs3",
+        "name": "Trt"
     }
 ]
