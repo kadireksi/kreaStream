@@ -342,7 +342,7 @@ class Trt : MainAPI() {
         }
 
         return newTvSeriesLoadResponse(
-            name = "TRT Canlı Yayınlar",
+            name = "TRT Tv",
             url = dummyTvUrl,
             type = TvType.TvSeries,
             episodes = episodes
@@ -364,8 +364,8 @@ class Trt : MainAPI() {
         }
 
         return newRadioSeriesLoadResponse(
-            name = "TRT Canlı Yayınlar",
-            url = dummyTvUrl,
+            name = "TRT Radyo",
+            url = dummyRadioUrl,
             type = TvType.TvSeries,
             episodes = episodes
         ) {
