@@ -316,6 +316,15 @@ class Trt : MainAPI() {
                 this.posterUrl = poster
                 this.plot = plot
             }
+            return newRadioSeriesLoadResponse(
+                name = title,
+                url = url,
+                type = TvType.TvSeries,
+                episodes = episodes
+            ) {
+                this.posterUrl = poster
+                this.plot = plot
+            }
         } catch (e: Exception) {
             throw ErrorLoadingException("Dizi yüklenemedi")
         }
@@ -343,7 +352,7 @@ class Trt : MainAPI() {
         }
     }
 
-        private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
+    private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
                 name = ch.name
@@ -354,7 +363,7 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse(
+        return newRadioSeriesLoadResponse(
             name = "TRT Canlı Yayınlar",
             url = dummyTvUrl,
             type = TvType.TvSeries,
