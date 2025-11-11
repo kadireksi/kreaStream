@@ -86,55 +86,74 @@ class Trt : MainAPI() {
     }
 
     /* ---------------------------------------------------------
-    Get Radio channels from __NUXT__ JSON
+    Get Radio channels - Alternative approach parsing HTML directly
     --------------------------------------------------------- */
     private suspend fun getRadioChannels(): List<TabiiChannel> {
         val result = mutableListOf<TabiiChannel>()
         try {
             val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
-            val html = response.text
+            val doc = response.document
 
-            // Extract __NUXT__ = (...)
-            val nuxtScript = Regex("""window\.__NUXT__\s*=\s*(\(function\s*\([^)]*\)\s*\{[\s\S]*?\}\))""")
-                .find(html)?.groupValues?.get(1) ?: return emptyList()
-
-            // Clean and parse JSON
-            val jsonStr = nuxtScript
-                .removePrefix("(function")
-                .substringAfter("{")
-                .removeSuffix("});")
-                .trim()
-
-            // This is minified – we need to extract `channels` array
-            val channelsMatch = Regex("""channels:\s*\[([\s\S]*?)\]""").find(jsonStr)
-                ?: return emptyList()
-            val channelsJson = "[" + channelsMatch.groupValues[1] + "]"
-
-            val jsonArray = JSONObject("{\"list\":$channelsJson}").getJSONArray("list")
-
-            for (i in 0 until jsonArray.length()) {
-                val ch = jsonArray.getJSONObject(i)
-                val name = ch.optString("title", "").takeIf { it.isNotBlank() } ?: continue
-                val audio = ch.optString("audio", "").takeIf { it.contains("http") } ?: continue
-                val cover = ch.optString("cover", "").takeIf { it.contains("cdn-i.pr.trt.com.tr") }
-                    ?: continue
-
-                // Extract slug from path
-                val path = ch.optString("path", "")
-                val slug = path.substringAfterLast("/").ifBlank { name.lowercase().replace(" ", "-") }
-
-                result += TabiiChannel(
-                    name = name,
-                    slug = slug,
-                    streamUrl = audio,
-                    logoUrl = cover,
-                    description = "$name - TRT Radyo"
-                )
+            // Try to find radio channel elements in the page
+            // Look for any elements that might contain channel information
+            val scriptElements = doc.select("script")
+            
+            for (script in scriptElements) {
+                val scriptContent = script.html()
+                if (scriptContent.contains("window.__NUXT__") || scriptContent.contains("channels")) {
+                    // Use the first approach with the extracted JSON
+                    val nuxtRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*?\});""")
+                    val nuxtMatch = nuxtRegex.find(scriptContent)
+                    if (nuxtMatch != null) {
+                        val nuxtJsonStr = nuxtMatch.groupValues[1]
+                        val nuxtJson = JSONObject(nuxtJsonStr)
+                        
+                        // Extract channels using the method above
+                        return extractChannelsFromNuxt(nuxtJson)
+                    }
+                }
             }
+            
         } catch (e: Exception) {
             e.printStackTrace()
         }
         return result
+    }
+
+    private fun extractChannelsFromNuxt(nuxtJson: JSONObject): List<TabiiChannel> {
+        val result = mutableListOf<TabiiChannel>()
+        
+        try {
+            // The channels are in the fetch data
+            val fetch = nuxtJson.getJSONObject("fetch")
+            val dataKey = fetch.keys().asSequence().find { it.contains("data-v-") } ?: return emptyList()
+            val pageData = fetch.getJSONObject(dataKey)
+            
+            // Extract from channels array
+            if (pageData.has("channels")) {
+                parseChannelsFromArray(pageData.getJSONArray("channels"), result)
+            }
+            
+            // Extract from groupContent
+            if (pageData.has("groupContent")) {
+                val groupContent = pageData.getJSONObject("groupContent")
+                val groupKeys = groupContent.keys()
+                while (groupKeys.hasNext()) {
+                    val groupArray = groupContent.getJSONArray(groupKeys.next())
+                    parseChannelsFromArray(groupArray, result)
+                }
+            }
+            
+            // Extract from noGroupContent
+            if (pageData.has("noGroupContent")) {
+                parseChannelsFromArray(pageData.getJSONArray("noGroupContent"), result)
+            }
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
+        return result.distinctBy { it.name }
     }
 
     /* ---------------------------------------------------------
