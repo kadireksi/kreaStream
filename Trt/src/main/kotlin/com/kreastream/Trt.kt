@@ -20,13 +20,12 @@ class Trt : MainAPI() {
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
 
     override val mainPage = mainPageOf(
-        "live" to "TRT Canlı Yayınlar",
-        //"radio" to "TRT Radyo",
         "series"  to "Güncel Diziler",
-        "archive" to "Eski Diziler"
+        "archive" to "Eski Diziler",
+        "live" to "TRT Canlı TV & Radyo"
     )
 
-    data class TabiiChannel(
+    data class TvChannel(
         val name: String,
         val slug: String,
         val streamUrl: String,
@@ -34,11 +33,16 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
-    /* ---------------------------------------------------------
-       Get TV channels from Tabii JSON
-       --------------------------------------------------------- */
-    private suspend fun getTvChannels(): List<TabiiChannel> {
-        val result = mutableListOf<TabiiChannel>()
+     data class RadioChannel(
+        val name: String,
+        val slug: String,
+        val streamUrl: String,
+        val logoUrl: String,
+        val description: String = ""
+    )
+
+    private suspend fun getTvChannels(): List<TvChannel> {
+        val result = mutableListOf<TvChannel>()
         try {
             val sample = "$liveBase/trt1?trackId=150002"
             val response = app.get(sample)
@@ -77,16 +81,17 @@ class Trt : MainAPI() {
                     }
                 }
                 if (streamUrl.isBlank()) continue
-
-                result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name")
+                if(!name.contains("tabii")) {
+                    result += TabiiChannel(name, slug, streamUrl, logoUrl, "$name")
+                } 
             }
         } catch (e: Exception) {}
 
         return result
     }
 
-    private suspend fun getRadioChannels(): List<TabiiChannel> {
-        val result = mutableListOf<TabiiChannel>()
+    private suspend fun getRadioChannels(): List<RadioChannel> {
+        val result = mutableListOf<RadioChannel>()
         try {
             val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
             val html = response.text
@@ -113,7 +118,7 @@ class Trt : MainAPI() {
 
                 if (url.isNotBlank()) {
                     result.add(
-                        TabiiChannel(
+                        RadioChannel(
                             name = title,
                             slug = slug,
                             streamUrl = url,
@@ -131,9 +136,6 @@ class Trt : MainAPI() {
         return result.distinctBy { it.name }
     }
 
-    /* ---------------------------------------------------------
-       3. Quality variants
-       --------------------------------------------------------- */
     private fun generateQualityVariants(base: String): List<String> {
         val list = mutableListOf(base)
         try {
@@ -147,9 +149,6 @@ class Trt : MainAPI() {
         return list.distinct()
     }
 
-    /* ---------------------------------------------------------
-       4. Series list
-       --------------------------------------------------------- */
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
             val url = if (page == 1) {
@@ -179,9 +178,6 @@ class Trt : MainAPI() {
 
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
-    /* ---------------------------------------------------------
-       5. Main page
-       --------------------------------------------------------- */
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
             "live" -> listOf(
@@ -213,9 +209,6 @@ class Trt : MainAPI() {
         )
     }
 
-    /* ---------------------------------------------------------
-       6. Load – intercept dummy URLs for TV and Radio
-       --------------------------------------------------------- */
     override suspend fun load(url: String): LoadResponse {
         // TV
         if (url == dummyTvUrl) {
@@ -223,7 +216,7 @@ class Trt : MainAPI() {
             return if (channels.isEmpty()) {
                 buildLiveResponse(
                     listOf(
-                        TabiiChannel(
+                        TvChannel(
                             name = "TRT 1",
                             slug = "trt1",
                             streamUrl = "https://tv-trt1.medya.trt.com.tr/master.m3u8",
@@ -243,7 +236,7 @@ class Trt : MainAPI() {
             return if (channels.isEmpty()) {
                 buildLiveResponse(
                     listOf(
-                        TabiiChannel(
+                        RadioChannel(
                             name = "TRT FM",
                             slug = "trt-fm",
                             streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
@@ -328,7 +321,7 @@ class Trt : MainAPI() {
         }
     }
 
-    private suspend fun buildLiveResponse(channels: List<TabiiChannel>): LoadResponse {
+    private suspend fun buildLiveResponse(channels: List<TvChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
                 name = ch.name
@@ -350,9 +343,6 @@ class Trt : MainAPI() {
         }
     }
 
-    /* ---------------------------------------------------------
-       7. Load links
-       --------------------------------------------------------- */
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -409,9 +399,6 @@ class Trt : MainAPI() {
         return false
     }
 
-    /* ---------------------------------------------------------
-       8. Search
-       --------------------------------------------------------- */
     override suspend fun search(query: String): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
 
