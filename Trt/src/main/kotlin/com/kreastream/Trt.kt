@@ -90,153 +90,94 @@ class Trt : MainAPI() {
         return result
     }
 
-private suspend fun getRadioChannels(): List<RadioChannel> {
-    val result = mutableListOf<RadioChannel>()
-    try {
-        val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
-        val document = response.document
+    private suspend fun getRadioChannels(): List<RadioChannel> {
+        val result = mutableListOf<RadioChannel>()
+        try {
+            val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
+            val document = response.document
 
-        // Try to extract from the script content
-        val scriptContent = document.select("script:containsData(window.__NUXT__)").firstOrNull()?.data()
-            ?: document.select("script").find { it.html().contains("window.__NUXT__") }?.html()
-            ?: return getFallbackRadioChannels()
+            // Try to extract from the script content
+            val scriptContent = document.select("script:containsData(window.__NUXT__)").firstOrNull()?.data()
+                ?: document.select("script").find { it.html().contains("window.__NUXT__") }?.html()
+                ?: return getFallbackRadioChannels()
 
-        // Extract JSON part
-        val jsonStr = scriptContent.substringAfter("window.__NUXT__=").substringBefore(";</script>")
-        
-        // Use Cloudstream3's json helper
-        val json = AppUtils.tryParseJson<Map<String, Any>>(jsonStr) ?: return getFallbackRadioChannels()
-        
-        // Navigate to channels data - this structure might need adjustment based on actual JSON
-        val data = (json["data"] as? List<Map<String, Any>>)?.firstOrNull() ?: return getFallbackRadioChannels()
-        val channels = data["channels"] as? List<Map<String, Any>> ?: return getFallbackRadioChannels()
-
-        for (channel in channels) {
-            try {
-                val title = channel["title"] as? String ?: continue
-                val audio = channel["audio"] as? String ?: continue
-                val imageUrl = channel["imageUrl"] as? String ?: ""
-                val description = channel["description"] as? String ?: ""
-
-                result += RadioChannel(
-                    name = title,
-                    slug = title.lowercase().replace(" ", "-"),
-                    streamUrl = audio,
-                    logoUrl = imageUrl,
-                    description = description
-                )
-            } catch (e: Exception) {
-                // Skip invalid channels
-                continue
-            }
-        }
-
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-
-    // If no channels found, use fallback
-    return if (result.isEmpty()) getFallbackRadioChannels() else result
-}
-
-private fun findChannelsInJson(json: JSONObject): JSONArray? {
-    return try {
-        when {
-            json.has("channels") -> json.getJSONArray("channels")
-            json.has("data") -> {
-                val data = json.getJSONArray("data")
-                if (data.length() > 0) {
-                    findChannelsInJson(data.getJSONObject(0))
-                } else null
-            }
-            json.has("fetch") -> findChannelsInJson(json.getJSONObject("fetch"))
-            else -> {
-                // Recursively search through all keys
-                for (key in json.keys()) {
-                    val value = json.get(key)
-                    if (value is JSONObject) {
-                        findChannelsInJson(value)?.let { return it }
-                    } else if (value is JSONArray && value.length() > 0) {
-                        val firstItem = value.get(0)
-                        if (firstItem is JSONObject && firstItem.has("title") && firstItem.has("audio")) {
-                            return value
-                        }
-                    }
-                }
-                null
-            }
-        }
-    } catch (e: Exception) {
-        null
-    }
-}
-
-private fun parseChannel(channel: JSONObject): RadioChannel? {
-    return try {
-        val title = channel.optString("title", "")
-        val audioUrl = channel.optString("audio", "")
-        val imageUrl = channel.optString("imageUrl", "") ?: channel.optString("featuredImage", "")
-        val description = channel.optString("description", "")
-        
-        if (audioUrl.isNotBlank() && title.isNotBlank()) {
-            val slug = title.lowercase()
-                .replace(" ", "-")
-                .replace("[^a-z0-9-]".toRegex(), "")
+            // Extract JSON part
+            val jsonStr = scriptContent.substringAfter("window.__NUXT__=").substringBefore(";</script>")
             
-            RadioChannel(
-                name = title,
-                slug = slug,
-                streamUrl = audioUrl,
-                logoUrl = imageUrl,
-                description = description
-            )
-        } else {
-            null
-        }
-    } catch (e: Exception) {
-        null
-    }
-}
+            // Use Cloudstream3's json helper
+            val json = AppUtils.tryParseJson<Map<String, Any>>(jsonStr) ?: return getFallbackRadioChannels()
+            
+            // Navigate to channels data - this structure might need adjustment based on actual JSON
+            val data = (json["data"] as? List<Map<String, Any>>)?.firstOrNull() ?: return getFallbackRadioChannels()
+            val channels = data["channels"] as? List<Map<String, Any>> ?: return getFallbackRadioChannels()
 
-private fun getFallbackRadioChannels(): List<RadioChannel> {
-    return listOf(
-        RadioChannel(
-            name = "TRT FM",
-            slug = "trt-fm",
-            streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
-            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/f_channel_b9f3c65ea803a398ff11f759fb5b59bc.jpeg",
-            description = "Türkçe Pop"
-        ),
-        RadioChannel(
-            name = "TRT Radyo 1",
-            slug = "trt-radyo-1",
-            streamUrl = "https://trt.radyotvonline.net/trt_1.aac",
-            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467415.jpeg",
-            description = "Haber ve Kültür"
-        ),
-        RadioChannel(
-            name = "TRT Türkü",
-            slug = "trt-turku",
-            streamUrl = "https://rd-trtturku.medya.trt.com.tr/master.m3u8",
-            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467466.jpeg",
-            description = "Türk Halk Müziği"
-        ),
-        RadioChannel(
-            name = "TRT Nağme",
-            slug = "trt-nagme",
-            streamUrl = "https://rd-trtnagme.medya.trt.com.tr/master.m3u8",
-            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467465.jpeg",
-            description = "Türk Sanat Müziği"
-        ),
-        RadioChannel(
-            name = "TRT Radyo Haber",
-            slug = "trt-radyo-haber",
-            streamUrl = "https://trt.radyotvonline.net/trt_haber.aac",
-            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12530424_0-0-2048-1536.jpeg",
-            description = "Sürekli Haber"
+            for (channel in channels) {
+                try {
+                    val title = channel["title"] as? String ?: continue
+                    val audio = channel["audio"] as? String ?: continue
+                    val imageUrl = channel["imageUrl"] as? String ?: ""
+                    val description = channel["description"] as? String ?: ""
+
+                    result += RadioChannel(
+                        name = title,
+                        slug = title.lowercase().replace(" ", "-"),
+                        streamUrl = audio,
+                        logoUrl = imageUrl,
+                        description = description
+                    )
+                } catch (e: Exception) {
+                    // Skip invalid channels
+                    continue
+                }
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // If no channels found, use fallback
+        return if (result.isEmpty()) getFallbackRadioChannels() else result
+    }
+
+    private fun getFallbackRadioChannels(): List<RadioChannel> {
+        return listOf(
+            RadioChannel(
+                name = "TRT FM",
+                slug = "trt-fm",
+                streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/f_channel_b9f3c65ea803a398ff11f759fb5b59bc.jpeg",
+                description = "Türkçe Pop"
+            ),
+            RadioChannel(
+                name = "TRT Radyo 1",
+                slug = "trt-radyo-1",
+                streamUrl = "https://trt.radyotvonline.net/trt_1.aac",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467415.jpeg",
+                description = "Haber ve Kültür"
+            ),
+            RadioChannel(
+                name = "TRT Türkü",
+                slug = "trt-turku",
+                streamUrl = "https://rd-trtturku.medya.trt.com.tr/master.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467466.jpeg",
+                description = "Türk Halk Müziği"
+            ),
+            RadioChannel(
+                name = "TRT Nağme",
+                slug = "trt-nagme",
+                streamUrl = "https://rd-trtnagme.medya.trt.com.tr/master.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467465.jpeg",
+                description = "Türk Sanat Müziği"
+            ),
+            RadioChannel(
+                name = "TRT Radyo Haber",
+                slug = "trt-radyo-haber",
+                streamUrl = "https://trt.radyotvonline.net/trt_haber.aac",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12530424_0-0-2048-1536.jpeg",
+                description = "Sürekli Haber"
+            )
         )
-    )
-}
+    }
 
     private fun generateQualityVariants(base: String): List<String> {
         val list = mutableListOf(base)
