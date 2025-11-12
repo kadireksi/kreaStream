@@ -117,15 +117,7 @@ class Trt : MainAPI() {
                 val slug = r.optString("slug", title.lowercase().replace(" ", "-"))
 
                 if (url.isNotBlank()) {
-                    result.add(
-                        RadioChannel(
-                            name = title,
-                            slug = slug,
-                            streamUrl = url,
-                            logoUrl = image,
-                            description = "TRT Radyo - $title"
-                        )
-                    )
+                     result += RadioChannel(title, slug, url, image, "$title")
                 }
             }
 
@@ -133,7 +125,7 @@ class Trt : MainAPI() {
             e.printStackTrace()
         }
 
-        return result.distinctBy { it.name }
+        return result
     }
 
     private fun generateQualityVariants(base: String): List<String> {
@@ -329,7 +321,7 @@ class Trt : MainAPI() {
 
         return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT kanalları canlı yayın"
+            this.plot = "TRT TV canlı yayın"
         }
     }
 
@@ -346,7 +338,7 @@ class Trt : MainAPI() {
 
         return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT kanalları canlı yayın"
+            this.plot = "TRT Radyo canlı yayın"
         }
     }
 
