@@ -367,7 +367,7 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                hasDownload = false
+                this.hasDownload = false
             }
         }
 
@@ -385,7 +385,7 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                hasDownload = false
+                this.hasDownload = false
             }
         }
 
