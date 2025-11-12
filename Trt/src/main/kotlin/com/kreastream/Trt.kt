@@ -96,60 +96,45 @@ private suspend fun getRadioChannels(): List<RadioChannel> {
         val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
         val html = response.text
 
-        // Try multiple patterns to extract the JSON
-        val patterns = listOf(
-            """window\.__NUXT__\s*=\s*(\{.*?});""",
-            """window\.__NUXT__\s*=\s*\(function.*?return\s*(\{.*?})\)\(\)""",
-            """<script[^>]*>window\.__NUXT__\s*=\s*(\{.*?})</script>"""
-        )
-
-        var jsonText: String? = null
-        for (pattern in patterns) {
-            val match = Regex(pattern, RegexOption.DOT_MATCHES_ALL).find(html)
-            if (match != null) {
-                jsonText = match.groupValues[1]
-                break
-            }
-        }
-
-        if (jsonText == null) return emptyList()
-
-        val root = JSONObject(jsonText)
+        // Extract the JSON data from the script tag
+        val jsonData = html.substringAfter("window.__NUXT__=").substringBefore(";</script>")
         
-        // Try different paths to find channels data
-        val channels = try {
-            // Path 1: Direct channels array
-            root.getJSONArray("channels")
-        } catch (e: Exception) {
-            try {
-                // Path 2: Through fetch data
-                val fetch = root.getJSONObject("fetch")
-                val firstKey = fetch.keys().next()
-                fetch.getJSONObject(firstKey).getJSONArray("channels")
-            } catch (e2: Exception) {
-                try {
-                    // Path 3: Through data array
-                    root.getJSONArray("data").getJSONObject(0).getJSONArray("channels")
-                } catch (e3: Exception) {
-                    // Path 4: Search for any array containing channel objects
-                    findChannelsInJson(root)
-                }
-            }
-        }
+        // Parse using Cloudstream3's JSON parser
+        val parsed = parseJson<Map<String, Any>>(jsonData)
+        
+        // Navigate through the complex structure to find channels
+        val fetch = parsed["fetch"] as? Map<String, Any> ?: return emptyList()
+        
+        // Find the key that contains channel data
+        val dataKey = fetch.keys.firstOrNull { it.contains("data-v-ee8b6fa0") } ?: return emptyList()
+        val pageData = fetch[dataKey] as? Map<String, Any> ?: return emptyList()
+        
+        val channels = pageData["channels"] as? List<Map<String, Any>> ?: return emptyList()
 
-        if (channels != null) {
-            for (i in 0 until channels.length()) {
-                val channel = channels.getJSONObject(i)
-                parseChannel(channel)?.let { result.add(it) }
+        for (channel in channels) {
+            val title = channel["title"] as? String ?: ""
+            val audioUrl = channel["audio"] as? String ?: ""
+            val imageUrl = channel["imageUrl"] as? String ?: ""
+            val description = channel["description"] as? String ?: ""
+            
+            if (audioUrl.isNotBlank() && title.isNotBlank()) {
+                val slug = title.lowercase()
+                    .replace(" ", "-")
+                    .replace("[^a-z0-9-]".toRegex(), "")
+                
+                result += RadioChannel(
+                    name = title,
+                    slug = slug,
+                    streamUrl = audioUrl,
+                    logoUrl = imageUrl,
+                    description = description
+                )
             }
         }
 
     } catch (e: Exception) {
         e.printStackTrace()
-    }
-
-    // Fallback: Add some known TRT radio channels
-    if (result.isEmpty()) {
+        // Fallback to known channels if parsing fails
         result.addAll(getFallbackRadioChannels())
     }
 
