@@ -90,43 +90,170 @@ class Trt : MainAPI() {
         return result
     }
 
-    private suspend fun getRadioChannels(): List<RadioChannel> {
-        val result = mutableListOf<RadioChannel>()
-        try {
-            val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
-            val html = response.text
+private suspend fun getRadioChannels(): List<RadioChannel> {
+    val result = mutableListOf<RadioChannel>()
+    try {
+        val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
+        val html = response.text
 
-            // Extract the large JSON from window.__NUXT__
-            val match = Regex("""window\.__NUXT__=\(function.*?return\s*(\{.*?});?\)\(\)""", RegexOption.DOT_MATCHES_ALL)
-                .find(html) ?: return emptyList()
+        // Try multiple patterns to extract the JSON
+        val patterns = listOf(
+            """window\.__NUXT__\s*=\s*(\{.*?});""",
+            """window\.__NUXT__\s*=\s*\(function.*?return\s*(\{.*?})\)\(\)""",
+            """<script[^>]*>window\.__NUXT__\s*=\s*(\{.*?})</script>"""
+        )
 
-            val jsonText = match.groupValues[1]
-
-            // Parse safely
-            val root = JSONObject(jsonText)
-            val radios = root.getJSONArray("data")
-                .getJSONObject(0)
-                .getJSONObject("radios")
-                .getJSONArray("list")
-
-            for (i in 0 until radios.length()) {
-                val r = radios.getJSONObject(i)
-                val title = r.optString("title")
-                val url = r.optString("streamUrl")
-                val image = r.optString("imageUrl")
-                val slug = r.optString("slug", title.lowercase().replace(" ", "-"))
-
-                if (url.isNotBlank()) {
-                     result += RadioChannel(title, slug, url, image, "$title")
-                }
+        var jsonText: String? = null
+        for (pattern in patterns) {
+            val match = Regex(pattern, RegexOption.DOT_MATCHES_ALL).find(html)
+            if (match != null) {
+                jsonText = match.groupValues[1]
+                break
             }
-
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
 
-        return result
+        if (jsonText == null) return emptyList()
+
+        val root = JSONObject(jsonText)
+        
+        // Try different paths to find channels data
+        val channels = try {
+            // Path 1: Direct channels array
+            root.getJSONArray("channels")
+        } catch (e: Exception) {
+            try {
+                // Path 2: Through fetch data
+                val fetch = root.getJSONObject("fetch")
+                val firstKey = fetch.keys().next()
+                fetch.getJSONObject(firstKey).getJSONArray("channels")
+            } catch (e2: Exception) {
+                try {
+                    // Path 3: Through data array
+                    root.getJSONArray("data").getJSONObject(0).getJSONArray("channels")
+                } catch (e3: Exception) {
+                    // Path 4: Search for any array containing channel objects
+                    findChannelsInJson(root)
+                }
+            }
+        }
+
+        if (channels != null) {
+            for (i in 0 until channels.length()) {
+                val channel = channels.getJSONObject(i)
+                parseChannel(channel)?.let { result.add(it) }
+            }
+        }
+
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
+
+    // Fallback: Add some known TRT radio channels
+    if (result.isEmpty()) {
+        result.addAll(getFallbackRadioChannels())
+    }
+
+    return result
+}
+
+private fun findChannelsInJson(json: JSONObject): JSONArray? {
+    return try {
+        when {
+            json.has("channels") -> json.getJSONArray("channels")
+            json.has("data") -> {
+                val data = json.getJSONArray("data")
+                if (data.length() > 0) {
+                    findChannelsInJson(data.getJSONObject(0))
+                } else null
+            }
+            json.has("fetch") -> findChannelsInJson(json.getJSONObject("fetch"))
+            else -> {
+                // Recursively search through all keys
+                for (key in json.keys()) {
+                    val value = json.get(key)
+                    if (value is JSONObject) {
+                        findChannelsInJson(value)?.let { return it }
+                    } else if (value is JSONArray && value.length() > 0) {
+                        val firstItem = value.get(0)
+                        if (firstItem is JSONObject && firstItem.has("title") && firstItem.has("audio")) {
+                            return value
+                        }
+                    }
+                }
+                null
+            }
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun parseChannel(channel: JSONObject): RadioChannel? {
+    return try {
+        val title = channel.optString("title", "")
+        val audioUrl = channel.optString("audio", "")
+        val imageUrl = channel.optString("imageUrl", "") ?: channel.optString("featuredImage", "")
+        val description = channel.optString("description", "")
+        
+        if (audioUrl.isNotBlank() && title.isNotBlank()) {
+            val slug = title.lowercase()
+                .replace(" ", "-")
+                .replace("[^a-z0-9-]".toRegex(), "")
+            
+            RadioChannel(
+                name = title,
+                slug = slug,
+                streamUrl = audioUrl,
+                logoUrl = imageUrl,
+                description = description
+            )
+        } else {
+            null
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun getFallbackRadioChannels(): List<RadioChannel> {
+    return listOf(
+        RadioChannel(
+            name = "TRT FM",
+            slug = "trt-fm",
+            streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
+            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/f_channel_b9f3c65ea803a398ff11f759fb5b59bc.jpeg",
+            description = "Türkçe Pop"
+        ),
+        RadioChannel(
+            name = "TRT Radyo 1",
+            slug = "trt-radyo-1",
+            streamUrl = "https://trt.radyotvonline.net/trt_1.aac",
+            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467415.jpeg",
+            description = "Haber ve Kültür"
+        ),
+        RadioChannel(
+            name = "TRT Türkü",
+            slug = "trt-turku",
+            streamUrl = "https://rd-trtturku.medya.trt.com.tr/master.m3u8",
+            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467466.jpeg",
+            description = "Türk Halk Müziği"
+        ),
+        RadioChannel(
+            name = "TRT Nağme",
+            slug = "trt-nagme",
+            streamUrl = "https://rd-trtnagme.medya.trt.com.tr/master.m3u8",
+            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467465.jpeg",
+            description = "Türk Sanat Müziği"
+        ),
+        RadioChannel(
+            name = "TRT Radyo Haber",
+            slug = "trt-radyo-haber",
+            streamUrl = "https://trt.radyotvonline.net/trt_haber.aac",
+            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12530424_0-0-2048-1536.jpeg",
+            description = "Sürekli Haber"
+        )
+    )
+}
 
     private fun generateQualityVariants(base: String): List<String> {
         val list = mutableListOf(base)
