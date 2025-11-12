@@ -94,51 +94,49 @@ private suspend fun getRadioChannels(): List<RadioChannel> {
     val result = mutableListOf<RadioChannel>()
     try {
         val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
-        val html = response.text
+        val document = response.document
 
-        // Extract the JSON data from the script tag
-        val jsonData = html.substringAfter("window.__NUXT__=").substringBefore(";</script>")
+        // Try to extract from the script content
+        val scriptContent = document.select("script:containsData(window.__NUXT__)").firstOrNull()?.data()
+            ?: document.select("script").find { it.html().contains("window.__NUXT__") }?.html()
+            ?: return getFallbackRadioChannels()
+
+        // Extract JSON part
+        val jsonStr = scriptContent.substringAfter("window.__NUXT__=").substringBefore(";</script>")
         
-        // Parse using Cloudstream3's JSON parser
-        val parsed = parseJson<Map<String, Any>>(jsonData)
+        // Use Cloudstream3's json helper
+        val json = AppUtils.tryParseJson<Map<String, Any>>(jsonStr) ?: return getFallbackRadioChannels()
         
-        // Navigate through the complex structure to find channels
-        val fetch = parsed["fetch"] as? Map<String, Any> ?: return emptyList()
-        
-        // Find the key that contains channel data
-        val dataKey = fetch.keys.firstOrNull { it.contains("data-v-ee8b6fa0") } ?: return emptyList()
-        val pageData = fetch[dataKey] as? Map<String, Any> ?: return emptyList()
-        
-        val channels = pageData["channels"] as? List<Map<String, Any>> ?: return emptyList()
+        // Navigate to channels data - this structure might need adjustment based on actual JSON
+        val data = (json["data"] as? List<Map<String, Any>>)?.firstOrNull() ?: return getFallbackRadioChannels()
+        val channels = data["channels"] as? List<Map<String, Any>> ?: return getFallbackRadioChannels()
 
         for (channel in channels) {
-            val title = channel["title"] as? String ?: ""
-            val audioUrl = channel["audio"] as? String ?: ""
-            val imageUrl = channel["imageUrl"] as? String ?: ""
-            val description = channel["description"] as? String ?: ""
-            
-            if (audioUrl.isNotBlank() && title.isNotBlank()) {
-                val slug = title.lowercase()
-                    .replace(" ", "-")
-                    .replace("[^a-z0-9-]".toRegex(), "")
-                
+            try {
+                val title = channel["title"] as? String ?: continue
+                val audio = channel["audio"] as? String ?: continue
+                val imageUrl = channel["imageUrl"] as? String ?: ""
+                val description = channel["description"] as? String ?: ""
+
                 result += RadioChannel(
                     name = title,
-                    slug = slug,
-                    streamUrl = audioUrl,
+                    slug = title.lowercase().replace(" ", "-"),
+                    streamUrl = audio,
                     logoUrl = imageUrl,
                     description = description
                 )
+            } catch (e: Exception) {
+                // Skip invalid channels
+                continue
             }
         }
 
     } catch (e: Exception) {
         e.printStackTrace()
-        // Fallback to known channels if parsing fails
-        result.addAll(getFallbackRadioChannels())
     }
 
-    return result
+    // If no channels found, use fallback
+    return if (result.isEmpty()) getFallbackRadioChannels() else result
 }
 
 private fun findChannelsInJson(json: JSONObject): JSONArray? {
