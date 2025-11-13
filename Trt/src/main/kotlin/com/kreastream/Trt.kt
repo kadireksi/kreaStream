@@ -110,7 +110,7 @@ class Trt : MainAPI() {
             // Navigate to channels data - this structure might need adjustment based on actual JSON
             val data = (json["data"] as? List<Map<String, Any>>)?.firstOrNull() ?: return getFallbackRadioChannels()
             val channels = data["channels"] as? List<Map<String, Any>> ?: return getFallbackRadioChannels()
-            log.i("Radio Channels: ${channels.size}")
+            Log.i("Radio Channels: ${channels.size}")
 
             for (channel in channels) {
                 try {
@@ -126,7 +126,7 @@ class Trt : MainAPI() {
                         logoUrl = imageUrl,
                         description = description
                     )
-                    log.i("Radio Channel: $title")
+                    Log.i("Radio Channel: $title")
                 } catch (e: Exception) {
                     // Skip invalid channels
                     continue
