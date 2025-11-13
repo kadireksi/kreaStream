@@ -101,30 +101,32 @@ class Trt : MainAPI() {
 
             // 2. Use a Regex to find and capture the large embedded JSON array of radio channels.
             // The JSON array is escaped (\/) and starts with objects like {"id":...}.
-            // This pattern is designed to capture the entire channel list array embedded in the JS state.
+            // Note the capturing group around the array.
             val jsonRegex = Regex(
                 "(\\[\\{\"id\":\\d+,\"title\":\".*?\",\"slug\":\".*?\",\"url\":\".*?\".*?\\])",
-                RegexOption.DOT_ALL
+                RegexOption.DOT_ALL // This needs to be imported: import kotlin.text.RegexOption
             )
             
             val match = jsonRegex.find(html)
             
-            val jsonString = match?.value ?: run {
+            // Fix: Use groupValues[1] to get the content of the first capturing group
+            val jsonString = match?.groupValues?.get(1) ?: run {
+                // If Log is not defined, replace Log.w with a function that returns the fallback
                 Log.w("TRT", "Could not find radio channel JSON array. Falling back.")
-                // Assuming getFallbackRadioChannels() is defined elsewhere
                 return getFallbackRadioChannels() 
             }
 
             // 3. Parse the extracted JSON string
-            val jsonArray = org.json.JSONArray(jsonString)
+            val jsonArray = JSONArray(jsonString)
 
+            // Fix: JSONArray uses length() for size and getJSONObject(i)
             for (i in 0 until jsonArray.length()) {
                 val ch = jsonArray.getJSONObject(i)
                 
                 val name = ch.getString("title")
                 val streamUrl = ch.getString("url") // This contains the stream URL (e.g., master.m3u8)
                 
-                // Prioritize 'imageUrl', falling back to 'image_1' which is also a logo field in the source
+                // Prioritize 'imageUrl', falling back to 'image_1'.
                 val logoUrl = ch.optString("imageUrl", ch.optString("image_1", "")) 
                 val description = ch.optString("description", "")
 
@@ -133,13 +135,15 @@ class Trt : MainAPI() {
                         name = name,
                         slug = name.lowercase().replace(" ", "-"),
                         streamUrl = streamUrl,
-                        logoUrl = logoUrl.ifBlank { "" },
+                        // Fix: Replace ifBlank with an if statement for older Kotlin compatibility
+                        logoUrl = if (logoUrl.isBlank()) "" else logoUrl,
                         description = description
                     )
                 }
             }
 
         } catch (e: Exception) {
+            // If Log is not defined, replace Log.e
             Log.e("TRT", "Error parsing radio channels: ${e.message}", e)
             return getFallbackRadioChannels()
         }
@@ -244,7 +248,7 @@ class Trt : MainAPI() {
                     url = dummyRadioUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h480/q70/12467415.jpeg"
+                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
