@@ -3,6 +3,7 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.json.JSONObject
+import org.json.JSONArray
 import kotlinx.coroutines.delay
 
 class Trt : MainAPI() {
@@ -92,53 +93,58 @@ class Trt : MainAPI() {
 
     private suspend fun getRadioChannels(): List<RadioChannel> {
         val result = mutableListOf<RadioChannel>()
+        // dummyRadioUrl is "https://www.trtdinle.com/radyolar" from Trt.kt
+
         try {
-            val response = app.get("https://www.trtdinle.com/radyolar", timeout = 15)
-            val document = response.document
+            // 1. Fetch the full HTML page source
+            val html = app.get(dummyRadioUrl, timeout = 10).text
 
-            // Try to extract from the script content
-            val scriptContent = document.select("script:containsData(window.__NUXT__)").firstOrNull()?.data()
-                ?: document.select("script").find { it.html().contains("window.__NUXT__") }?.html()
-                ?: return getFallbackRadioChannels()
-
-            // Extract JSON part
-            val jsonStr = scriptContent.substringAfter("window.__NUXT__=").substringBefore(";</script>")
+            // 2. Use a Regex to find and capture the large embedded JSON array of radio channels.
+            // The JSON array is escaped (\/) and starts with objects like {"id":...}.
+            // This pattern is designed to capture the entire channel list array embedded in the JS state.
+            val jsonRegex = Regex(
+                "(\\[\\{\"id\":\\d+,\"title\":\".*?\",\"slug\":\".*?\",\"url\":\".*?\".*?\\])",
+                RegexOption.DOT_ALL
+            )
             
-            // Use Cloudstream3's json helper
-            val json = AppUtils.tryParseJson<Map<String, Any>>(jsonStr) ?: return getFallbackRadioChannels()
+            val match = jsonRegex.find(html)
             
-            // Navigate to channels data - this structure might need adjustment based on actual JSON
-            val data = (json["data"] as? List<Map<String, Any>>)?.firstOrNull() ?: return getFallbackRadioChannels()
-            val channels = data["channels"] as? List<Map<String, Any>> ?: return getFallbackRadioChannels()
-            //Log.i("Radio Channels: ${channels.size}")
+            val jsonString = match?.value ?: run {
+                Log.w("TRT", "Could not find radio channel JSON array. Falling back.")
+                // Assuming getFallbackRadioChannels() is defined elsewhere
+                return getFallbackRadioChannels() 
+            }
 
-            for (channel in channels) {
-                try {
-                    val title = channel["title"] as? String ?: continue
-                    val audio = channel["audio"] as? String ?: continue
-                    val imageUrl = channel["imageUrl"] as? String ?: ""
-                    val description = channel["description"] as? String ?: ""
+            // 3. Parse the extracted JSON string
+            val jsonArray = org.json.JSONArray(jsonString)
 
+            for (i in 0 until jsonArray.length()) {
+                val ch = jsonArray.getJSONObject(i)
+                
+                val name = ch.getString("title")
+                val streamUrl = ch.getString("url") // This contains the stream URL (e.g., master.m3u8)
+                
+                // Prioritize 'imageUrl', falling back to 'image_1' which is also a logo field in the source
+                val logoUrl = ch.optString("imageUrl", ch.optString("image_1", "")) 
+                val description = ch.optString("description", "")
+
+                if (name.isNotBlank() && streamUrl.isNotBlank()) {
                     result += RadioChannel(
-                        name = title,
-                        slug = title.lowercase().replace(" ", "-"),
-                        streamUrl = audio,
-                        logoUrl = imageUrl,
+                        name = name,
+                        slug = name.lowercase().replace(" ", "-"),
+                        streamUrl = streamUrl,
+                        logoUrl = logoUrl.ifBlank { "" },
                         description = description
                     )
-                    //Log.i("Radio Channel: $title")
-                } catch (e: Exception) {
-                    // Skip invalid channels
-                    continue
                 }
             }
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("TRT", "Error parsing radio channels: ${e.message}", e)
+            return getFallbackRadioChannels()
         }
 
-        // If no channels found, use fallback
-        return if (result.isEmpty()) getFallbackRadioChannels() else result
+        return result
     }
 
     private fun getFallbackRadioChannels(): List<RadioChannel> {
@@ -147,7 +153,7 @@ class Trt : MainAPI() {
                 name = "TRT FM",
                 slug = "trt-fm",
                 streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/f_channel_b9f3c65ea803a398ff11f759fb5b59bc.jpeg",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h480/q70/12467418.jpeg",
                 description = "Türkçe Pop"
             ),
             RadioChannel(
