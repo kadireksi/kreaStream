@@ -1,10 +1,12 @@
 package com.kreastream
 
+import kotlin.text.RegexOption
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.delay
+import android.util.Log
 
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
