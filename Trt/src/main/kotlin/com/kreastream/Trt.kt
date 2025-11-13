@@ -22,7 +22,7 @@ class Trt : MainAPI() {
     override val mainPage = mainPageOf(
         "series"  to "Güncel Diziler",
         "archive" to "Eski Diziler",
-        "live" to "TRT Canlı TV & Radyo"
+        "live" to "TRT Tv & Radyo"
     )
 
     data class TvChannel(
@@ -110,6 +110,7 @@ class Trt : MainAPI() {
             // Navigate to channels data - this structure might need adjustment based on actual JSON
             val data = (json["data"] as? List<Map<String, Any>>)?.firstOrNull() ?: return getFallbackRadioChannels()
             val channels = data["channels"] as? List<Map<String, Any>> ?: return getFallbackRadioChannels()
+            log.i("Radio Channels: ${channels.size}")
 
             for (channel in channels) {
                 try {
@@ -125,6 +126,7 @@ class Trt : MainAPI() {
                         logoUrl = imageUrl,
                         description = description
                     )
+                    log.i("Radio Channel: $title")
                 } catch (e: Exception) {
                     // Skip invalid channels
                     continue
@@ -367,7 +369,6 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.hasDownload = false
             }
         }
 
@@ -385,7 +386,6 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.hasDownload = false
             }
         }
 
