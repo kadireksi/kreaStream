@@ -93,40 +93,55 @@ class Trt : MainAPI() {
         return result
     }
 
-    private suspend fun getRadioChannels(): List<RadioChannel> = try {
-        val html = app.get(dummyRadioUrl, timeout = 15).text
+    private suspend fun getRadioChannels(): List<RadioChannel> {
+        val result = mutableListOf<RadioChannel>()
 
-        // Find all objects that look like radio channels: have "title" and "url" fields
-        val channelRegex = Regex("""\{"title":"([^"]+)"[^}]*"url":"([^"]+\.m3u8[^"]*)"[^}]*\}""")
-        val matches = channelRegex.findAll(html).toList()
+        try {
+            val html = app.get(dummyRadioUrl, timeout = 15).text
 
-        if (matches.isEmpty()) return getFallbackRadioChannels()
+            // ── Very robust regex: finds every object that has "title":"…" and "url":"…m3u8"
+            //    It also captures the logo/cover URL that appears right before/after the object
+            val channelRegex = Regex(
+                """cover"\s*:\s*"([^"]*\.jpe?g[^"]*)".*?"title"\s*:\s*"([^"]+)".*?"url"\s*:\s*"([^"]+\.m3u8[^"]*)"""",
+                setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.UNIX_LINES)
+            )
 
-        matches.distinctBy { it.groupValues[2] } // dedupe by stream URL
-            .mapNotNull { m ->
-                val name = m.groupValues[1].takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val streamUrl = m.groupValues[2]
+            val matches = channelRegex.findAll(html).toList()
 
-                // Try to extract logo from nearby cover/imageUrl
-                val start = maxOf(0, m.range.first - 300)
-                val snippet = html.substring(start, m.range.last + 300)
-                val logoMatch = Regex("""cover"?:?"([^"]+\.jpe?g[^"]*)""").find(snippet)
-                val logoUrl = logoMatch?.groupValues?.get(1) ?: ""
+            if (matches.isEmpty()) {
+                Log.w("TRT", "No radio channels found with regex → fallback")
+                return getFallbackRadioChannels()
+            }
 
-                RadioChannel(
+            // Deduplicate by stream URL (some channels appear twice)
+            val seenUrls = mutableSetOf<String>()
+            for (m in matches) {
+                val logoUrl = m.groupValues[1].replace("\u002F", "/")
+                val name    = m.groupValues[2]
+                val streamUrl = m.groupValues[3].replace("\u002F", "/")
+
+                if (name.isBlank() || streamUrl.isBlank() || !seenUrls.add(streamUrl)) continue
+
+                result += RadioChannel(
                     name = name,
-                    slug = name.lowercase().replace(" ", "-"),
+                    slug = name.lowercase(Locale.ROOT).replace(" ", "-"),
                     streamUrl = streamUrl,
                     logoUrl = logoUrl,
                     description = ""
                 )
             }
-            .takeIf { it.isNotEmpty() }
-            ?: getFallbackRadioChannels()
 
-    } catch (e: Exception) {
-        Log.e("TRT", "Radio parse error", e)
-        getFallbackRadioChannels()
+            if (result.isNotEmpty()) {
+                Log.i("TRT", "Successfully parsed ${result.size} radio channels")
+                return result
+            }
+
+        } catch (e: Exception) {
+            Log.e("TRT", "Error while parsing radio channels", e)
+        }
+
+        // ── If anything goes wrong → safe fallback
+        return getFallbackRadioChannels()
     }
 
     private fun getFallbackRadioChannels(): List<RadioChannel> {
