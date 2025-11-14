@@ -86,7 +86,7 @@ class Trt : MainAPI() {
                     }
                 }
                 if (streamUrl.isBlank()) continue
-                if(!name.contains("tabii TV")) {
+                if(!name.contains("tabii Spor")) {
                     result += TvChannel(name, slug, streamUrl, logoUrl, "$name")
                 } 
             }
@@ -372,6 +372,8 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
+                addDownloadButton = false
+                isPreview = false
             }
         }
 
@@ -389,6 +391,8 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
+                addDownloadButton = false
+                isPreview = false
             }
         }
 
