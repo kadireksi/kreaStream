@@ -93,113 +93,40 @@ class Trt : MainAPI() {
         return result
     }
 
-    private suspend fun getRadioChannels(): List<RadioChannel> {
-        val result = mutableListOf<RadioChannel>()
+    private suspend fun getRadioChannels(): List<RadioChannel> = try {
+        val html = app.get(dummyRadioUrl, timeout = 15).text
 
-        try {
-            val response = app.get(dummyRadioUrl, timeout = 15)
-            val html = response.text
+        // Find all objects that look like radio channels: have "title" and "url" fields
+        val channelRegex = Regex("""\{"title":"([^"]+)"[^}]*"url":"([^"]+\.m3u8[^"]*)"[^}]*\}""")
+        val matches = channelRegex.findAll(html).toList()
 
-            // Step 1: Extract the window.__NUXT__ = (...) assignment
-            val nuxtScriptRegex = Regex("""window\.__NUXT__\s*=\s*\(function\([^)]*\)\{[^}]*\}\)\((.*)\);?</script>""")
-            val match = nuxtScriptRegex.find(html) ?: run {
-                Log.w("TRT", "Nuxt script not found, falling back")
-                return getFallbackRadioChannels()
-            }
+        if (matches.isEmpty()) return getFallbackRadioChannels()
 
-            val argsString = match.groupValues[1]
+        matches.distinctBy { it.groupValues[2] } // dedupe by stream URL
+            .mapNotNull { m ->
+                val name = m.groupValues[1].takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val streamUrl = m.groupValues[2]
 
-            // Step 2: Extract the last argument — that's the actual data object (JSON-like)
-            // It's a series of quoted strings, numbers, objects — we extract from the last opening ( to end
-            val dataStartIdx = argsString.indexOfLast { it == '(' }
-            if (dataStartIdx == -1) return getFallbackRadioChannels()
+                // Try to extract logo from nearby cover/imageUrl
+                val start = maxOf(0, m.range.first - 300)
+                val snippet = html.substring(start, m.range.last + 300)
+                val logoMatch = Regex("""cover"?:?"([^"]+\.jpe?g[^"]*)""").find(snippet)
+                val logoUrl = logoMatch?.groupValues?.get(1) ?: ""
 
-            // Balance parentheses to find the correct closing one
-            var balance = 0
-            var endIdx = -1
-            for (i in dataStartIdx until argsString.length) {
-                when (argsString[i]) {
-                    '(' -> balance++
-                    ')' -> {
-                        balance--
-                        if (balance == 0) {
-                            endIdx = i
-                            break
-                        }
-                    }
-                }
-            }
-
-            if (endIdx == -1) return getFallbackRadioChannels()
-
-            val rawJson = argsString.substring(dataStartIdx + 1, endIdx)
-
-            // Step 3: Clean up escaped unicode and fix common issues
-            val cleanedJson = rawJson
-                .replace(Regex("""\\u002F"""), "/")
-                .replace(Regex("""\\"""), "\"")
-
-            // Step 4: Parse as JSONObject
-            val nuxtData = JSONObject(cleanedJson)
-
-            // Path may vary slightly, but as of 2025 it's usually under data[0] or state
-            val channelsArray = when {
-                nuxtData.has("data") -> {
-                    val dataArray = nuxtData.getJSONArray("data")
-                    if (dataArray.length() > 0) {
-                        val first = dataArray.getJSONObject(0)
-                        first.optJSONArray("channels") ?: first.optJSONArray("noGroupContent") ?: first.optJSONObject("channels")?.let {
-                            // sometimes nested in groups
-                            val arr = JSONArray()
-                            first.keys().forEach { key ->
-                                if (key.matches(Regex("\\d+"))) {
-                                    val group = first.getJSONArray(key)
-                                    for (i in 0 until group.length()) arr.put(group.getJSONObject(i))
-                                }
-                            }
-                            arr
-                        }
-                    } else null
-                }
-                nuxtData.has("channels") -> nuxtData.getJSONArray("channels")
-                nuxtData.has("noGroupContent") -> nuxtData.getJSONArray("noGroupContent")
-                else -> null
-            } ?: run {
-                Log.w("TRT", "No channels array found in __NUXT__")
-                return getFallbackRadioChannels()
-            }
-
-            for (i in 0 until channelsArray.length()) {
-                val ch = channelsArray.getJSONObject(i)
-
-                val name = ch.optString("title", "").takeIf { it.isNotBlank() } ?: continue
-                val streamUrl = ch.optString("url", "").takeIf { it.isNotBlank() } ?: continue
-                val logoUrl = ch.optString("imageUrl")
-                    .takeIf { it.isNotBlank() }
-                    ?: ch.optString("cover", "").takeIf { it.isNotBlank() }
-                    ?: ""
-
-                val description = ch.optString("description", "")
-
-                result += RadioChannel(
+                RadioChannel(
                     name = name,
                     slug = name.lowercase().replace(" ", "-"),
                     streamUrl = streamUrl,
                     logoUrl = logoUrl,
-                    description = description
+                    description = ""
                 )
             }
+            .takeIf { it.isNotEmpty() }
+            ?: getFallbackRadioChannels()
 
-            if (result.isNotEmpty()) {
-                Log.i("TRT", "Successfully parsed ${result.size} radio channels from __NUXT__")
-                return result
-            }
-
-        } catch (e: Exception) {
-            Log.e("TRT", "Failed to parse radio channels from Nuxt: ${e.message}", e)
-        }
-
-        return getFallbackRadioChannels()
+    } catch (e: Exception) {
+        Log.e("TRT", "Radio parse error", e)
+        getFallbackRadioChannels()
     }
 
     private fun getFallbackRadioChannels(): List<RadioChannel> {
