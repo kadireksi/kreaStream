@@ -93,94 +93,124 @@ class Trt : MainAPI() {
         return result
     }
 
-   private suspend fun getRadioChannels(): List<RadioChannel> {
+    private suspend fun getRadioChannels(): List<RadioChannel> {
         val result = mutableListOf<RadioChannel>()
 
         try {
-            // 1. Fetch the full HTML page source
-            val html = app.get(dummyRadioUrl, timeout = 10).text
+            val response = app.get(dummyRadioUrl, timeout = 15)
+            val html = response.text
 
-            // 2. Use a Regex to find and capture the large embedded JSON array of radio channels.
-            // The pattern captures the entire JSON array.
-            val jsonRegex = Regex(
-                "(\\[\\{\"id\":\\d+,\"title\":\".*?\",\"slug\":\".*?\",\"url\":\".*?\".*?\\])",
-                RegexOption.DOT_MATCHES_ALL
-            )
-            
-            val match = jsonRegex.find(html)
-            
-            val jsonString = match?.groups?.get(1)?.value ?: run {
-                Log.w("TRT", "Could not find radio channel JSON array. Falling back.")
-                return getFallbackRadioChannels() 
+            // Step 1: Extract the window.__NUXT__ = (...) assignment
+            val nuxtScriptRegex = Regex("""window\.__NUXT__\s*=\s*\(function\([^)]*\)\{[^}]*\}\)\((.*)\);?</script>""")
+            val match = nuxtScriptRegex.find(html) ?: run {
+                Log.w("TRT", "Nuxt script not found, falling back")
+                return getFallbackRadioChannels()
             }
 
-            // 3. Parse the extracted JSON string
-            val jsonArray = JSONArray(jsonString)
+            val argsString = match.groupValues[1]
 
-            for (i in 0 until jsonArray.length()) {
-                val ch = jsonArray.getJSONObject(i)
-                
-                val name = ch.getString("title")
-                val streamUrl = ch.getString("url")
-                
-                val logoUrl = ch.optString("imageUrl", ch.optString("image_1", "")) 
-                val description = ch.optString("description", "")
+            // Step 2: Extract the last argument — that's the actual data object (JSON-like)
+            // It's a series of quoted strings, numbers, objects — we extract from the last opening ( to end
+            val dataStartIdx = argsString.indexOfLast { it == '(' }
+            if (dataStartIdx == -1) return getFallbackRadioChannels()
 
-                if (name.isNotBlank() && streamUrl.isNotBlank()) {
-                    result += RadioChannel(
-                        name = name,
-                        slug = name.lowercase().replace(" ", "-"),
-                        streamUrl = streamUrl,
-                        logoUrl = if (logoUrl.isBlank()) "" else logoUrl,
-                        description = description
-                    )
+            // Balance parentheses to find the correct closing one
+            var balance = 0
+            var endIdx = -1
+            for (i in dataStartIdx until argsString.length) {
+                when (argsString[i]) {
+                    '(' -> balance++
+                    ')' -> {
+                        balance--
+                        if (balance == 0) {
+                            endIdx = i
+                            break
+                        }
+                    }
                 }
             }
 
+            if (endIdx == -1) return getFallbackRadioChannels()
+
+            val rawJson = argsString.substring(dataStartIdx + 1, endIdx)
+
+            // Step 3: Clean up escaped unicode and fix common issues
+            val cleanedJson = rawJson
+                .replace(Regex("""\\u002F"""), "/")
+                .replace(Regex("""\\"""), "\"")
+
+            // Step 4: Parse as JSONObject
+            val nuxtData = JSONObject(cleanedJson)
+
+            // Path may vary slightly, but as of 2025 it's usually under data[0] or state
+            val channelsArray = when {
+                nuxtData.has("data") -> {
+                    val dataArray = nuxtData.getJSONArray("data")
+                    if (dataArray.length() > 0) {
+                        val first = dataArray.getJSONObject(0)
+                        first.optJSONArray("channels") ?: first.optJSONArray("noGroupContent") ?: first.optJSONObject("channels")?.let {
+                            // sometimes nested in groups
+                            val arr = JSONArray()
+                            first.keys().forEach { key ->
+                                if (key.matches(Regex("\\d+"))) {
+                                    val group = first.getJSONArray(key)
+                                    for (i in 0 until group.length()) arr.put(group.getJSONObject(i))
+                                }
+                            }
+                            arr
+                        }
+                    } else null
+                }
+                nuxtData.has("channels") -> nuxtData.getJSONArray("channels")
+                nuxtData.has("noGroupContent") -> nuxtData.getJSONArray("noGroupContent")
+                else -> null
+            } ?: run {
+                Log.w("TRT", "No channels array found in __NUXT__")
+                return getFallbackRadioChannels()
+            }
+
+            for (i in 0 until channelsArray.length()) {
+                val ch = channelsArray.getJSONObject(i)
+
+                val name = ch.optString("title", "").takeIf { it.isNotBlank() } ?: continue
+                val streamUrl = ch.optString("url", "").takeIf { it.isNotBlank() } ?: continue
+                val logoUrl = ch.optString("imageUrl")
+                    .takeIf { it.isNotBlank() }
+                    ?: ch.optString("cover", "").takeIf { it.isNotBlank() }
+                    ?: ""
+
+                val description = ch.optString("description", "")
+
+                result += RadioChannel(
+                    name = name,
+                    slug = name.lowercase().replace(" ", "-"),
+                    streamUrl = streamUrl,
+                    logoUrl = logoUrl,
+                    description = description
+                )
+            }
+
+            if (result.isNotEmpty()) {
+                Log.i("TRT", "Successfully parsed ${result.size} radio channels from __NUXT__")
+                return result
+            }
+
         } catch (e: Exception) {
-            Log.e("TRT", "Error parsing radio channels: ${e.message}", e)
-            return getFallbackRadioChannels()
+            Log.e("TRT", "Failed to parse radio channels from Nuxt: ${e.message}", e)
         }
 
-        return result
+        return getFallbackRadioChannels()
     }
 
     private fun getFallbackRadioChannels(): List<RadioChannel> {
         return listOf(
-            RadioChannel(
-                name = "TRT FM",
-                slug = "trt-fm",
-                streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h480/q70/12467418.jpeg",
-                description = "Türkçe Pop"
-            ),
-            RadioChannel(
-                name = "TRT Radyo 1",
-                slug = "trt-radyo-1",
-                streamUrl = "https://trt.radyotvonline.net/trt_1.aac",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467415.jpeg",
-                description = "Haber ve Kültür"
-            ),
+
             RadioChannel(
                 name = "TRT Türkü",
                 slug = "trt-turku",
                 streamUrl = "https://rd-trtturku.medya.trt.com.tr/master.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467466.jpeg",
                 description = "Türk Halk Müziği"
-            ),
-            RadioChannel(
-                name = "TRT Nağme",
-                slug = "trt-nagme",
-                streamUrl = "https://rd-trtnagme.medya.trt.com.tr/master.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12467465.jpeg",
-                description = "Türk Sanat Müziği"
-            ),
-            RadioChannel(
-                name = "TRT Radyo Haber",
-                slug = "trt-radyo-haber",
-                streamUrl = "https://trt.radyotvonline.net/trt_haber.aac",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/12530424_0-0-2048-1536.jpeg",
-                description = "Sürekli Haber"
             )
         )
     }
