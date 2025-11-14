@@ -7,6 +7,7 @@ import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.delay
 import android.util.Log
+import com.lagradost.cloudstream3.ui.search.SearchViewModel.Companion.Log
 
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
@@ -95,40 +96,38 @@ class Trt : MainAPI() {
 
     private suspend fun getRadioChannels(): List<RadioChannel> {
         val result = mutableListOf<RadioChannel>()
-        // dummyRadioUrl is "https://www.trtdinle.com/radyolar" from Trt.kt
 
         try {
             // 1. Fetch the full HTML page source
             val html = app.get(dummyRadioUrl, timeout = 10).text
 
             // 2. Use a Regex to find and capture the large embedded JSON array of radio channels.
-            // The JSON array is escaped (\/) and starts with objects like {"id":...}.
-            // Note the capturing group around the array.
+            // The pattern captures the entire JSON array.
             val jsonRegex = Regex(
                 "(\\[\\{\"id\":\\d+,\"title\":\".*?\",\"slug\":\".*?\",\"url\":\".*?\".*?\\])",
-                RegexOption.DOT_ALL // This needs to be imported: import kotlin.text.RegexOption
+                // Fix for Unresolved reference 'DOT_ALL'
+                RegexOption.DOT_ALL
             )
             
             val match = jsonRegex.find(html)
             
-            // Fix: Use groupValues[1] to get the content of the first capturing group
-            val jsonString = match?.groupValues?.get(1) ?: run {
-                // If Log is not defined, replace Log.w with a function that returns the fallback
+            // Fix: Use match.groups[1]?.value to reliably get the captured group's content
+            val jsonString = match?.groups?.get(1)?.value ?: run {
                 Log.w("TRT", "Could not find radio channel JSON array. Falling back.")
                 return getFallbackRadioChannels() 
             }
 
             // 3. Parse the extracted JSON string
+            // Fix for Overload resolution ambiguity
             val jsonArray = JSONArray(jsonString)
 
-            // Fix: JSONArray uses length() for size and getJSONObject(i)
+            // Fix for Unresolved references 'length' and 'getJSONObject'
             for (i in 0 until jsonArray.length()) {
                 val ch = jsonArray.getJSONObject(i)
                 
                 val name = ch.getString("title")
-                val streamUrl = ch.getString("url") // This contains the stream URL (e.g., master.m3u8)
+                val streamUrl = ch.getString("url")
                 
-                // Prioritize 'imageUrl', falling back to 'image_1'.
                 val logoUrl = ch.optString("imageUrl", ch.optString("image_1", "")) 
                 val description = ch.optString("description", "")
 
@@ -137,7 +136,7 @@ class Trt : MainAPI() {
                         name = name,
                         slug = name.lowercase().replace(" ", "-"),
                         streamUrl = streamUrl,
-                        // Fix: Replace ifBlank with an if statement for older Kotlin compatibility
+                        // Fix for Argument type mismatch (ifBlank is a newer Kotlin function)
                         logoUrl = if (logoUrl.isBlank()) "" else logoUrl,
                         description = description
                     )
@@ -145,7 +144,6 @@ class Trt : MainAPI() {
             }
 
         } catch (e: Exception) {
-            // If Log is not defined, replace Log.e
             Log.e("TRT", "Error parsing radio channels: ${e.message}", e)
             return getFallbackRadioChannels()
         }
@@ -243,7 +241,7 @@ class Trt : MainAPI() {
                     url = dummyTvUrl,
                     type = TvType.TvSeries
                 ) {
-                    this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                 },
                  newTvSeriesSearchResponse(
                     name = "TRT Radyo",
