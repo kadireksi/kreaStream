@@ -3,7 +3,6 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.json.JSONObject
-import kotlinx.coroutines.delay
 import android.util.Log
 import java.util.Locale
 
@@ -16,8 +15,9 @@ class Trt : MainAPI() {
 
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
+    private val liveBase = "$tabiiUrl/watch/live"
 
-    private val dummyTvUrl = "https://www.tabii.com/tr/watch/live"
+    private val dummyTvUrl = tabiiUrl
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
 
     override val mainPage = mainPageOf(
@@ -42,37 +42,11 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
-    // Hardcoded reliable TRT TV channels (dynamic fallback if Tabii works)
+    // Dynamic TV channels from Tabii (TRT 1, Haber, Çocuk, etc.)
     private suspend fun getTvChannels(): List<TvChannel> {
-        // Try dynamic first
-        val dynamic = tryDynamicTvChannels()
-        if (dynamic.isNotEmpty()) {
-            Log.i("TRT_TV", "Using dynamic TV channels: ${dynamic.size}")
-            return dynamic
-        }
-
-        // Hardcoded always-works fallback
-        Log.i("TRT_TV", "Using hardcoded TV channels")
-        return listOf(
-            TvChannel("TRT 1", "trt1", "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/TRT_1_2018.svg/512px-TRT_1_2018.svg.png", "Genel eğlence ve diziler"),
-            TvChannel("TRT Haber", "trthaber", "https://tv-trthaber.medya.trt.com.tr/master.m3u8",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/TRT_Haber_2018.svg/512px-TRT_Haber_2018.svg.png", "24 saat haber"),
-            TvChannel("TRT 2", "trt2", "https://tv-trt2.medya.trt.com.tr/master.m3u8",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/TRT_2_2018.svg/512px-TRT_2_2018.svg.png", "Kültür-sanat"),
-            TvChannel("TRT Spor", "trtspor", "https://tv-trtspor.medya.trt.com.tr/master.m3u8",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/TRT_Spor_2018.svg/512px-TRT_Spor_2018.svg.png", "Spor yayınları"),
-            TvChannel("TRT Çocuk", "trtcocuk", "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/TRT_%C3%87ocuk_2018.svg/512px-TRT_%C3%87ocuk_2018.svg.png", "Çocuk programları"),
-            TvChannel("TRT Belgesel", "trtbelgesel", "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/TRT_Belgesel_2018.svg/512px-TRT_Belgesel_2018.svg.png", "Belgeseller")
-        )
-    }
-
-    private suspend fun tryDynamicTvChannels(): List<TvChannel> {
         val result = mutableListOf<TvChannel>()
         try {
-            val response = app.get("$dummyTvUrl/trt1?trackId=150002", headers = mapOf("User-Agent" to "Mozilla/5.0"))
+            val response = app.get("$liveBase/trt1?trackId=150002")
             val doc = response.document
             val nextData = doc.selectFirst("#__NEXT_DATA__")?.data() ?: return emptyList()
 
@@ -111,13 +85,14 @@ class Trt : MainAPI() {
 
                 result += TvChannel(name, slug, streamUrl, logoUrl, "$name - Canlı Yayın")
             }
+            Log.i("TRT_TV", "Loaded ${result.size} live TV channels")
         } catch (e: Exception) {
-            Log.e("TRT_TV", "Dynamic TV fetch failed", e)
+            Log.e("TRT_TV", "Failed to load TV channels", e)
         }
         return result
     }
 
-    // Hardcoded reliable TRT Radio channels
+    // Hardcoded & always working TRT Radio channels
     private suspend fun getRadioChannels(): List<RadioChannel> {
         return listOf(
             RadioChannel("TRT FM", "trt-fm", "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
@@ -161,24 +136,23 @@ class Trt : MainAPI() {
                         ?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
                         ?.replace("/q75/", "/q85/")
 
-                    newTvSeriesSearchResponse(title, "$trt1Url$href") { 
-                        this.posterUrl = poster 
-                    }
+                    newTvSeriesSearchResponse(title, "$trt1Url$href") { this.posterUrl = poster }
                 }
-        } catch (e: Exception) { 
-            Log.e("TRT", "Series fetch error", e)
-            emptyList() 
-        }
+        } catch (e: Exception) { emptyList() }
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
             "live" -> listOf(
                 newMovieSearchResponse("TRT TV Canlı", dummyTvUrl, TvType.Live) {
-                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    year = 1964
+                    plot = "TRT 1, TRT Haber, TRT Çocuk ve daha fazlası"
                 },
                 newMovieSearchResponse("TRT Radyo Canlı", dummyRadioUrl, TvType.Live) {
-                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle/w480/h480/q70/12530507_0-0-2048-1536.jpeg"
+                    posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle/w480/h480/q70/12530507_0-0-2048-1536.jpeg"
+                    year = 1927
+                    plot = "TRT FM, Radyo 1, Türkü, Nağme ve bölgesel radyolar"
                 }
             )
             "series" -> getTrtSeries(archive = false, page = page)
@@ -186,127 +160,96 @@ class Trt : MainAPI() {
             else -> emptyList()
         }
 
-        val hasNext = request.data in listOf("series", "archive") && items.isNotEmpty()
-
-        return newHomePageResponse(
-            listOf(HomePageList(request.name, items, true)),
-            hasNext = hasNext
-        )
+        return newHomePageResponse(HomePageList(request.name, items, true), items.isNotEmpty())
     }
 
     override suspend fun load(url: String): LoadResponse {
         return when {
-            url == dummyTvUrl -> buildLiveTVResponse(getTvChannels())
+            url == dummyTvUrl -> {
+                val channels = getTvChannels()
+                if (channels.isEmpty()) {
+                    buildLiveTVResponse(listOf(TvChannel("TRT 1", "trt1", "https://tv-trt1.medya.trt.com.tr/master.m3u8",
+                        "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png", "TRT 1")))
+                } else buildLiveTVResponse(channels)
+            }
             url == dummyRadioUrl -> buildLiveRadioResponse(getRadioChannels())
-            url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true) -> 
-                newMovieLoadResponse("TRT Canlı Yayın", url, TvType.Live, url) {
-                    this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+            url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true) ->
+                newMovieLoadResponse("Canlı Yayın", url, TvType.Live, url) {
+                    posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
                 }
             else -> {
-                try {
-                    val doc = app.get(url, timeout = 15).document
-                    val title = doc.selectFirst("h1")?.text()?.trim() ?: throw ErrorLoadingException("Başlık bulunamadı")
-                    val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
-                    var poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
-                        ?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                        ?.replace("/q75/", "/q85/")
+                val doc = app.get(url, timeout = 15).document
+                val title = doc.selectFirst("h1")?.text()?.trim() ?: "TRT Dizi"
+                val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
+                val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
+                    ?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                    ?.replace("/q75/", "/q85/")
 
-                    val seriesSlug = url.removePrefix("$trt1Url/diziler/").substringBefore("/")
-                    val episodes = mutableListOf<Episode>()
-                    var pageNum = 1
-                    var more = true
-
-                    while (more && pageNum <= 30) {
-                        try {
-                            val epUrl = if (pageNum == 1) "$trt1Url/diziler/$seriesSlug/bolum"
-                            else "$trt1Url/diziler/$seriesSlug/bolum/$pageNum"
-                            val epDoc = app.get(epUrl, timeout = 10).document
-                            val pageEps = epDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
-                                .mapNotNull { el ->
-                                    val epTitle = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
-                                    val href = el.attr("href")
-                                    var img = el.selectFirst("img")?.absUrl("src")
-                                        ?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                                        ?.replace("/q75/", "/q85/")
-                                    val desc = el.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
-                                    val epNum = epTitle.replace(Regex("[^0-9]"), "").toIntOrNull() ?: pageNum
-
-                                    newEpisode("$trt1Url$href") {
-                                        name = epTitle
-                                        posterUrl = img
-                                        episode = epNum
-                                        description = desc
-                                    }
-                                }
-
-                            if (pageEps.isNotEmpty()) {
-                                episodes += pageEps
-                                pageNum++
-                                delay(100)
-                            } else more = false
-                        } catch (e: Exception) { 
-                            more = false 
+                val episodes = mutableListOf<Episode>()
+                var pageNum = 1
+                while (pageNum <= 30) {
+                    val epDoc = app.get("$url/bolum${if (pageNum > 1) "/$pageNum" else ""}", timeout = 10).document
+                    val eps = epDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
+                        .mapNotNull { el ->
+                            val epTitle = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
+                            val href = el.attr("href")
+                            val img = el.selectFirst("img")?.absUrl("src")
+                                ?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                                ?.replace("/q75/", "/q85/")
+                            newEpisode("$trt1Url$href") {
+                                name = epTitle
+                                posterUrl = img
+                                episode = epTitle.replace(Regex("[^0-9]"), "").toIntOrNull() ?: pageNum
+                            }
                         }
-                    }
-
-                    newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                        this.posterUrl = poster
-                        this.plot = plot
-                    }
-                } catch (e: Exception) {
-                    throw ErrorLoadingException("Dizi yüklenemedi: ${e.message}")
+                    if (eps.isEmpty()) break
+                    episodes += eps
+                    pageNum++
+                }
+                newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                    this.posterUrl = poster
+                    this.plot = plot
                 }
             }
         }
     }
 
-    private suspend fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
+    private fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
-                name = ch.name
+                name = "TRT ${ch.name}"
                 posterUrl = ch.logoUrl
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl  // Fixes Continue Watching posters
+                this.data = ch.streamUrl
             }
         }
-
         return newTvSeriesLoadResponse("TRT Canlı TV", dummyTvUrl, TvType.Live, episodes) {
-            this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
-            this.plot = "TRT 1, Haber, Spor, Çocuk ve daha fazlası - Canlı yayın"
+            posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+            plot = "Tüm TRT kanalları canlı yayın"
+            year = 1964
+            tags = listOf("Canlı", "TV", "TRT")
         }
     }
 
-    private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
+    private fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
-                name = ch.name
+                name = "TRT ${ch.name}"
                 posterUrl = ch.logoUrl
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl  // Fixes Continue Watching posters
+                this.data = ch.streamUrl
             }
         }
-
         return newTvSeriesLoadResponse("TRT Radyo Canlı", dummyRadioUrl, TvType.Live, episodes) {
-            this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle/w480/h480/q70/12530507_0-0-2048-1536.jpeg"
-            this.plot = "TRT FM, Radyo 1, Türkü, Nağme ve bölgesel - Canlı yayın"
+            posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle/w480/h480/q70/12530507_0-0-2048-1536.jpeg"
+            plot = "TRT'nin tüm radyoları 7/24 canlı"
+            year = 1927
+            tags = listOf("Radyo", "Müzik", "TRT")
         }
-    }
-
-    private fun generateQualityVariants(base: String): List<String> {
-        val list = mutableListOf(base)
-        try {
-            if (base.contains("medya.trt.com.tr")) {
-                val prefix = base.substringBeforeLast("/").removeSuffix("_master")
-                listOf("360", "480", "720", "1080").forEach { q ->
-                    list += "$prefix" + "_$q.m3u8"
-                }
-            }
-        } catch (_: Exception) {}
-        return list.distinct()
     }
 
     override suspend fun loadLinks(
@@ -315,84 +258,22 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
-            generateQualityVariants(data).forEach { u ->
-                M3u8Helper.generateM3u8(
-                    source = name,
-                    streamUrl = u,
-                    referer = tabiiUrl,
-                    headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
-                ).forEach(callback)
-            }
+        if (data.contains(".m3u8") || data.contains(".aac")) {
+            M3u8Helper.generateM3u8(name, data, tabiiUrl).forEach(callback)
             return true
         }
-
-        try {
-            val doc = app.get(data, timeout = 10).document
-            val script = doc.select("script").find { it.html().contains("playerConfig") }?.html()
-            val m3u8 = script?.let {
-                Regex("""streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""").find(it)?.groupValues?.get(1)
-            }
-
-            if (m3u8 != null) {
-                generateQualityVariants(m3u8).forEach { u ->
-                    M3u8Helper.generateM3u8(
-                        source = name,
-                        streamUrl = u,
-                        referer = trt1Url,
-                        headers = mapOf("Referer" to trt1Url)
-                    ).forEach(callback)
-                }
-                return true
-            }
-
-            val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")?.attr("src")
-                ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
-                ?: Regex("""https://www\.youtube\.com/watch\?v=([a-zA-Z0-9_-]+)""").find(doc.html())?.groupValues?.get(1)
-                    ?.let { "https://www.youtube.com/watch?v=$it" }
-
-            if (yt != null) {
-                loadExtractor(yt, tabiiUrl, subtitleCallback, callback)
-                return true
-            }
-        } catch (e: Exception) {
-            Log.e("TRT", "loadLinks error", e)
-        }
-
         return false
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val out = mutableListOf<SearchResponse>()
+        val results = mutableListOf<SearchResponse>()
 
-        getTvChannels().filter { it.name.contains(query, ignoreCase = true) }
-            .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) { this.posterUrl = ch.logoUrl }
-            }
+        getTvChannels().filter { it.name.contains(query, true) }
+            .forEach { results += newMovieSearchResponse(it.name, it.streamUrl, TvType.Live) { posterUrl = it.logoUrl } }
 
-        getRadioChannels().filter { it.name.contains(query, ignoreCase = true) }
-            .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) { this.posterUrl = ch.logoUrl }
-            }
+        getRadioChannels().filter { it.name.contains(query, true) }
+            .forEach { results += newMovieSearchResponse(it.name, it.streamUrl, TvType.Live) { posterUrl = it.logoUrl } }
 
-        try {
-            val sUrl = "$trt1Url/arama/$query?contenttype=series"
-            app.get(sUrl, timeout = 10).document
-                .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
-                .mapNotNull { el ->
-                    val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim() ?: return@mapNotNull null
-                    val href = el.attr("href")
-                    if (!href.contains("/diziler/")) return@mapNotNull null
-                    var poster = el.selectFirst("img")?.absUrl("src")
-                        ?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                        ?.replace("/q75/", "/q85/")
-
-                    out += newTvSeriesSearchResponse(title, "$trt1Url$href") { this.posterUrl = poster }
-                }
-        } catch (e: Exception) {
-            Log.e("TRT", "Search error", e)
-        }
-
-        return out
+        return results
     }
 }
