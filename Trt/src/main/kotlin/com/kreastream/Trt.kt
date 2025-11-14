@@ -112,59 +112,70 @@ class Trt : MainAPI() {
             val html = response.text
             Log.d("TRT_RADIO", "HTML loaded, length: ${html.length}")
 
-            // This is the REAL pattern that exists in the page (tested live)
-            // Looks for: "title":"TRT FM",..."audio":"https://radio-trt-fm.medya.trt.com.tr/master.m3u8",..."cover":"https://..."
+            // DEBUG: Dump first ~2000 chars to see structure (check logcat for __NUXT__)
+            Log.d("TRT_RADIO", "HTML preview: ${html.take(2000)}")
+
+            // Primary regex: Matches { ... "title":"..." ... "audio":"...m3u8" ... "cover":"...jpg" ... } - ANY ORDER
+            // Uses lookaheads to find all fields in the same object block, non-greedy
             val pattern = Regex(
-                """"title"\s*:\s*"([^"]+)"[^}]*?"audio"\s*:\s*"([^"]+?\.(m3u8|aac))"[^}]*?"cover"\s*:\s*"([^"]+?\.jpe?g[^"]*)"""",
+                """\{[^}]*?"title"\s*:\s*"([^"]+)"[^}]*?"audio"\s*:\s*"([^"]+?\.(?:m3u8|aac))"[^}]*?"cover"\s*:\s*"([^"]+?\.jpe?g[^"]*)"[^}]*\}""",
                 RegexOption.DOT_MATCHES_ALL
             )
 
-            val matches = pattern.findAll(html).toList()
-
-            Log.d("TRT_RADIO", "Found ${matches.size} regex matches")
+            var matches = pattern.findAll(html).toList()
 
             if (matches.isEmpty()) {
-                Log.w("TRT_RADIO", "No matches → trying fallback regex")
-                // Fallback: looser pattern if order changes
-                val fallback = Regex(""""title"\s*:\s*"([^"]+)".*?"audio"\s*:\s*"([^"]+?\.(m3u8|aac))".*?"cover"\s*:\s*"([^"]+)"""", RegexOption.DOT_MATCHES_ALL)
-                fallback.findAll(html).forEach { m ->
-                    val name = m.groupValues[1]
-                    val url = m.groupValues[2].replace("\\u002F", "/")
-                    val cover = m.groupValues[3].replace("\\u002F", "/")
-                    if (name.isNotBlank() && url.isNotBlank()) {
-                        result += RadioChannel(name, name.lowercase(Locale.ROOT).replace(" ", "-"), url, cover, "")
-                    }
-                }
+                Log.w("TRT_RADIO", "Primary regex failed → trying ultra-loose fallback")
+                // Fallback: Even looser - any order, allows url as alternative to audio
+                val fallback = Regex(
+                    """\{[^}]*?("title"\s*:\s*"([^"]+)"[^}]*?("audio"|"url")\s*:\s*"([^"]+?\.(?:m3u8|aac))"[^}]*?"cover"\s*:\s*"([^"]+?\.jpe?g[^"]*)")""",
+                    RegexOption.DOT_MATCHES_ALL
+                )
+                matches = fallback.findAll(html).toList()
+
+                Log.d("TRT_RADIO", "Fallback found ${matches.size} matches")
             } else {
-                val seen = mutableSetOf<String>()
-                for (m in matches) {
-                    val name = m.groupValues[1].trim()
-                    val streamUrl = m.groupValues[2].replace("\\u002F", "/")
-                    val logoUrl = m.groupValues[3].replace("\\u002F", "/")
+                Log.d("TRT_RADIO", "Primary found ${matches.size} matches")
+            }
 
-                    if (name.isBlank() || !seen.add(streamUrl)) continue
+            if (matches.isEmpty()) {
+                Log.w("TRT_RADIO", "No matches at all → fallback list")
+                return getFallbackRadioChannels()
+            }
 
-                    result += RadioChannel(
-                        name = name,
-                        slug = name.lowercase(Locale.ROOT).replace(" ", "-"),
-                        streamUrl = streamUrl,
-                        logoUrl = logoUrl,
-                        description = ""
-                    )
-                }
+            val seen = mutableSetOf<String>()
+            for (m in matches.distinct()) {  // Dedupe matches
+                // For fallback, parse groups carefully (group 2=name, 4=url, 5=logo)
+                val name = if (m.groupValues.size > 2) m.groupValues[2] else m.groupValues[1]
+                val streamUrl = if (m.groupValues.size > 4) m.groupValues[4].replace("\\u002F", "/") else m.groupValues[2].replace("\\u002F", "/")
+                val logoUrl = if (m.groupValues.size > 5) m.groupValues[5].replace("\\u002F", "/") else m.groupValues[3].replace("\\u002F", "/")
+
+                val trimmedName = name.trim()
+                if (trimmedName.isBlank() || streamUrl.isBlank()) continue
+                if (!seen.add(streamUrl)) continue
+
+                Log.d("TRT_RADIO", "Extracted: $trimmedName → $streamUrl → $logoUrl")
+
+                result += RadioChannel(
+                    name = trimmedName,
+                    slug = trimmedName.lowercase(Locale.ROOT).replace(" ", "-").replace(Regex("[^a-z0-9-]"), ""),
+                    streamUrl = streamUrl,
+                    logoUrl = logoUrl,
+                    description = ""
+                )
             }
 
             if (result.isNotEmpty()) {
-                Log.i("TRT_RADIO", "Successfully loaded ${result.size} dynamic radio channels:")
-                result.forEach { Log.i("TRT_RADIO", "→ ${it.name} → ${it.streamUrl}") }
-                return result.distinctBy { it.streamUrl } // final dedupe
+                Log.i("TRT_RADIO", "SUCCESS: Loaded ${result.size} dynamic radios")
+                result.forEach { Log.i("TRT_RADIO", "  - ${it.name}: ${it.streamUrl}") }
+                return result
             }
 
         } catch (e: Exception) {
-            Log.e("TRT_RADIO", "Dynamic radio fetch failed", e)
+            Log.e("TRT_RADIO", "Exception in radio fetch", e)
         }
 
-        Log.w("TRT_RADIO", "All dynamic methods failed → using fallback list")
+        Log.w("TRT_RADIO", "Full fallback activated")
         return getFallbackRadioChannels()
     }
 
