@@ -100,75 +100,69 @@ class Trt : MainAPI() {
 
         try {
             val response = app.get(
-                url = dummyRadioUrl,
+                url = "https://www.trtradyo.com.tr/radyolar/trt-dinle",
                 timeout = 30,
                 headers = mapOf(
-                    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
-                    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
                 )
             )
             val html = response.text
-            Log.d("TRT_RADIO", "HTML loaded, length = ${html.length}")
 
-            // Quick sanity check
-            if (!html.contains("title") || !html.contains("audio")) {
-                Log.w("TRT_RADIO", "No radio data found in HTML → fallback")
+            // Check if we got a valid HTML response
+            if (!html.contains("<title>", ignoreCase = true)) {
+                Log.w("TRT_RADIO", "Invalid HTML response received")
                 return getFallbackRadioChannels()
             }
 
-            // Find all "title":"..." entries
-            val titleRegex = Regex("""["']title["']\s*:\s*["']([^"']+)["']""")
-            val titleMatches = titleRegex.findAll(html).toList()
+            // Extract radio channel data using more specific patterns
+            val radioPattern = """data-title="([^"]+)"[^>]*data-stream="([^"]+)""".toRegex()
+            val matches = radioPattern.findAll(html)
 
-            val seenUrls = mutableSetOf<String>()
+            for (match in matches) {
+                val name = match.groupValues[1].trim()
+                var streamUrl = match.groupValues[2].trim()
 
-            for (match in titleMatches) {
-                val title = match.groupValues[1].trim()
-                if (title.isBlank() || !"TRT".equals(title, ignoreCase = true) && !title.contains("TRT", ignoreCase = true)) {
-                    continue
-                }
+                // Clean up the stream URL if needed
+                streamUrl = streamUrl.replace("\\/", "/")
+                    .replace(" ", "%20")
+                    .replace("&amp;", "&")
 
-                // Look around this title (±800 chars) for audio and cover
-                val center = match.range.first
-                val windowStart = (center - 800).coerceAtLeast(0)
-                val windowEnd = (center + 800).coerceAtMost(html.length)
-                val window = html.substring(windowStart, windowEnd)
+                // Skip invalid entries
+                if (name.isBlank() || streamUrl.isBlank()) continue
 
-                // Find audio stream
-                val audioRegex = Regex("""["'](audio|url)["']\s*:\s*["'](https?://[^"']+\.(m3u8|aac))["']""")
-                val audioMatch = audioRegex.find(window)
-                val streamUrl = audioMatch?.groupValues?.get(2)?.replace("\\u002F", "/")?.trim()
-                    ?: continue
+                // Create a slug from the name
+                val slug = name.lowercase(Locale.ROOT)
+                    .replace(Regex("[^a-z0-9\\s-]"), "")
+                    .trim()
+                    .replace(Regex("\\s+"), "-")
 
-                if (!seenUrls.add(streamUrl)) continue  // dedupe
+                // Find logo URL (if available)
+                val logoUrl = "https://www.trtradyo.com.tr/Content/Images/RadioChannelLogos/${slug}.png"
 
-                // Find cover/logo
-                val coverRegex = Regex("""["'](cover|imageUrl)["']\s*:\s*["'](https?://[^"']+\.jpe?g[^"']*)["']""")
-                val coverMatch = coverRegex.find(window)
-                val logoUrl = coverMatch?.groupValues?.get(2)?.replace("\\u002F", "/")?.trim() ?: ""
+                Log.d("TRT_RADIO", "Found channel: $name → $streamUrl")
 
-                Log.d("TRT_RADIO", "Found: $title → $streamUrl")
-
-                result += RadioChannel(
-                    name = title,
-                    slug = title.lowercase(Locale.ROOT).replace(" ", "-").replace(Regex("[^a-z0-9-]"), ""),
-                    streamUrl = streamUrl,
-                    logoUrl = logoUrl,
-                    description = ""
+                result.add(
+                    RadioChannel(
+                        name = name,
+                        slug = slug,
+                        streamUrl = streamUrl,
+                        logoUrl = logoUrl,
+                        description = name
+                    )
                 )
             }
 
             if (result.isNotEmpty()) {
-                Log.i("TRT_RADIO", "SUCCESS: Loaded ${result.size} dynamic radio channels")
-                result.forEach { Log.i("TRT_RADIO", "  • ${it.name} → ${it.streamUrl}") }
+                Log.i("TRT_RADIO", "Successfully loaded ${result.size} radio channels")
                 return result
             }
 
         } catch (e: Exception) {
-            Log.e("TRT_RADIO", "Error parsing radios", e)
+            Log.e("TRT_RADIO", "Error fetching radio channels: ${e.message}", e)
         }
 
-        Log.w("TRT_RADIO", "Dynamic parsing failed → using fallback")
+        Log.w("TRT_RADIO", "Falling back to default radio channels")
         return getFallbackRadioChannels()
     }
 
