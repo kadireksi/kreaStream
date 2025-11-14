@@ -232,16 +232,18 @@ class Trt : MainAPI() {
                 newTvSeriesSearchResponse(
                     name = "TRT TV",
                     url = dummyTvUrl,
-                    type = TvType.TvSeries
+                    type = TvType.Live
                 ) {
                     this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.year = 1964
                 },
                  newTvSeriesSearchResponse(
                     name = "TRT Radyo",
                     url = dummyRadioUrl,
-                    type = TvType.TvSeries
+                    type = TvType.Live
                 ) {
                     this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
+                    this.year = 1927
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
@@ -372,14 +374,14 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                addDownloadButton = false
-                isPreview = false
+                this.data = ch.streamUrl
             }
         }
 
         return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             this.plot = "TRT TV canlı yayın"
+            this.year = 1964
         }
     }
 
@@ -391,14 +393,14 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                addDownloadButton = false
-                isPreview = false
+                this.data = ch.streamUrl
             }
         }
 
         return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             this.plot = "TRT Radyo canlı yayın"
+            this.year = 1927
         }
     }
 
