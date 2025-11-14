@@ -7,6 +7,8 @@ import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.delay
 import android.util.Log
+import java.util.Locale
+
 
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
@@ -99,28 +101,27 @@ class Trt : MainAPI() {
         try {
             val html = app.get(dummyRadioUrl, timeout = 15).text
 
-            // ── Very robust regex: finds every object that has "title":"…" and "url":"…m3u8"
-            //    It also captures the logo/cover URL that appears right before/after the object
+            // Very robust regex: grabs cover → title → url even if they appear in different order
             val channelRegex = Regex(
                 """cover"\s*:\s*"([^"]*\.jpe?g[^"]*)".*?"title"\s*:\s*"([^"]+)".*?"url"\s*:\s*"([^"]+\.m3u8[^"]*)"""",
-                setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.UNIX_LINES)
+                setOf(RegexOption.DOT_MATCHES_ALL)
             )
 
             val matches = channelRegex.findAll(html).toList()
 
             if (matches.isEmpty()) {
-                Log.w("TRT", "No radio channels found with regex → fallback")
+                Log.w("TRT", "No radio channels found with regex → using fallback")
                 return getFallbackRadioChannels()
             }
 
-            // Deduplicate by stream URL (some channels appear twice)
             val seenUrls = mutableSetOf<String>()
             for (m in matches) {
-                val logoUrl = m.groupValues[1].replace("\u002F", "/")
-                val name    = m.groupValues[2]
-                val streamUrl = m.groupValues[3].replace("\u002F", "/")
+                val logoUrl   = m.groupValues[1].replace("\\u002F", "/")
+                val name      = m.groupValues[2].trim()
+                val streamUrl = m.groupValues[3].replace("\\u002F", "/")
 
-                if (name.isBlank() || streamUrl.isBlank() || !seenUrls.add(streamUrl)) continue
+                if (name.isBlank() || streamUrl.isBlank()) continue
+                if (!seenUrls.add(streamUrl)) continue   // deduplicate
 
                 result += RadioChannel(
                     name = name,
@@ -132,15 +133,15 @@ class Trt : MainAPI() {
             }
 
             if (result.isNotEmpty()) {
-                Log.i("TRT", "Successfully parsed ${result.size} radio channels")
+                Log.i("TRT", "Successfully loaded ${result.size} radio channels")
                 return result
             }
 
         } catch (e: Exception) {
-            Log.e("TRT", "Error while parsing radio channels", e)
+            Log.e("TRT", "Failed to parse radio channels", e)
         }
 
-        // ── If anything goes wrong → safe fallback
+        // Fallback if anything goes wrong
         return getFallbackRadioChannels()
     }
 
