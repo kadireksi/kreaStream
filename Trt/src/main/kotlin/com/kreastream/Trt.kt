@@ -16,9 +16,8 @@ class Trt : MainAPI() {
 
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
-    private val liveBase = "$tabiiUrl/watch/live"
 
-    private val dummyTvUrl = tabiiUrl
+    private val dummyTvUrl = "https://www.tabii.com/tr/watch/live"
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
 
     override val mainPage = mainPageOf(
@@ -43,11 +42,37 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
-    // Dynamic TV channels from Tabii (excludes tabii Spor)
+    // Hardcoded reliable TRT TV channels (dynamic fallback if Tabii works)
     private suspend fun getTvChannels(): List<TvChannel> {
+        // Try dynamic first
+        val dynamic = tryDynamicTvChannels()
+        if (dynamic.isNotEmpty()) {
+            Log.i("TRT_TV", "Using dynamic TV channels: ${dynamic.size}")
+            return dynamic
+        }
+
+        // Hardcoded always-works fallback
+        Log.i("TRT_TV", "Using hardcoded TV channels")
+        return listOf(
+            TvChannel("TRT 1", "trt1", "https://tv-trt1.medya.trt.com.tr/master.m3u8",
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/TRT_1_2018.svg/512px-TRT_1_2018.svg.png", "Genel eğlence ve diziler"),
+            TvChannel("TRT Haber", "trthaber", "https://tv-trthaber.medya.trt.com.tr/master.m3u8",
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/TRT_Haber_2018.svg/512px-TRT_Haber_2018.svg.png", "24 saat haber"),
+            TvChannel("TRT 2", "trt2", "https://tv-trt2.medya.trt.com.tr/master.m3u8",
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/TRT_2_2018.svg/512px-TRT_2_2018.svg.png", "Kültür-sanat"),
+            TvChannel("TRT Spor", "trtspor", "https://tv-trtspor.medya.trt.com.tr/master.m3u8",
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/TRT_Spor_2018.svg/512px-TRT_Spor_2018.svg.png", "Spor yayınları"),
+            TvChannel("TRT Çocuk", "trtcocuk", "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8",
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/TRT_%C3%87ocuk_2018.svg/512px-TRT_%C3%87ocuk_2018.svg.png", "Çocuk programları"),
+            TvChannel("TRT Belgesel", "trtbelgesel", "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8",
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/TRT_Belgesel_2018.svg/512px-TRT_Belgesel_2018.svg.png", "Belgeseller")
+        )
+    }
+
+    private suspend fun tryDynamicTvChannels(): List<TvChannel> {
         val result = mutableListOf<TvChannel>()
         try {
-            val response = app.get("$liveBase/trt1?trackId=150002")
+            val response = app.get("$dummyTvUrl/trt1?trackId=150002", headers = mapOf("User-Agent" to "Mozilla/5.0"))
             val doc = response.document
             val nextData = doc.selectFirst("#__NEXT_DATA__")?.data() ?: return emptyList()
 
@@ -86,9 +111,8 @@ class Trt : MainAPI() {
 
                 result += TvChannel(name, slug, streamUrl, logoUrl, "$name - Canlı Yayın")
             }
-            Log.i("TRT_TV", "Loaded ${result.size} live TV channels")
         } catch (e: Exception) {
-            Log.e("TRT_TV", "Failed to load TV channels", e)
+            Log.e("TRT_TV", "Dynamic TV fetch failed", e)
         }
         return result
     }
@@ -172,28 +196,12 @@ class Trt : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         return when {
-            url == dummyTvUrl -> {
-                val channels = getTvChannels()
-                val tvResponse = if (channels.isEmpty()) {
-                    suspend {
-                        buildLiveTVResponse(listOf(
-                            TvChannel("TRT 1", "trt1", "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-                                "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png", "TRT 1")
-                        ))
-                    }
-                } else {
-                    suspend { buildLiveTVResponse(channels) }
-                }
-                tvResponse()
-            }
-            url == dummyRadioUrl -> {
-                suspend { buildLiveRadioResponse(getRadioChannels()) }()
-            }
-            url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true) -> {
+            url == dummyTvUrl -> buildLiveTVResponse(getTvChannels())
+            url == dummyRadioUrl -> buildLiveRadioResponse(getRadioChannels())
+            url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true) -> 
                 newMovieLoadResponse("TRT Canlı Yayın", url, TvType.Live, url) {
                     this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
                 }
-            }
             else -> {
                 try {
                     val doc = app.get(url, timeout = 15).document
@@ -252,7 +260,6 @@ class Trt : MainAPI() {
         }
     }
 
-    // Suspend version for TV
     private suspend fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
@@ -261,17 +268,16 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl  // For Continue Watching
+                this.data = ch.streamUrl  // Fixes Continue Watching posters
             }
         }
 
         return newTvSeriesLoadResponse("TRT Canlı TV", dummyTvUrl, TvType.Live, episodes) {
             this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
-            this.plot = "TRT 1, TRT Haber, TRT Çocuk ve daha fazlası - Canlı yayın"
+            this.plot = "TRT 1, Haber, Spor, Çocuk ve daha fazlası - Canlı yayın"
         }
     }
 
-    // Suspend version for Radio
     private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
@@ -280,13 +286,13 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl  // For Continue Watching
+                this.data = ch.streamUrl  // Fixes Continue Watching posters
             }
         }
 
         return newTvSeriesLoadResponse("TRT Radyo Canlı", dummyRadioUrl, TvType.Live, episodes) {
             this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle/w480/h480/q70/12530507_0-0-2048-1536.jpeg"
-            this.plot = "TRT FM, Radyo 1, Türkü, Nağme ve bölgesel radyolar - Canlı yayın"
+            this.plot = "TRT FM, Radyo 1, Türkü, Nağme ve bölgesel - Canlı yayın"
         }
     }
 
@@ -381,7 +387,7 @@ class Trt : MainAPI() {
                         ?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
                         ?.replace("/q75/", "/q85/")
 
-                    newTvSeriesSearchResponse(title, "$trt1Url$href") { this.posterUrl = poster }
+                    out += newTvSeriesSearchResponse(title, "$trt1Url$href") { this.posterUrl = poster }
                 }
         } catch (e: Exception) {
             Log.e("TRT", "Search error", e)
