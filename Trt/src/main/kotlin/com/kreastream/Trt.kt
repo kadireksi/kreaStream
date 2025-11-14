@@ -95,7 +95,6 @@ class Trt : MainAPI() {
         return result
     }
 
-
     private suspend fun getRadioChannels(): List<RadioChannel> {
         val result = mutableListOf<RadioChannel>()
 
@@ -105,60 +104,56 @@ class Trt : MainAPI() {
                 timeout = 20,
                 headers = mapOf(
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
-                    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Referer" to "https://www.trtdinle.com"
                 )
             )
 
             val html = response.text
             Log.d("TRT_RADIO", "HTML loaded, length: ${html.length}")
 
-            // DEBUG: Dump first ~2000 chars to see structure (check logcat for __NUXT__)
-            Log.d("TRT_RADIO", "HTML preview: ${html.take(2000)}")
-
-            // Primary regex: Matches { ... "title":"..." ... "audio":"...m3u8" ... "cover":"...jpg" ... } - ANY ORDER
-            // Uses lookaheads to find all fields in the same object block, non-greedy
-            val pattern = Regex(
-                """\{[^}]*?"title"\s*:\s*"([^"]+)"[^}]*?"audio"\s*:\s*"([^"]+?\.(?:m3u8|aac))"[^}]*?"cover"\s*:\s*"([^"]+?\.jpe?g[^"]*)"[^}]*\}""",
-                RegexOption.DOT_MATCHES_ALL
-            )
-
-            var matches = pattern.findAll(html).toList()
-
-            if (matches.isEmpty()) {
-                Log.w("TRT_RADIO", "Primary regex failed → trying ultra-loose fallback")
-                // Fallback: Even looser - any order, allows url as alternative to audio
-                val fallback = Regex(
-                    """\{[^}]*?("title"\s*:\s*"([^"]+)"[^}]*?("audio"|"url")\s*:\s*"([^"]+?\.(?:m3u8|aac))"[^}]*?"cover"\s*:\s*"([^"]+?\.jpe?g[^"]*)")""",
-                    RegexOption.DOT_MATCHES_ALL
-                )
-                matches = fallback.findAll(html).toList()
-
-                Log.d("TRT_RADIO", "Fallback found ${matches.size} matches")
-            } else {
-                Log.d("TRT_RADIO", "Primary found ${matches.size} matches")
-            }
-
-            if (matches.isEmpty()) {
-                Log.w("TRT_RADIO", "No matches at all → fallback list")
+            // Quick check if data fields exist
+            if (!html.contains(Regex("\"title\"\\s*:\\s*\"TRT")) || !html.contains(Regex("\"audio\"\\s*:\\s*\"https.*?m3u8")) {
+                Log.w("TRT_RADIO", "Key fields not found in HTML")
                 return getFallbackRadioChannels()
             }
 
+            // DEBUG: Find and dump body/script snippet (where __NUXT__ usually is, after </head>)
+            val bodyStart = html.indexOf("</head>") + 7
+            val bodyPreview = if (bodyStart > 0) html.substring(bodyStart, minOf(bodyStart + 2000, html.length)) else html.take(2000)
+            Log.d("TRT_RADIO", "Body/JS preview: ${bodyPreview.take(1500)}...")  // Truncated to avoid log spam
+
+            // Ultra-flexible: Find all "title" near "audio"/"url" within object blocks
+            val titleRegex = Regex(""""title"\s*:\s*"([^"]+)" """, RegexOption.DOT_MATCHES_ALL)
+            val titles = titleRegex.findAll(html).toList()
+
             val seen = mutableSetOf<String>()
-            for (m in matches.distinct()) {  // Dedupe matches
-                // For fallback, parse groups carefully (group 2=name, 4=url, 5=logo)
-                val name = if (m.groupValues.size > 2) m.groupValues[2] else m.groupValues[1]
-                val streamUrl = if (m.groupValues.size > 4) m.groupValues[4].replace("\\u002F", "/") else m.groupValues[2].replace("\\u002F", "/")
-                val logoUrl = if (m.groupValues.size > 5) m.groupValues[5].replace("\\u002F", "/") else m.groupValues[3].replace("\\u002F", "/")
+            for (titleMatch in titles) {
+                val name = titleMatch.groupValues[1].trim()
+                if (name.isBlank() || !name.contains("TRT", ignoreCase = true)) continue
 
-                val trimmedName = name.trim()
-                if (trimmedName.isBlank() || streamUrl.isBlank()) continue
-                if (!seen.add(streamUrl)) continue
+                // Search ~1000 chars around this title for "audio" or "url" with stream
+                val startPos = titleMatch.range.start - 500
+                val endPos = titleMatch.range.endInclusive + 500
+                val context = html.substring(maxOf(0, startPos), minOf(html.length, endPos))
 
-                Log.d("TRT_RADIO", "Extracted: $trimmedName → $streamUrl → $logoUrl")
+                val streamRegex = Regex(""""(audio|url)"\s*:\s*"([^"]+?\.(?:m3u8|aac))" """, RegexOption.DOT_MATCHES_ALL)
+                val streamMatch = streamRegex.find(context)
+                if (streamMatch == null) continue
+
+                val streamUrl = streamMatch.groupValues[2].replace("\\u002F", "/").trim()
+                if (streamUrl.isBlank() || !seen.add(streamUrl)) continue
+
+                // Search same context for "cover" or "imageUrl"
+                val logoRegex = Regex(""""(cover|imageUrl)"\s*:\s*"([^"]+?\.jpe?g[^"]*)" """, RegexOption.DOT_MATCHES_ALL)
+                val logoMatch = logoRegex.find(context)
+                val logoUrl = logoMatch?.groupValues?.get(2)?.replace("\\u002F", "/")?.trim() ?: ""
+
+                Log.d("TRT_RADIO", "Extracted: $name → $streamUrl → $logoUrl")
 
                 result += RadioChannel(
-                    name = trimmedName,
-                    slug = trimmedName.lowercase(Locale.ROOT).replace(" ", "-").replace(Regex("[^a-z0-9-]"), ""),
+                    name = name,
+                    slug = name.lowercase(Locale.ROOT).replace(" ", "-").replace(Regex("[^a-z0-9-]"), ""),
                     streamUrl = streamUrl,
                     logoUrl = logoUrl,
                     description = ""
@@ -168,14 +163,14 @@ class Trt : MainAPI() {
             if (result.isNotEmpty()) {
                 Log.i("TRT_RADIO", "SUCCESS: Loaded ${result.size} dynamic radios")
                 result.forEach { Log.i("TRT_RADIO", "  - ${it.name}: ${it.streamUrl}") }
-                return result
+                return result.distinctBy { it.streamUrl }
             }
 
         } catch (e: Exception) {
             Log.e("TRT_RADIO", "Exception in radio fetch", e)
         }
 
-        Log.w("TRT_RADIO", "Full fallback activated")
+        Log.w("TRT_RADIO", "Dynamic extraction failed → fallback")
         return getFallbackRadioChannels()
     }
 
