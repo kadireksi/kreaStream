@@ -99,49 +99,58 @@ class Trt : MainAPI() {
         val result = mutableListOf<RadioChannel>()
 
         try {
-            val html = app.get(dummyRadioUrl, timeout = 15).text
+            val html = app.get(
+                dummyRadioUrl, 
+                timeout = 15,
+                headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            ).text
 
-            // Very robust regex: grabs cover → title → url even if they appear in different order
+            // Looser regex: Finds any {... "title":"NAME" ... "url":"STREAM.m3u8" ... "cover":"LOGO" ...}
+            // Order doesn't matter; DOT_MATCHES_ALL handles newlines/minification
             val channelRegex = Regex(
-                """cover"\s*:\s*"([^"]*\.jpe?g[^"]*)".*?"title"\s*:\s*"([^"]+)".*?"url"\s*:\s*"([^"]+\.m3u8[^"]*)"""",
+                """"title"\s*:\s*"([^"]+)"[^}]*"url"\s*:\s*"([^"]+\.(m3u8|aac)[^"]*)"[^}]*("(?:cover|imageUrl)"\s*:\s*"([^"]+\.jpe?g[^"]*)")""",
                 setOf(RegexOption.DOT_MATCHES_ALL)
             )
 
             val matches = channelRegex.findAll(html).toList()
 
             if (matches.isEmpty()) {
-                Log.w("TRT", "No radio channels found with regex → using fallback")
+                Log.w("TRT", "No radio matches found → fallback")
                 return getFallbackRadioChannels()
             }
 
             val seenUrls = mutableSetOf<String>()
             for (m in matches) {
-                val logoUrl   = m.groupValues[1].replace("\\u002F", "/")
-                val name      = m.groupValues[2].trim()
-                val streamUrl = m.groupValues[3].replace("\\u002F", "/")
+                val name = m.groupValues[1].trim()
+                val streamUrl = m.groupValues[2].replace("\\u002F", "/")
+                val logoField = m.groupValues[3]  // "cover" or "imageUrl"
+                val logoUrl = m.groupValues[4].replace("\\u002F", "/")
 
                 if (name.isBlank() || streamUrl.isBlank()) continue
-                if (!seenUrls.add(streamUrl)) continue   // deduplicate
+                if (!seenUrls.add(streamUrl)) continue  // dedupe
+
+                // Prefer cover if available, else empty
+                val finalLogo = if (logoField.contains("cover")) logoUrl else ""
 
                 result += RadioChannel(
                     name = name,
                     slug = name.lowercase(Locale.ROOT).replace(" ", "-"),
                     streamUrl = streamUrl,
-                    logoUrl = logoUrl,
+                    logoUrl = finalLogo,
                     description = ""
                 )
             }
 
             if (result.isNotEmpty()) {
-                Log.i("TRT", "Successfully loaded ${result.size} radio channels")
+                Log.i("TRT", "Parsed ${result.size} channels: ${result.map { it.name }}")
                 return result
             }
 
         } catch (e: Exception) {
-            Log.e("TRT", "Failed to parse radio channels", e)
+            Log.e("TRT", "Radio parsing failed: ${e.message}", e)
         }
 
-        // Fallback if anything goes wrong
+        Log.w("TRT", "Full fallback activated")
         return getFallbackRadioChannels()
     }
 
