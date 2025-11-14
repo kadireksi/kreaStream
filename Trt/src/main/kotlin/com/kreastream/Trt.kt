@@ -100,127 +100,116 @@ class Trt : MainAPI() {
 
         try {
             val response = app.get(
-                dummyRadioUrl,
+                url = dummyRadioUrl,
                 timeout = 20,
                 headers = mapOf(
-                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36"
                 )
             )
             val html = response.text
 
-            // Step 1: Extract the __NUXT__ script content (the big function call)
-            val nuxtRegex = Regex("""window\.__NUXT__\s*=\s*\(function\([^)]*\)\s*\{[^}]+\}\)\s*\(\s*([^)]*)\s*\)\s*;\s*</script>""", setOf(RegexOption.DOT_MATCHES_ALL))
-            val nuxtMatch = nuxtRegex.find(html) ?: run {
-                Log.w("TRT", "No __NUXT__ script found → fallback")
+            // Step 1: Find the huge __NUXT__ payload (it's always the last big argument)
+            val payloadRegex = Regex("""window\.__NUXT__\s*=\s*\([^;]+\)\s*\(\s*([^)]+)\s*\)\s*;""")
+            val match = payloadRegex.find(html) ?: run {
+                Log.w("TRT", "No __NUXT__ payload found")
                 return getFallbackRadioChannels()
             }
-            var rawArgs = nuxtMatch.groupValues[1]
 
-            // Step 2: Find the main data payload (last big argument, after variables)
-            // Skip initial vars (short strings/numbers) until the giant nested object starts with '{'
-            val dataStart = rawArgs.indexOfLast { it == '{' && rawArgs.substringBefore(it).count { c -> c == ',' } > 20 } // Heuristic: after ~20 vars
-            if (dataStart == -1) {
-                Log.w("TRT", "No data payload found → fallback")
-                return getFallbackRadioChannels()
-            }
-            var rawJson = rawArgs.substring(dataStart)
+            // The actual JSON is the last argument (a giant object starting with {)
+            var rawJson = match.groupValues[1].trim()
+            val lastOpenBrace = rawJson.lastIndexOf('{')
+            if (lastOpenBrace == -1) return getFallbackRadioChannels()
+            rawJson = rawJson.substring(lastOpenBrace)
 
-            // Balance closing paren/brace to extract complete object
+            // Balance braces to extract complete object
             var balance = 0
-            var braceBalance = 0
-            var i = 0
-            while (i < rawJson.length) {
+            var endIndex = rawJson.length
+            for (i in rawJson.indices) {
                 when (rawJson[i]) {
-                    '{' -> braceBalance++
+                    '{' -> balance++
                     '}' -> {
-                        braceBalance--
-                        if (braceBalance == 0) break
+                        balance--
+                        if (balance == 0) {
+                            endIndex = i + 1
+                            break
+                        }
                     }
-                    '(' -> balance++
-                    ')' -> balance--
                 }
-                i++
             }
-            rawJson = rawJson.substring(0, i + 1)
+            rawJson = rawJson.substring(0, endIndex)
 
-            // Step 3: Clean escapes (Unicode / → \, quotes, etc.)
+            // Clean escapes
             rawJson = rawJson
-                .replace(Regex("\\\\u002F"), "/")
-                .replace(Regex("\\\\""), "\"")
-                .replace(Regex("\\\\n"), "\n")
-                .replace(Regex("\\\\t"), "\t")
+                .replace("\\u002F", "/")
+                .replace("\\\"", "\"")
 
-            // Step 4: Parse as JSON (the payload is a flat object like {data: [...], state: {...}})
-            val nuxtObj = JSONObject(rawJson)
+            // Parse as JSON
+            val nuxtData = JSONObject(rawJson)
 
-            // Step 5: Navigate to channels (from txt: data[0].noGroupContent + grouped like "10319021":[...])
-            var channelsArray = JSONArray()
+            // Step 2: Extract channels from known paths
+            val channels = JSONArray()
 
-            // Try data[0].noGroupContent first (ungrouped channels)
-            if (nuxtObj.has("data")) {
-                val dataArr = nuxtObj.getJSONArray("data")
-                if (dataArr.length() > 0) {
-                    val pageData = dataArr.getJSONObject(0)
-                    if (pageData.has("noGroupContent")) {
-                        channelsArray = pageData.getJSONArray("noGroupContent")
-                    }
+            fun collectChannels(obj: JSONObject?) {
+                obj ?: return
+                // Direct array
+                obj.optJSONArray("noGroupContent")?.let { arr ->
+                    for (i in 0 until arr.length()) channels.put(arr.getJSONObject(i))
                 }
-            }
-
-            // Add grouped channels (e.g., "10319021": [...array of channels])
-            if (nuxtObj.has("data") || nuxtObj.has("state")) {  // Fallback to state if needed
-                val root = if (nuxtObj.has("data")) nuxtObj.getJSONArray("data").getJSONObject(0) else nuxtObj
-                root.keys().forEachRemaining { key ->
-                    if (key.matches(Regex("\\d+"))) {  // Group IDs like 10319021
-                        val group = root.optJSONArray(key)
-                        if (group != null) {
-                            for (j in 0 until group.length()) {
-                                channelsArray.put(group.getJSONObject(j))
-                            }
+                // Grouped by number keys like "10319021": [...]
+                obj.keys().forEach { key ->
+                    if (key.matches(Regex("\\d+"))) {
+                        obj.optJSONArray(key)?.let { group ->
+                            for (i in 0 until group.length()) channels.put(group.getJSONObject(i))
                         }
                     }
                 }
             }
 
-            if (channelsArray.length() == 0) {
-                Log.w("TRT", "No channels in JSON → fallback")
+            // data[0] → page data
+            if (nuxtData.has("data")) {
+                val dataArr = nuxtData.getJSONArray("data")
+                for (i in 0 until dataArr.length()) {
+                    collectChannels(dataArr.optJSONObject(i))
+                }
+            }
+
+            if (channels.length() == 0) {
+                Log.w("TRT", "No channels found in __NUXT__ data")
                 return getFallbackRadioChannels()
             }
 
-            // Step 6: Map to RadioChannel
-            val seenUrls = mutableSetOf<String>()
-            for (i in 0 until channelsArray.length()) {
-                val ch = channelsArray.getJSONObject(i)
+            // Step 3: Convert to RadioChannel
+            val seen = mutableSetOf<String>()
+            for (i in 0 until channels.length()) {
+                val ch = channels.getJSONObject(i)
 
                 val name = ch.optString("title", "").trim()
-                val streamUrl = ch.optString("audio", ch.optString("url", "")).trim()  // "audio" from txt
+                val streamUrl = ch.optString("audio", ch.optString("url", "")).trim()
                 val logoUrl = ch.optString("cover", ch.optString("imageUrl", "")).trim()
-                val description = ch.optString("description", "")
 
-                if (name.isBlank() || streamUrl.isBlank() || !streamUrl.contains(".m3u8") && !streamUrl.contains(".aac")) continue
-                if (!seenUrls.add(streamUrl)) continue  // Dedupe
+                if (name.isBlank() || streamUrl.isBlank()) continue
+                if (!streamUrl.endsWith(".m3u8") && !streamUrl.endsWith(".aac")) continue
+                if (!seen.add(streamUrl)) continue
 
                 result += RadioChannel(
                     name = name,
-                    slug = name.lowercase(Locale.ROOT).replace(" ", "-").replace(Regex("[^a-z0-9-]"), ""),
+                    slug = name.lowercase(Locale.ROOT).replace(" ", "-"),
                     streamUrl = streamUrl,
                     logoUrl = logoUrl,
-                    description = description
+                    description = ch.optString("description", "")
                 )
             }
 
             if (result.isNotEmpty()) {
-                Log.i("TRT", "Dynamically loaded ${result.size} radios: ${result.joinToString { it.name }}")
+                Log.i("TRT", "Successfully loaded ${result.size} live radio channels dynamically")
                 return result
             }
 
         } catch (e: Exception) {
-            Log.e("TRT", "Dynamic radio parse failed: ${e.message}", e)
-            // Optionally log snippet for debug: Log.d("TRT", "HTML preview: ${html.take(1000)}")
+            Log.e("TRT", "Failed to parse radio channels dynamically", e)
         }
 
-        // Ultimate fallback (your original hardcoded, but only if dynamic fails)
-        Log.w("TRT", "Dynamic failed → using minimal fallback")
+        Log.w("TRT", "Using fallback radio channels")
         return getFallbackRadioChannels()
     }
 
