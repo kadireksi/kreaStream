@@ -7,7 +7,6 @@ import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.delay
 import android.util.Log
-import com.lagradost.cloudstream3.ui.search.SearchViewModel.Companion.Log
 
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
@@ -94,7 +93,7 @@ class Trt : MainAPI() {
         return result
     }
 
-    private suspend fun getRadioChannels(): List<RadioChannel> {
+   private suspend fun getRadioChannels(): List<RadioChannel> {
         val result = mutableListOf<RadioChannel>()
 
         try {
@@ -105,23 +104,19 @@ class Trt : MainAPI() {
             // The pattern captures the entire JSON array.
             val jsonRegex = Regex(
                 "(\\[\\{\"id\":\\d+,\"title\":\".*?\",\"slug\":\".*?\",\"url\":\".*?\".*?\\])",
-                // Fix for Unresolved reference 'DOT_ALL'
-                RegexOption.DOT_ALL
+                RegexOption.DOT_MATCHES_ALL
             )
             
             val match = jsonRegex.find(html)
             
-            // Fix: Use match.groups[1]?.value to reliably get the captured group's content
             val jsonString = match?.groups?.get(1)?.value ?: run {
                 Log.w("TRT", "Could not find radio channel JSON array. Falling back.")
                 return getFallbackRadioChannels() 
             }
 
             // 3. Parse the extracted JSON string
-            // Fix for Overload resolution ambiguity
             val jsonArray = JSONArray(jsonString)
 
-            // Fix for Unresolved references 'length' and 'getJSONObject'
             for (i in 0 until jsonArray.length()) {
                 val ch = jsonArray.getJSONObject(i)
                 
@@ -136,7 +131,6 @@ class Trt : MainAPI() {
                         name = name,
                         slug = name.lowercase().replace(" ", "-"),
                         streamUrl = streamUrl,
-                        // Fix for Argument type mismatch (ifBlank is a newer Kotlin function)
                         logoUrl = if (logoUrl.isBlank()) "" else logoUrl,
                         description = description
                     )
