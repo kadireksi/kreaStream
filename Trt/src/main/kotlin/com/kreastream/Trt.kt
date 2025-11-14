@@ -100,7 +100,7 @@ class Trt : MainAPI() {
             RadioChannel(
                 name = "TRT FM",
                 slug = "trt-fm",
-                streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://trt.radyotvonline.net/trt_fm.aac",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467418.jpeg",
                 description = "Türkçe Pop ve güncel müzik"
             ),
