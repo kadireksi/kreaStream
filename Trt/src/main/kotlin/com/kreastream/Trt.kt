@@ -6,14 +6,15 @@ import org.json.JSONObject
 import kotlinx.coroutines.delay
 import android.util.Log
 import java.net.URI
-import java.net.URL   // <-- Eksik import eklendi
+import java.net.URL
 
 class Trt : MainAPI() {
-    override val name = "TRT"
-    override val mainUrl = "https://www.tabii.com"
+    // MainAPI'de var olarak tanımlı, val yerine override var kullan
+    override var name = "TRT"
+    override var mainUrl = "https://www.tabii.com"
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
-    override val lang = "tr"
-    override val hasMainPage = true
+    override var lang = "tr"
+    override var hasMainPage = true
 
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
@@ -66,9 +67,8 @@ class Trt : MainAPI() {
         val list = mutableListOf<TvChannel>()
         try {
             val resp = app.get("$liveBase/trt1?trackId=150002")
-            val json = resp.document.selectFirst("#__NEXT_DATA__")?.data()
-                ?.let { JSONObject(it) } ?: return emptyList()
-
+            val jsonText = resp.document.selectFirst("#__NEXT_DATA__")?.data() ?: return emptyList()
+            val json = JSONObject(jsonText)
             val channels = json.getJSONObject("props")
                 .getJSONObject("pageProps")
                 .getJSONArray("liveChannels")
@@ -77,20 +77,28 @@ class Trt : MainAPI() {
                 val ch = channels.getJSONObject(i)
                 val name = ch.optString("title")
                 val slug = ch.optString("slug")
-                if (name.contains("tabii", true)) continue
+                if (name.contains("tabii", ignoreCase = true)) continue
 
-                val logo = ch.optJSONArray("images")
-                    ?.let { arr -> (0 until arr.length()).firstOrNull { arr.getJSONObject(it).optString("imageType") == "logo" } }
-                    ?.let { arr.getJSONObject(it).optString("name") }
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { "https://cms-tabii-public-image.tabii.com/int/$it" } ?: continue
+                val logoUrl = ch.optJSONArray("images")
+                    ?.let { images ->
+                        (0 until images.length())
+                            .map { images.getJSONObject(it) }
+                            .firstOrNull { it.optString("imageType") == "logo" }
+                            ?.optString("name")
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { "https://cms-tabii-public-image.tabii.com/int/$it" }
+                    } ?: continue
 
-                val stream = ch.optJSONArray("media")
-                    ?.let { arr -> (0 until arr.length()).firstOrNull { arr.getJSONObject(it).optString("type") == "hls" && arr.getJSONObject(it).optString("drmSchema") == "clear" } }
-                    ?.let { it.optString("url") }
-                    ?.takeIf { it.isNotBlank() } ?: continue
+                val streamUrl = ch.optJSONArray("media")
+                    ?.let { media ->
+                        (0 until media.length())
+                            .map { media.getJSONObject(it) }
+                            .firstOrNull { it.optString("type") == "hls" && it.optString("drmSchema") == "clear" }
+                            ?.optString("url")
+                            ?.takeIf { it.isNotBlank() }
+                    } ?: continue
 
-                list += TvChannel(name, slug, stream, logo, name)
+                list += TvChannel(name, slug, streamUrl, logoUrl, name)
             }
         } catch (e: Exception) {
             Log.e("TRT", "getTvChannels error: ${e.message}")
@@ -194,7 +202,7 @@ class Trt : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // TV & Radio dummy pages
+        // TV & Radio dummy
         if (url == dummyTvUrl) {
             return newAnimeLoadResponse("TRT TV Kanalları", url, TvType.Live) {
                 posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
@@ -236,10 +244,9 @@ class Trt : MainAPI() {
             }
         }
 
-        // TRT Çocuk video
         if (url.contains("trtcocuk.net.tr/video", true)) return loadTrtCocukVideoPage(url)
 
-        // Series / Program detail
+        // Series / Program
         val doc = app.get(url).document
         val title = doc.selectFirst("h1")?.text()?.trim() ?: throw ErrorLoadingException("Başlık yok")
         val plot = doc.selectFirst("meta[name=description]")?.attr("content").orEmpty()
@@ -313,7 +320,6 @@ class Trt : MainAPI() {
             try {
                 val doc = app.get(data).document
 
-                // YouTube
                 doc.selectFirst("iframe[src*='youtube.com/embed']")?.attr("src")?.let { src ->
                     val id = src.substringAfter("embed/").substringBefore("?")
                     if (id.isNotBlank()) {
@@ -322,7 +328,6 @@ class Trt : MainAPI() {
                     }
                 }
 
-                // Direct source
                 doc.selectFirst("video source, video[src], source[src]")?.attr("src")?.takeIf { it.isNotBlank() }?.let { src ->
                     callback(newExtractorLink {
                         source = name
@@ -333,7 +338,6 @@ class Trt : MainAPI() {
                     return true
                 }
 
-                // m3u8/mp4 in script
                 doc.select("script").forEach { s ->
                     Regex("""https?://[^\s"']+\.(m3u8|mp4)[^\s"']*""").find(s.html())?.value?.let { link ->
                         callback(newExtractorLink {
@@ -350,7 +354,6 @@ class Trt : MainAPI() {
             }
         }
 
-        // TRT1 player
         try {
             val doc = app.get(data).document
             doc.select("script").forEach { s ->
@@ -365,7 +368,6 @@ class Trt : MainAPI() {
                 }
             }
 
-            // YouTube fallback
             doc.selectFirst("iframe[src*='youtube.com/embed']")?.attr("src")?.let { src ->
                 val id = src.substringAfter("embed/").substringBefore("?")
                 if (id.isNotBlank()) loadExtractor("https://www.youtube.com/watch?v=$id", tabiiUrl, subtitleCallback, callback)
