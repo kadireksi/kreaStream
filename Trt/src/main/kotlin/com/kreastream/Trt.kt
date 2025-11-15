@@ -408,10 +408,10 @@ class Trt : MainAPI() {
                 //generateQualityVariants(m3u8).forEach { u ->
                     M3u8Helper.generateM3u8(
                         source = name,
-                        streamUrl = u,
+                        streamUrl = m3u8,
                         referer = trt1Url,
                         headers = mapOf("Referer" to trt1Url)
-                    )//.forEach(callback)
+                    )(callback)//.forEach(callback)
                 }
                 return true
             }
