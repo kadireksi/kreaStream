@@ -184,18 +184,18 @@ class Trt : MainAPI() {
         )
     }
 
-    private fun generateQualityVariants(base: String): List<String> {
-        val list = mutableListOf(base)
-        try {
-            if (base.contains("medya.trt.com.tr")) {
-                val prefix = base.substringBeforeLast("/").removeSuffix("_master")
-                listOf("360", "480", "720", "1080").forEach { q ->
-                    list += "$prefix" + "_$q.m3u8"
-                }
-            }
-        } catch (_: Exception) {}
-        return list.distinct()
-    }
+    // private fun generateQualityVariants(base: String): List<String> {
+    //     val list = mutableListOf(base)
+    //     try {
+    //         if (base.contains("medya.trt.com.tr")) {
+    //             val prefix = base.substringBeforeLast("/").removeSuffix("_master")
+    //             listOf("360", "480", "720", "1080").forEach { q ->
+    //                 list += "$prefix" + "_$q.m3u8"
+    //             }
+    //         }
+    //     } catch (_: Exception) {}
+    //     return list.distinct()
+    // }
 
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
@@ -232,7 +232,7 @@ class Trt : MainAPI() {
                 newTvSeriesSearchResponse(
                     name = "TRT TV",
                     url = dummyTvUrl,
-                    type = TvType.Live
+                    type = TvType.Live,
                 ) {
                     this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                     this.year = 1964
@@ -263,49 +263,21 @@ class Trt : MainAPI() {
         // TV
         if (url == dummyTvUrl) {
             val channels = getTvChannels()
-            return if (channels.isEmpty()) {
-                buildLiveTVResponse(
-                    listOf(
-                        TvChannel(
-                            name = "TRT 1",
-                            slug = "trt1",
-                            streamUrl = "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-                            logoUrl = "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png",
-                            description = "TRT 1"
-                        )
-                    )
-                )
-            } else {
-                buildLiveTVResponse(channels)
-            }
+            return buildLiveTVResponse(channels)
         }
 
         // Radio
         if (url == dummyRadioUrl) {
             val channels = getRadioChannels()
-            return if (channels.isEmpty()) {
-                buildLiveRadioResponse(
-                    listOf(
-                        RadioChannel(
-                            name = "TRT FM",
-                            slug = "trt-fm",
-                            streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
-                            logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/f_channel_b9f3c65ea803a398ff11f759fb5b59bc.jpeg",
-                            description = "TRT FM"
-                        )
-                    )
-                )
-            } else {
-                buildLiveRadioResponse(channels)
-            }
+            return buildLiveRadioResponse(channels)
         }
 
-        // Direct m3u8
-        if (url.contains(".m3u8", ignoreCase = true)) {
-            return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
-                this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            }
-        }
+        // // Direct m3u8
+        // if (url.contains(".m3u8", ignoreCase = true)) {
+        //     return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
+        //         this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+        //     }
+        // }
 
         // Series
         try {
@@ -410,17 +382,17 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        if (data.contains(".m3u8", ignoreCase = true)) {
-            generateQualityVariants(data).forEach { u ->
-                M3u8Helper.generateM3u8(
-                    source = name,
-                    streamUrl = u,
-                    referer = tabiiUrl,
-                    headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
-                ).forEach(callback)
-            }
-            return true
-        }
+        // if (data.contains(".m3u8", ignoreCase = true)) {
+        //     generateQualityVariants(data).forEach { u ->
+        //         M3u8Helper.generateM3u8(
+        //             source = name,
+        //             streamUrl = u,
+        //             referer = tabiiUrl,
+        //             headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
+        //         ).forEach(callback)
+        //     }
+        //     return true
+        // }
 
         try {
             val doc = app.get(data, timeout = 10).document
@@ -432,17 +404,17 @@ class Trt : MainAPI() {
                     .find(it)?.groupValues?.get(1)
             }
 
-            if (m3u8 != null) {
-                generateQualityVariants(m3u8).forEach { u ->
-                    M3u8Helper.generateM3u8(
-                        source = name,
-                        streamUrl = u,
-                        referer = trt1Url,
-                        headers = mapOf("Referer" to trt1Url)
-                    ).forEach(callback)
-                }
-                return true
-            }
+            // if (m3u8 != null) {
+            //     generateQualityVariants(m3u8).forEach { u ->
+            //         M3u8Helper.generateM3u8(
+            //             source = name,
+            //             streamUrl = u,
+            //             referer = trt1Url,
+            //             headers = mapOf("Referer" to trt1Url)
+            //         ).forEach(callback)
+            //     }
+            //     return true
+            // }
 
             val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
                 ?.attr("src")
