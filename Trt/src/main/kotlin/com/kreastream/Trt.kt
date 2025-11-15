@@ -24,29 +24,6 @@ class Trt : MainAPI() {
     private val dummyTvUrl = "$tabiiUrl/tv"
     private val dummyRadioUrl = "$tabiiUrl/radio"
 
-    sealed class LiveChannel {
-        abstract val name: String
-        abstract val streamUrl: String
-        abstract val logoUrl: String
-        abstract val description: String
-    }
-
-    data class TvChannel(
-        override val name: String,
-        val slug: String,
-        override val streamUrl: String,
-        override val logoUrl: String,
-        override val description: String = ""
-    ) : LiveChannel()
-
-    data class RadioChannel(
-        override val name: String,
-        val slug: String,
-        override val streamUrl: String,
-        override val logoUrl: String,
-        override val description: String = ""
-    ) : LiveChannel()
-
     override val mainPage = mainPageOf(
         "series" to "Güncel Diziler",
         "archive" to "Eski Diziler",
