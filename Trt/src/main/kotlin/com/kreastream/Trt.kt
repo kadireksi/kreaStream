@@ -184,19 +184,6 @@ class Trt : MainAPI() {
         )
     }
 
-    private fun generateQualityVariants(base: String): List<String> {
-        val list = mutableListOf(base)
-        try {
-            if (base.contains("medya.trt.com.tr")) {
-                val prefix = base.substringBeforeLast("/").removeSuffix("_master")
-                listOf("360", "480", "720", "1080").forEach { q ->
-                    list += "$prefix" + "_$q.m3u8"
-                }
-            }
-        } catch (_: Exception) {}
-        return list.distinct()
-    }
-
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
             val url = if (page == 1) {
@@ -228,24 +215,34 @@ class Trt : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
-            "live" -> listOf(
-                newTvSeriesSearchResponse(
-                    name = "TRT TV",
-                    url = dummyTvUrl,
-                    type = TvType.Live,
-                ) {
-                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
-                    this.year = 1964
-                },
-                 newTvSeriesSearchResponse(
-                    name = "TRT Radyo",
-                    url = dummyRadioUrl,
-                    type = TvType.Live
-                ) {
-                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
-                    this.year = 1927
+            "live" -> {
+                val tvChannels = getTvChannels()
+                val radioChannels = getRadioChannels()
+                
+                // Create proper TV channel items with actual channel data
+                val tvItems = tvChannels.take(6).map { channel ->
+                    newTvSeriesSearchResponse(
+                        name = channel.name,
+                        url = channel.streamUrl,
+                        type = TvType.Live,
+                    ) {
+                        this.posterUrl = channel.logoUrl
+                    }
                 }
-            )
+                
+                // Create radio items
+                val radioItems = radioChannels.take(6).map { channel ->
+                    newTvSeriesSearchResponse(
+                        name = channel.name,
+                        url = channel.streamUrl,
+                        type = TvType.Live
+                    ) {
+                        this.posterUrl = channel.logoUrl
+                    }
+                }
+                
+                tvItems + radioItems
+            }
             "series"  -> getTrtSeries(archive = false, page = page)
             "archive" -> getTrtSeries(archive = true,  page = page)
             else -> emptyList()
@@ -260,24 +257,34 @@ class Trt : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // TV
+        // TV Channel (direct m3u8)
+        if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
+            val channels = getTvChannels() + getRadioChannels()
+            val channel = channels.find { it.streamUrl == url }
+            
+            return if (channel != null) {
+                newMovieLoadResponse(channel.name, url, TvType.Live, url) {
+                    this.posterUrl = channel.logoUrl
+                    this.plot = channel.description
+                }
+            } else {
+                newMovieLoadResponse("TRT Stream", url, TvType.Live, url) {
+                    this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+                }
+            }
+        }
+
+        // TV Channels collection
         if (url == dummyTvUrl) {
             val channels = getTvChannels()
             return buildLiveTVResponse(channels)
         }
 
-        // Radio
+        // Radio Channels collection
         if (url == dummyRadioUrl) {
             val channels = getRadioChannels()
             return buildLiveRadioResponse(channels)
         }
-
-        // // Direct m3u8
-        // if (url.contains(".m3u8", ignoreCase = true)) {
-        //     return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
-        //         this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-        //     }
-        // }
 
         // Series
         try {
@@ -346,7 +353,6 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl
             }
         }
 
@@ -365,7 +371,6 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl
             }
         }
 
@@ -382,17 +387,22 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        if (data.contains(".m3u8", ignoreCase = true)) {
-            // For live streams, use the original m3u8 directly as it already contains quality options
-            M3u8Helper.generateM3u8(
-                source = name,
-                streamUrl = data,
-                referer = tabiiUrl,
-                headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
-            ).forEach(callback)
+        // For direct stream URLs (live TV/radio), use them directly without quality variants
+        if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
+            callback(
+                ExtractorLink(
+                    source = name,
+                    name = "TRT Stream",
+                    url = data,
+                    referer = tabiiUrl,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = data.contains(".m3u8")
+                )
+            )
             return true
         }
 
+        // For series episodes
         try {
             val doc = app.get(data, timeout = 10).document
             val script = doc.select("script")
@@ -404,15 +414,17 @@ class Trt : MainAPI() {
             }
 
             if (m3u8 != null) {
-                // For series episodes, you can still generate quality variants if needed
-                generateQualityVariants(m3u8).forEach { u ->
-                    M3u8Helper.generateM3u8(
+                // Use direct m3u8 without generating quality variants
+                callback(
+                    ExtractorLink(
                         source = name,
-                        streamUrl = u,
+                        name = "TRT",
+                        url = m3u8,
                         referer = trt1Url,
-                        headers = mapOf("Referer" to trt1Url)
-                    ).forEach(callback)
-                }
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = true
+                    )
+                )
                 return true
             }
 
