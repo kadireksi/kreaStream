@@ -133,53 +133,67 @@ class Trt : MainAPI() {
                 description = "Sürekli haber akışı"
             ),
             RadioChannel(
+                name = "TRT Memleketim",
+                slug = "trt-memleketim",
+                streamUrl = "https://radio-trtmemleketimfm.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467512.jpeg",
+                description = "Memleketim FM"
+            ),
+            RadioChannel(
                 name = "TRT Radyo 3",
                 slug = "trt-radyo-3",
-                streamUrl = "https://trt.radyotvonline.net/trt_3.aac",
+                streamUrl = "https://rd-trtradyo3.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
                 description = "Klasik, caz, rock ve dünya müziği"
             ),
             RadioChannel(
-                name = "TRT Kurdi",
-                slug = "trt-kurdi",
-                streamUrl = "https://rd-trtkurdi.medya.trt.com.tr/master.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467508.jpeg",
-                description = "Kürtçe yayın"
+                name = "Erzurum Radyosu",
+                slug = "erzurum-radyosu",
+                streamUrl = "https://rd-erzurum.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
+                description = "Bölgesel yayın"
             ),
             RadioChannel(
-                name = "TRT Arabi",
-                slug = "trt-arabi",
-                streamUrl = "https://rd-trtarabi.medya.trt.com.tr/master.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467526.jpeg",
-                description = "Arapça yayın"
+                name = "TRT GAP",
+                slug = "trt-gap",
+                streamUrl = "https://rd-trtgap.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467503.jpeg",
+                description = "Bölgesel yayın"
             ),
             RadioChannel(
                 name = "Antalya Radyosu",
                 slug = "antalya-radyosu",
-                streamUrl = "https://rd-antalya.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://rd-antalya.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
                 name = "Çukurova Radyosu",
                 slug = "cukurova-radyosu",
-                streamUrl = "https://rd-cukurova.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://rd-cukurova.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467486.jpeg",
-                description = "Bölgesel yayın"
-            ),
-            RadioChannel(
-                name = "Erzurum Radyosu",
-                slug = "erzurum-radyosu",
-                streamUrl = "https://rd-erzurum.medya.trt.com.tr/master.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
                 name = "Trabzon Radyosu",
                 slug = "trabzon-radyosu",
-                streamUrl = "https://rd-trabzon.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://rd-trabzon.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467523.jpeg",
                 description = "Bölgesel yayın"
+            ),
+            RadioChannel(
+                name = "TRT Arabi",
+                slug = "trt-arabi",
+                streamUrl = "https://rd-trtarabi.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467526.jpeg",
+                description = "Arapça yayın"
+            ),
+            RadioChannel(
+                name = "TRT Kurdi",
+                slug = "trt-kurdi",
+                streamUrl = "https://rd-trtkurdi.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467508.jpeg",
+                description = "Kürtçe yayın"
             )
         )
     }
@@ -324,12 +338,15 @@ class Trt : MainAPI() {
     }
 
     private suspend fun loadIndividualChannel(url: String): LoadResponse {
-        val allChannels = getTvChannels() + getRadioChannels()
+        // Get all channels and find the matching one
+        val tvChannels = getTvChannels()
+        val radioChannels = getRadioChannels()
+        val allChannels = tvChannels + radioChannels
         val channel = allChannels.find { it.streamUrl == url }
         
         return if (channel != null) {
             // Create a single episode for this channel for easy zapping
-            val episode = newEpisode(url) {
+            val episode = newEpisode(channel.streamUrl) {
                 name = channel.name
                 posterUrl = channel.logoUrl
                 episode = 1
