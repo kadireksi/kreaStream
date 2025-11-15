@@ -29,7 +29,7 @@ class Trt : MainAPI() {
         "archive" to "Eski Diziler",
         "programs" to "Programlar",
         "archivePrograms" to "Arşiv Programlar",
-        "trtcocuk" to "TRT Çocuk",
+        //"trtcocuk" to "TRT Çocuk",
         "live" to "TRT Tv & Radyo"
     )
 
@@ -280,7 +280,7 @@ class Trt : MainAPI() {
             "archive" -> getTrtSeries(archive = true,  page = page)
             "programs" -> getTrtPrograms(archive = false, page = page)
             "archivePrograms" -> getTrtPrograms(archive = true,  page = page)
-            "trtcocuk" -> getTrtCocuk(archive = false, page = page)
+            //"trtcocuk" -> getTrtCocuk(archive = false, page = page)
             else -> emptyList()
         }
 
