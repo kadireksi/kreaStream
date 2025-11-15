@@ -114,14 +114,14 @@ class Trt : MainAPI() {
             RadioChannel(
                 name = "TRT Nağme",
                 slug = "trt-nagme",
-                streamUrl = "https://rd-trtnagme.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://rd-trtnagme.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467465.jpeg",
                 description = "Türk Sanat Müziği"
             ),
             RadioChannel(
                 name = "TRT Türkü",
                 slug = "trt-turku",
-                streamUrl = "https://rd-trtturku.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://rd-trtturku.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467466.jpeg",
                 description = "Türk Halk Müziği"
             ),
@@ -135,50 +135,57 @@ class Trt : MainAPI() {
             RadioChannel(
                 name = "TRT Radyo 3",
                 slug = "trt-radyo-3",
-                streamUrl = "https://trt.radyotvonline.net/trt_3.aac",
+                streamUrl = "https://rd-trtradyo3.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
                 description = "Klasik, caz, rock ve dünya müziği"
             ),
             RadioChannel(
                 name = "TRT Kurdi",
                 slug = "trt-kurdi",
-                streamUrl = "https://rd-trtkurdi.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://radio-trtradyo6.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467508.jpeg",
                 description = "Kürtçe yayın"
             ),
             RadioChannel(
                 name = "TRT Arabi",
                 slug = "trt-arabi",
-                streamUrl = "https://rd-trtarabi.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://radio-trtarabi.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467526.jpeg",
                 description = "Arapça yayın"
             ),
             RadioChannel(
                 name = "Antalya Radyosu",
                 slug = "antalya-radyosu",
-                streamUrl = "https://rd-antalya.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://radio-trtantalya.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
                 name = "Çukurova Radyosu",
                 slug = "cukurova-radyosu",
-                streamUrl = "https://rd-cukurova.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://radio-trtcukurova.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467486.jpeg",
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
                 name = "Erzurum Radyosu",
                 slug = "erzurum-radyosu",
-                streamUrl = "https://radio-trterzurum.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://radio-trterzurum.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
                 name = "Trabzon Radyosu",
                 slug = "trabzon-radyosu",
-                streamUrl = "https://rd-trabzon.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://radio-trttrabzon.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467523.jpeg",
+                description = "Bölgesel yayın"
+            ),
+            RadioChannel(
+                name = "Gap Radyosu",
+                slug = "gap-radyosu",
+                streamUrl = "https://radio-trtgap.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467503.jpeg",
                 description = "Bölgesel yayın"
             )
         )
@@ -197,10 +204,6 @@ class Trt : MainAPI() {
         return list.distinct()
     }
 
-    /**
-     * Get series (shows) list from TRT Çocuk main list page
-     * (container-fluid.mpage contains anchors to series: /ekip-siberay)
-     */
     private suspend fun getTrtCocuk(page: Int = 1): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
         val url = "$trtCocukBase" + if (page > 1) "?page=$page" else ""
@@ -209,7 +212,7 @@ class Trt : MainAPI() {
             val doc = app.get(url, timeout = 15).document
 
             // Target the program list container. This should match the structure you pasted.
-            val anchors = doc.select("div.container-fluid.mpage a[href^='/']")
+            val anchors = doc.select("div.col-xl-2.col-lg-3.col-md-4.col-sm-6.col-6.py-3 a[href^='/']")
             Log.d("TRTÇocuk", "anchors: ${anchors.size}")
             for (a in anchors) {
                 val href = a.attr("href").trim()
@@ -240,11 +243,6 @@ class Trt : MainAPI() {
         return out
     }
 
-    /**
-     * Get episodes for a TRT Çocuk series page.
-     * Series page contains anchors to /video/... (episode pages).
-     * We return Episode objects that point to those /video/... URLs so loadLinks can resolve them.
-     */
     private suspend fun getTrtCocukEpisodes(seriesUrl: String): List<Episode> {
         val episodes = mutableListOf<Episode>()
         try {
@@ -399,9 +397,7 @@ class Trt : MainAPI() {
         }
 
         if (url.contains(".m3u8", ignoreCase = true)) {
-            return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) {
-                this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            }
+            return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url) 
         }
 
         // TRT Çocuk Series (series page like https://www.trtcocuk.net.tr/ekip-siberay)
@@ -427,7 +423,7 @@ class Trt : MainAPI() {
         }
 
         // TRT Çocuk Video page (episode page)
-        if (url.contains("trtcocuk.net.tr/video")) {
+        if (url.contains("trtcocuk.net.tr")) {
             try {
                 val doc = app.get(url, timeout = 15).document
                 val title = doc.selectFirst("h1, .page-title, .title")?.text()?.trim() ?: "TRT Çocuk Video"
@@ -569,7 +565,7 @@ class Trt : MainAPI() {
         }
 
         // TRT Çocuk links (episode pages)
-        if (data.contains("trtcocuk.net.tr/video")) {
+        if (data.contains("trtcocuk.net.tr")) {
             try {
                 val doc = app.get(data, timeout = 10).document
 
