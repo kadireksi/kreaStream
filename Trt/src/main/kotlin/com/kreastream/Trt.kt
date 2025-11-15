@@ -359,7 +359,7 @@ class Trt : MainAPI() {
                     this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                     this.year = 1964
                 },
-                newTvSeriesSearchResponse(
+                 newTvSeriesSearchResponse(
                     name = "TRT Radyo",
                     url = dummyRadioUrl,
                     type = TvType.Live
@@ -666,7 +666,7 @@ class Trt : MainAPI() {
         getTvChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newTvSeriesSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
                     this.posterUrl = ch.logoUrl
                 }
             }
@@ -674,7 +674,7 @@ class Trt : MainAPI() {
         getRadioChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newTvSeriesSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
                     this.posterUrl = ch.logoUrl
                 }
             }
