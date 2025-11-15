@@ -212,7 +212,7 @@ class Trt : MainAPI() {
             val doc = app.get(url, timeout = 15).document
 
             // Target the program list container. This should match the structure you pasted.
-            val anchors = doc.select("div.col-xl-2.col-lg-3.col-md-4.col-sm-6.col-6.py-3 a[href^='/']")
+                        val anchors = doc.select("div.container-fluid.mpage div.col-xl-2.col-lg-3.col-md-4.col-sm-6.col-6.py-3 a[href^='/']")
             Log.d("TRTÇocuk", "anchors: ${anchors.size}")
             for (a in anchors) {
                 val href = a.attr("href").trim()
