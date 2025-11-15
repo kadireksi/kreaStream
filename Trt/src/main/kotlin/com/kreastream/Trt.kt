@@ -553,7 +553,7 @@ class Trt : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         if (data.contains(".m3u8", ignoreCase = true) && 
-            (data.contains("medya.trt.com.tr") || data.contains("radyotvonline.net") || data.contains("medya.trt.com.tr"))) {
+            (data.contains("medya.trt.com.tr") || data.contains("radyotvonline.net"))) {
             return false
         }
 
