@@ -395,14 +395,17 @@ class Trt : MainAPI() {
     ): Boolean {
         // For direct stream URLs (live TV/radio)
         if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
-            newExtractorLink(
-                source = name,
-                name = "TRT",
-                url = data,
-                referer = tabiiUrl,
-                quality = Qualities.Unknown.value,
-                isM3u8 = data.contains(".m3u8")
-            )?.let(callback)
+            callback.invoke(
+                newExtractorLink(
+                    name = "TRT",
+                    source = this.name,
+                    url = data
+                ) {
+                    this.referer = tabiiUrl
+                    this.quality = Qualities.Unknown.value
+                    //this.isM3u8 = data.contains(".m3u8")
+                }
+            )
             return true
         }
 
@@ -418,14 +421,17 @@ class Trt : MainAPI() {
             }
 
             if (m3u8 != null) {
-                newExtractorLink(
-                    source = name,
-                    name = "TRT",
-                    url = m3u8,
-                    referer = trt1Url,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true
-                )?.let(callback)
+                callback.invoke(
+                    newExtractorLink(
+                        name = "TRT",
+                        source = this.name,
+                        url = m3u8,
+                    ) {
+                        this.referer = trt1Url
+                        this.quality = Qualities.Unknown.value
+                        //this.isM3u8 = true
+                    }
+                )
                 return true
             }
 
