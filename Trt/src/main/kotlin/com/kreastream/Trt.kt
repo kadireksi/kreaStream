@@ -553,7 +553,7 @@ class Trt : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         
-        if (data.contains(".m3u8", ignoreCase = true)) {
+        if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
             generateQualityVariants(data).forEach { u ->
                 M3u8Helper.generateM3u8(
                     source = name,
