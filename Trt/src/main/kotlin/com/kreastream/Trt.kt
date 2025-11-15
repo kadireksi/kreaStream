@@ -23,10 +23,12 @@ class Trt : MainAPI() {
     private val dummyTvUrl = "$tabiiUrl/tv"
     private val dummyRadioUrl = "$tabiiUrl/radio"
 
+    // Added TRT Çocuk main page key
     override val mainPage = mainPageOf(
         "series" to "Güncel Diziler",
         "archive" to "Eski Diziler",
-        "live" to "TRT Tv & Radyo"
+        "live" to "TRT Tv & Radyo",
+        "trtcocuk_videos" to "TRT Çocuk Videolar"
     )
 
     data class TvChannel(
@@ -45,6 +47,9 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
+    // ----------------------------
+    // TV / Radio channels (tabii)
+    // ----------------------------
     private suspend fun getTvChannels(): List<TvChannel> {
         val result = mutableListOf<TvChannel>()
         try {
@@ -91,7 +96,7 @@ class Trt : MainAPI() {
                 }
             }
         } catch (e: Exception) {
-            // silent failure, return what we have
+            // ignore and return whatever we managed to parse
         }
 
         return result
@@ -200,6 +205,77 @@ class Trt : MainAPI() {
         )
     }
 
+    // ----------------------------
+    // TRT Çocuk video list + details
+    // ----------------------------
+    private suspend fun getTrtCocukVideos(page: Int = 1): List<SearchResponse> {
+        val out = mutableListOf<SearchResponse>()
+        val url = if (page <= 1) "https://www.trtcocuk.net.tr/video" else "https://www.trtcocuk.net.tr/video?page=$page"
+        try {
+            val doc = app.get(url, timeout = 15).document
+
+            // Generic selector: find anchors linking to individual video pages.
+            // We try a few common card patterns to be resilient.
+            val anchors = doc.select("a[href*='/video/']")
+            for (el in anchors) {
+                val href = el.absUrl("href").ifEmpty { continue }
+                // Avoid duplicates
+                if (out.any { it.url == href }) continue
+
+                // Title: try several fallbacks
+                val title = el.selectFirst("h3, h2, .title, .card-title")?.text()?.trim()
+                    ?: el.attr("title")?.takeIf { it.isNotBlank() }
+                    ?: el.text()?.trim()
+                    ?: continue
+
+                // Poster image
+                var poster = el.selectFirst("img")?.absUrl("src")
+                if (poster.isNullOrBlank()) {
+                    // try parent or child image
+                    poster = el.parent()?.selectFirst("img")?.absUrl("src")
+                }
+                poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+
+                out += newTvSeriesSearchResponse(title, href) {
+                    this.posterUrl = poster
+                }
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
+        return out
+    }
+
+    // Parse a single TRT Çocuk video page and return a LoadResponse
+    private suspend fun loadTrtCocukVideoPage(url: String): LoadResponse {
+        try {
+            val doc = app.get(url, timeout = 15).document
+            val title = doc.selectFirst("h1, .page-title")?.text()?.trim() ?: "TRT Çocuk Video"
+            val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
+                ?: doc.selectFirst("img")?.absUrl("src")
+            val desc = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
+
+            // create a single episode representing the video
+            val episode = newEpisode(url) {
+                name = title
+                posterUrl = poster
+                episode = 1
+                season = 1
+                description = desc
+            }
+
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, listOf(episode)) {
+                this.posterUrl = poster
+                this.plot = desc
+            }
+        } catch (e: Exception) {
+            throw ErrorLoadingException("TRT Çocuk video yüklenemedi")
+        }
+    }
+
+    // ----------------------------
+    // Series fetching (TRT1)
+    // ----------------------------
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
             val url = if (page == 1) {
@@ -229,6 +305,9 @@ class Trt : MainAPI() {
 
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
+    // ----------------------------
+    // Main page
+    // ----------------------------
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
             "live" -> listOf(
@@ -251,10 +330,11 @@ class Trt : MainAPI() {
             )
             "series" -> getTrtSeries(archive = false, page = page)
             "archive" -> getTrtSeries(archive = true, page = page)
+            "trtcocuk_videos" -> getTrtCocukVideos(page)
             else -> emptyList()
         }
 
-        val hasNext = request.data in listOf("series", "archive") && items.isNotEmpty()
+        val hasNext = request.data in listOf("series", "archive", "trtcocuk_videos") && items.isNotEmpty()
 
         return newHomePageResponse(
             listOf(HomePageList(request.name, items, true)),
@@ -262,6 +342,9 @@ class Trt : MainAPI() {
         )
     }
 
+    // ----------------------------
+    // Load (series, channels, trt çocuk video page)
+    // ----------------------------
     override suspend fun load(url: String): LoadResponse {
         // TV Channels collection
         if (url == dummyTvUrl) {
@@ -275,12 +358,17 @@ class Trt : MainAPI() {
             return buildLiveRadioResponse(channels)
         }
 
-        // Individual channel (direct stream URL)
+        // Direct media (m3u8, aac)
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
             return loadIndividualChannel(url)
         }
 
-        // Series
+        // TRT Çocuk video page
+        if (url.contains("trtcocuk.net.tr/video", ignoreCase = true)) {
+            return loadTrtCocukVideoPage(url)
+        }
+
+        // Series (TRT1)
         try {
             val doc = app.get(url, timeout = 15).document
             val title = doc.selectFirst("h1")?.text()?.trim()
@@ -341,6 +429,9 @@ class Trt : MainAPI() {
         }
     }
 
+    // ----------------------------
+    // loadIndividualChannel, builders
+    // ----------------------------
     private suspend fun loadIndividualChannel(url: String): LoadResponse {
         // Get all channels and find the matching one
         val tvChannels = getTvChannels()
@@ -412,13 +503,16 @@ class Trt : MainAPI() {
         }
     }
 
+    // ----------------------------
+    // Links extraction (episodes, trt çocuk pages, youtube fallback, etc.)
+    // ----------------------------
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // For direct stream URLs (live TV/radio)
+        // Direct media (m3u8 / aac)
         if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
             callback(
                 newExtractorLink(
@@ -428,31 +522,94 @@ class Trt : MainAPI() {
                 ) {
                     this.referer = tabiiUrl
                     this.quality = Qualities.Unknown.value
-                    //this.isM3u8 = data.contains(".m3u8")
                 }
             )
             return true
         }
 
-        // For series episodes - TRT native source parsing
+        // TRT Çocuk video pages
+        if (data.contains("trtcocuk.net.tr/video", ignoreCase = true)) {
+            try {
+                val doc = app.get(data, timeout = 10).document
+
+                // 1) Try YouTube embed
+                val yt = doc.selectFirst("iframe[src*='youtube.com/embed'], iframe[src*='youtube-nocookie.com/embed']")
+                    ?.attr("src")
+                    ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
+
+                if (yt != null) {
+                    loadExtractor(yt, "https://www.trtcocuk.net.tr", subtitleCallback, callback)
+                    return true
+                }
+
+                // 2) Try video source tags for direct mp4 or m3u8
+                val videoSrc = doc.selectFirst("video source[src*='.m3u8'], video source[src*='.mp4'], source[src*='.m3u8'], source[src*='.mp4']")
+                    ?.attr("src")
+
+                if (!videoSrc.isNullOrBlank()) {
+                    val resolved = if (videoSrc.startsWith("http")) videoSrc else app.baseUrl + videoSrc
+                    callback(
+                        newExtractorLink(
+                            name = "TRT Çocuk",
+                            source = this.name,
+                            url = resolved
+                        ) {
+                            this.referer = "https://www.trtcocuk.net.tr"
+                            this.quality = Qualities.Unknown.value
+                        }
+                    )
+                    return true
+                }
+
+                // 3) Try JSON or script containing video url
+                val scriptContaining = doc.select("script")
+                    .find { it.html().contains("videoUrl") || it.html().contains("streamUrl") || it.html().contains(".m3u8") || it.html().contains(".mp4") }
+                    ?.html()
+
+                if (!scriptContaining.isNullOrBlank()) {
+                    val patterns = listOf(
+                        """https?://[^"'\\s]+?\.m3u8[^"'\\s]*""",
+                        """https?://[^"'\\s]+?\.mp4[^"'\\s]*"""
+                    )
+                    for (p in patterns) {
+                        val found = Regex(p).find(scriptContaining)?.value
+                        if (found != null) {
+                            callback(
+                                newExtractorLink(
+                                    name = "TRT Çocuk",
+                                    source = this.name,
+                                    url = found
+                                ) {
+                                    this.referer = "https://www.trtcocuk.net.tr"
+                                    this.quality = Qualities.Unknown.value
+                                }
+                            )
+                            return true
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("TRT", "Error parsing TRT Çocuk page: ${e.message}")
+            }
+        }
+
+        // Series episodes - TRT native source parsing
         try {
             val doc = app.get(data, timeout = 10).document
 
-            // Method 1: Look for TRT native player config
+            // Method 1: Look for TRT native player config in scripts
             val script = doc.select("script")
-                .find { it.html().contains("playerConfig") || it.html().contains("streamUrl") }
+                .find { it.html().contains("playerConfig") || it.html().contains("streamUrl") || it.html().contains("__NEXT_DATA__") }
                 ?.html()
 
             // Try to extract m3u8 from TRT native player
             val m3u8 = script?.let { html ->
-                // Pattern for TRT native stream URLs
                 val patterns = listOf(
                     """streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
                     """videoUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
                     """file["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
                     """src["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""
                 )
-
                 for (pattern in patterns) {
                     Regex(pattern).find(html)?.groupValues?.get(1)?.let { return@let it }
                 }
@@ -468,7 +625,6 @@ class Trt : MainAPI() {
                     ) {
                         this.referer = trt1Url
                         this.quality = Qualities.Unknown.value
-                        //this.isM3u8 = true
                     }
                 )
                 return true
@@ -497,7 +653,6 @@ class Trt : MainAPI() {
                             ) {
                                 this.referer = trt1Url
                                 this.quality = Qualities.Unknown.value
-                                //this.isM3u8 = true
                             }
                         )
                         return true
@@ -519,7 +674,7 @@ class Trt : MainAPI() {
             }
 
             // Method 4: Look for video elements with src
-            val videoSrc = doc.selectFirst("video source[src*='.m3u8']")?.attr("src")
+            val videoSrc = doc.selectFirst("video source[src*='.m3u8'], video source[src*='.mp4']")?.attr("src")
             if (videoSrc != null) {
                 callback(
                     newExtractorLink(
@@ -529,11 +684,11 @@ class Trt : MainAPI() {
                     ) {
                         this.referer = trt1Url
                         this.quality = Qualities.Unknown.value
-                        //this.isM3u8 = true
                     }
                 )
                 return true
             }
+
         } catch (e: Exception) {
             Log.e("TRT", "Error loading links: ${e.message}")
         }
@@ -541,6 +696,9 @@ class Trt : MainAPI() {
         return false
     }
 
+    // ----------------------------
+    // Search
+    // ----------------------------
     override suspend fun search(query: String): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
 
@@ -562,6 +720,13 @@ class Trt : MainAPI() {
                 }
             }
 
+        // Search in TRT Çocuk videos (quick local search)
+        getTrtCocukVideos()
+            .filter { it.title.contains(query, ignoreCase = true) }
+            .forEach { v ->
+                out += v
+            }
+
         // Search in series
         try {
             val sUrl = "$trt1Url/arama/$query?contenttype=series"
@@ -580,9 +745,7 @@ class Trt : MainAPI() {
                         this.posterUrl = poster
                     }
                 }
-        } catch (_: Exception) {
-            // ignore
-        }
+        } catch (_: Exception) {}
 
         return out
     }
