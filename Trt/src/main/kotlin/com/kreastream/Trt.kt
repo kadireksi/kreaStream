@@ -27,6 +27,9 @@ class Trt : MainAPI() {
     override val mainPage = mainPageOf(
         "series"  to "Güncel Diziler",
         "archive" to "Eski Diziler",
+        "programs" to "Programlar",
+        "archivePrograms" to "Arşiv Programlar",
+        "trtcocuk" to "TRT Çocuk",
         "live" to "TRT Tv & Radyo"
     )
 
@@ -100,7 +103,7 @@ class Trt : MainAPI() {
             RadioChannel(
                 name = "TRT FM",
                 slug = "trt-fm",
-                streamUrl = "https://radio-trt-fm.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://trt.radyotvonline.net/trt_fm.aac",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467418.jpeg",
                 description = "Türkçe Pop ve güncel müzik"
             ),
@@ -170,7 +173,7 @@ class Trt : MainAPI() {
             RadioChannel(
                 name = "Erzurum Radyosu",
                 slug = "erzurum-radyosu",
-                streamUrl = "https://rd-erzurum.medya.trt.com.tr/master.m3u8",
+                streamUrl = "https://radio-trterzurum.medya.trt.com.tr/master.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
                 description = "Bölgesel yayın"
             ),
@@ -224,6 +227,33 @@ class Trt : MainAPI() {
         }
     }
 
+    private suspend fun getTrtPrograms(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
+        return try {
+            val url = if (page == 1) {
+                "$trt1Url/programlar?archive=$archive&order=title_asc"
+            } else {
+                "$trt1Url/programlar/$page?archive=$archive&order=title_asc"
+            }
+
+            app.get(url, timeout = 15).document
+                .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
+                .mapNotNull { el ->
+                    val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
+                        ?: return@mapNotNull null
+                    val href = el.attr("href")
+                    var poster = el.selectFirst("img")?.absUrl("src")
+                    poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                        ?.replace("/q75/", "/q85/")
+
+                    newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
+                        this.posterUrl = poster
+                    }
+                }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -242,12 +272,15 @@ class Trt : MainAPI() {
                     url = dummyRadioUrl,
                     type = TvType.Live
                 ) {
-                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
+                    this.posterUrl = "https://trtdinle.com/trt-dinle-fb-share.jpg"
                     this.year = 1927
                 }
             )
             "series"  -> getTrtSeries(archive = false, page = page)
             "archive" -> getTrtSeries(archive = true,  page = page)
+            "programs" -> getTrtPrograms(archive = false, page = page)
+            "archivePrograms" -> getTrtPrograms(archive = true,  page = page)
+            "trtcocuk" -> getTrtCocuk(archive = false, page = page)
             else -> emptyList()
         }
 
@@ -263,21 +296,7 @@ class Trt : MainAPI() {
         // TV
         if (url == dummyTvUrl) {
             val channels = getTvChannels()
-            return if (channels.isEmpty()) {
-                buildLiveTVResponse(
-                    listOf(
-                        TvChannel(
-                            name = "TRT 1",
-                            slug = "trt1",
-                            streamUrl = "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-                            logoUrl = "https://upload.wikimedia.org/wikipedia/tr/6/67/TRT_1_logo.png",
-                            description = "TRT 1"
-                        )
-                    )
-                )
-            } else {
-                buildLiveTVResponse(channels)
-            }
+            return buildLiveTVResponse(channels)
         }
 
         if (url == dummyRadioUrl) {
