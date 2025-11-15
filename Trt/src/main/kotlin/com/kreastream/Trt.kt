@@ -212,7 +212,7 @@ class Trt : MainAPI() {
             val doc = app.get(url, timeout = 15).document
 
             // Target the program list container. This should match the structure you pasted.
-                        val anchors = doc.select("div.container-fluid.mpage div.col-xl-2.col-lg-3.col-md-4.col-sm-6.col-6.py-3 a[href^='/']")
+            val anchors = doc.select("div.container-fluid.mpage div.col-xl-2.col-lg-3.col-md-4.col-sm-6.col-6.py-3 a[href^='/']")
             Log.d("TRTÇocuk", "anchors: ${anchors.size}")
             for (a in anchors) {
                 val href = a.attr("href").trim()
@@ -359,7 +359,7 @@ class Trt : MainAPI() {
                     this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                     this.year = 1964
                 },
-                 newTvSeriesSearchResponse(
+                newTvSeriesSearchResponse(
                     name = "TRT Radyo",
                     url = dummyRadioUrl,
                     type = TvType.Live
@@ -552,6 +552,11 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        if (data.contains(".m3u8", ignoreCase = true) && 
+            (data.contains("medya.trt.com.tr") || data.contains("radyotvonline.net") || data.contains("medya.trt.com.tr"))) {
+            return false
+        }
+
         if (data.contains(".m3u8", ignoreCase = true)) {
             generateQualityVariants(data).forEach { u ->
                 M3u8Helper.generateM3u8(
@@ -661,7 +666,7 @@ class Trt : MainAPI() {
         getTvChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                out += newTvSeriesSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
                     this.posterUrl = ch.logoUrl
                 }
             }
@@ -669,7 +674,7 @@ class Trt : MainAPI() {
         getRadioChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                out += newTvSeriesSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
                     this.posterUrl = ch.logoUrl
                 }
             }
