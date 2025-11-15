@@ -390,14 +390,15 @@ class Trt : MainAPI() {
         // For direct stream URLs (live TV/radio), use them directly without quality variants
         if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
             callback(
-                ExtractorLink(
+                newExtractorLink(
                     source = name,
                     name = "TRT Stream",
-                    url = data,
-                    referer = tabiiUrl,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = data.contains(".m3u8")
-                )
+                    url = data
+                ){
+                    this.referer = tabiiUrl
+                    this.quality = Qualities.Unknown.value
+                    //this.isM3u8 = data.contains(".m3u8")
+                }
             )
             return true
         }
@@ -416,14 +417,15 @@ class Trt : MainAPI() {
             if (m3u8 != null) {
                 // Use direct m3u8 without generating quality variants
                 callback(
-                    ExtractorLink(
+                    new(
                         source = name,
                         name = "TRT",
-                        url = m3u8,
-                        referer = trt1Url,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
-                    )
+                        url = m3u8
+                    ){
+                        this.referer = trt1Url
+                        this.quality = Qualities.Unknown.value
+                        //this.isM3u8 = true
+                    }
                 )
                 return true
             }
