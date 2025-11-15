@@ -552,11 +552,7 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        if (data.contains(".m3u8", ignoreCase = true) && 
-            (data.contains("medya.trt.com.tr") || data.contains("radyotvonline.net"))) {
-            return false
-        }
-
+        
         if (data.contains(".m3u8", ignoreCase = true)) {
             generateQualityVariants(data).forEach { u ->
                 M3u8Helper.generateM3u8(
