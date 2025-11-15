@@ -404,17 +404,17 @@ class Trt : MainAPI() {
                     .find(it)?.groupValues?.get(1)
             }
 
-            // if (m3u8 != null) {
-            //     generateQualityVariants(m3u8).forEach { u ->
-            //         M3u8Helper.generateM3u8(
-            //             source = name,
-            //             streamUrl = u,
-            //             referer = trt1Url,
-            //             headers = mapOf("Referer" to trt1Url)
-            //         ).forEach(callback)
-            //     }
-            //     return true
-            // }
+            if (m3u8 != null) {
+                //generateQualityVariants(m3u8).forEach { u ->
+                    M3u8Helper.generateM3u8(
+                        source = name,
+                        streamUrl = u,
+                        referer = trt1Url,
+                        headers = mapOf("Referer" to trt1Url)
+                    )//.forEach(callback)
+                }
+                return true
+            }
 
             val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
                 ?.attr("src")
