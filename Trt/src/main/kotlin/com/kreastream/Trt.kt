@@ -229,7 +229,7 @@ class Trt : MainAPI() {
 
                 out += newTvSeriesSearchResponse(title, fullUrl) {
                     this.posterUrl = poster
-                    this.referer = trtCocukBase
+                    //this.referer = trtCocukBase
                 }
             }
 
