@@ -243,7 +243,7 @@ class Trt : MainAPI() {
                     url = dummyRadioUrl,
                     type = TvType.Live
                 ) {
-                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
+                    this.posterUrl = "https://www.trtdinle.com/trt-dinle-fb-share.jpg"
                     this.year = 1927
                 }
             )
@@ -313,10 +313,10 @@ class Trt : MainAPI() {
                             val epNum = epTitle.replace(Regex("[^0-9]"), "").toIntOrNull() ?: pageNum
 
                             newEpisode(fixTrtUrl(href)) {
-                                name = epTitle
-                                posterUrl = img
-                                episode = epNum
-                                description = desc
+                                this.name = epTitle
+                                this.posterUrl = img
+                                this.episode = epNum
+                                this.description = desc
                             }
                         }
 
@@ -347,11 +347,11 @@ class Trt : MainAPI() {
         return if (channel != null) {
             // Create a single episode for this channel for easy zapping
             val episode = newEpisode(channel.streamUrl) {
-                name = channel.name
-                posterUrl = channel.logoUrl
-                episode = 1
-                season = 1
-                description = channel.description
+                this.name = channel.name
+                this.posterUrl = channel.logoUrl
+                this.episode = 1
+                this.season = 1
+                this.description = channel.description
             }
             
             newTvSeriesLoadResponse(channel.name, url, TvType.Live, listOf(episode)) {
@@ -361,9 +361,9 @@ class Trt : MainAPI() {
         } else {
             // Fallback for direct URLs
             val episode = newEpisode(url) {
-                name = "TRT Stream"
-                episode = 1
-                season = 1
+                this.name = "TRT Stream"
+                this.episode = 1
+                this.season = 1
             }
             
             newTvSeriesLoadResponse("TRT Stream", url, TvType.Live, listOf(episode)) {
@@ -375,11 +375,11 @@ class Trt : MainAPI() {
     private suspend fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
-                name = ch.name
-                posterUrl = ch.logoUrl
-                episode = i + 1
-                season = 1
-                description = ch.description
+                this.name = ch.name
+                this.posterUrl = ch.logoUrl
+                this.episode = i + 1
+                this.season = 1
+                this.description = ch.description
             }
         }
 
@@ -393,11 +393,11 @@ class Trt : MainAPI() {
     private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
-                name = ch.name
-                posterUrl = ch.logoUrl
-                episode = i + 1
-                season = 1
-                description = ch.description
+                this.name = ch.name
+                this.posterUrl = ch.logoUrl
+                this.episode = i + 1
+                this.season = 1
+                this.description = ch.description
             }
         }
 
@@ -416,17 +416,14 @@ class Trt : MainAPI() {
     ): Boolean {
         // For direct stream URLs (live TV/radio)
         if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
-            callback(
-                newExtractorLink(
-                    name = "TRT",
-                    source = this.name,
-                    url = data
-                ) {
-                    this.referer = tabiiUrl
-                    this.quality = Qualities.Unknown.value
-                    //this.isM3u8 = data.contains(".m3u8")
-                }
-            )
+            newExtractorLink(
+                name = "TRT",
+                url = data,
+                referer = tabiiUrl
+            ) {
+                this.quality = Qualities.Unknown.value
+                this.isM3u8 = data.contains(".m3u8")
+            }?.let(callback)
             return true
         }
 
@@ -456,17 +453,14 @@ class Trt : MainAPI() {
             }
 
             if (m3u8 != null) {
-                callback(
-                    newExtractorLink(
-                        name = "TRT",
-                        source = this.name,
-                        url = m3u8
-                    ) {
-                        this.referer = trt1Url
-                        this.quality = Qualities.Unknown.value
-                        //this.isM3u8 = true
-                    }
-                )
+                newExtractorLink(
+                    name = "TRT",
+                    url = m3u8,
+                    referer = trt1Url
+                ) {
+                    this.quality = Qualities.Unknown.value
+                    this.isM3u8 = true
+                }?.let(callback)
                 return true
             }
 
@@ -485,17 +479,14 @@ class Trt : MainAPI() {
                 for (pattern in jsonPatterns) {
                     val found = Regex(pattern).find(jsonScript)?.groupValues?.get(1)
                     if (found != null) {
-                        callback(
-                            newExtractorLink(
-                                name = "TRT",
-                                source = this.name,
-                                url = found
-                            ) {
-                                this.referer = trt1Url
-                                this.quality = Qualities.Unknown.value
-                                //this.isM3u8 = true
-                            }
-                        )
+                        newExtractorLink(
+                            name = "TRT",
+                            url = found,
+                            referer = trt1Url
+                        ) {
+                            this.quality = Qualities.Unknown.value
+                            this.isM3u8 = true
+                        }?.let(callback)
                         return true
                     }
                 }
@@ -517,17 +508,14 @@ class Trt : MainAPI() {
             // Method 4: Look for video elements with src
             val videoSrc = doc.selectFirst("video source[src*='.m3u8']")?.attr("src")
             if (videoSrc != null) {
-                callback(
-                    newExtractorLink(
-                        name = "TRT",
-                        source = this.name,
-                        url = videoSrc
-                    ) {
-                        this.referer = trt1Url
-                        this.quality = Qualities.Unknown.value
-                        //this.isM3u8 = true
-                    }
-                )
+                newExtractorLink(
+                    name = "TRT",
+                    url = videoSrc,
+                    referer = trt1Url
+                ) {
+                    this.quality = Qualities.Unknown.value
+                    this.isM3u8 = true
+                }?.let(callback)
                 return true
             }
 
