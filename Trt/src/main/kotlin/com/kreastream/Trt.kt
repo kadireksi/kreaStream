@@ -206,32 +206,27 @@ class Trt : MainAPI() {
         page: Int = 1
     ): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
-        val url = "$trtCocukBase/video" + if (page > 1) "?page=$page" else ""
+        val url = "$trtCocukBase/programlar" + if (page > 1) "?page=$page" else ""
 
         try {
             val doc = app.get(url, timeout = 15).document
-
-            // Select all show links: <a href="/ibi-galaktik-seruven">
             val anchors = doc.select("a[href^='/']")
 
             for (el in anchors) {
                 val hrefRaw = el.attr("href")
                 if (hrefRaw.isBlank()) continue
 
-                // TRT uses links like /ekip-siberay (not /video/)
-                val fullHref = trtCocukBase + hrefRaw.trim()
-
-                // avoid duplicates
+                val fullHref = trtCocukBase + hrefRaw
                 if (out.any { it.url == fullHref }) continue
 
-                // Title comes from <img alt="TITLE">
                 val imgEl = el.selectFirst("img") ?: continue
-                val title = imgEl.attr("alt").trim().ifBlank { continue }
+                val title = imgEl.attr("alt").trim()
+                if (title.isBlank()) continue
 
-                // Poster comes from data-src or src
                 val poster = imgEl.attr("data-src").ifBlank {
                     imgEl.attr("src")
-                }.trim().ifBlank { continue }
+                }.trim()
+                if (poster.isBlank()) continue
 
                 out += newTvSeriesSearchResponse(title, fullHref) {
                     this.posterUrl = poster
@@ -244,6 +239,7 @@ class Trt : MainAPI() {
 
         return out
     }
+
 
 
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
