@@ -383,14 +383,13 @@ class Trt : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         if (data.contains(".m3u8", ignoreCase = true)) {
-            generateQualityVariants(data).forEach { u ->
-                M3u8Helper.generateM3u8(
-                    source = name,
-                    streamUrl = u,
-                    referer = tabiiUrl,
-                    headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
-                ).forEach(callback)
-            }
+            // For live streams, use the original m3u8 directly as it already contains quality options
+            M3u8Helper.generateM3u8(
+                source = name,
+                streamUrl = data,
+                referer = tabiiUrl,
+                headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
+            ).forEach(callback)
             return true
         }
 
@@ -405,6 +404,7 @@ class Trt : MainAPI() {
             }
 
             if (m3u8 != null) {
+                // For series episodes, you can still generate quality variants if needed
                 generateQualityVariants(m3u8).forEach { u ->
                     M3u8Helper.generateM3u8(
                         source = name,
