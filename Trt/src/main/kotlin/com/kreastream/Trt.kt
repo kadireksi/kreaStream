@@ -210,7 +210,7 @@ class Trt : MainAPI() {
 
             // Target the program list container. This should match the structure you pasted.
             val anchors = doc.select("div.container-fluid.mpage a[href^='/']")
-
+            Log.d("TRTÇocuk", "anchors: ${anchors.size}")
             for (a in anchors) {
                 val href = a.attr("href").trim()
                 if (href.isBlank()) continue
@@ -234,7 +234,7 @@ class Trt : MainAPI() {
             }
 
         } catch (e: Exception) {
-            Log.e("TRT", "getTrtCocuk failed: ${e.message}")
+            Log.e("TRTÇocuk", "getTrtCocuk failed: ${e.message}")
         }
 
         return out
@@ -289,7 +289,7 @@ class Trt : MainAPI() {
             // (already covered by a[href^='/video/']), so nothing extra required.
 
         } catch (e: Exception) {
-            Log.e("TRT", "getTrtCocukEpisodes failed: ${e.message}")
+            Log.e("TRTÇocuk", "getTrtCocukEpisodes failed: ${e.message}")
         }
         return episodes
     }
