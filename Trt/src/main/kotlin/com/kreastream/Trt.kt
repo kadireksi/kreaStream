@@ -201,32 +201,50 @@ class Trt : MainAPI() {
         return list.distinct()
     }
 
-    private suspend fun getTrtCocuk(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
+    private suspend fun getTrtCocuk(
+        archive: Boolean = false,
+        page: Int = 1
+    ): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
         val url = "$trtCocukBase/video" + if (page > 1) "?page=$page" else ""
+
         try {
             val doc = app.get(url, timeout = 15).document
-            val anchors = doc.select("a[href*='/video/']")
+
+            // Select all show links: <a href="/ibi-galaktik-seruven">
+            val anchors = doc.select("a[href^='/']")
+
             for (el in anchors) {
                 val hrefRaw = el.attr("href")
-                if (hrefRaw.isNullOrBlank()) continue
-                val fullHref = "$trtCocukBase$hrefRaw"
+                if (hrefRaw.isBlank()) continue
+
+                // TRT uses links like /ekip-siberay (not /video/)
+                val fullHref = trtCocukBase + hrefRaw.trim()
+
+                // avoid duplicates
                 if (out.any { it.url == fullHref }) continue
-                val title = el.selectFirst("p.oneline")?.text()?.trim()
-                    ?: el.selectFirst(".title, h3, h2")?.text()?.trim() ?: continue
-                var poster = el.selectFirst("img")?.attr("data-src")
-                    ?: el.selectFirst("img")?.attr("src")
-                if (poster.isNullOrBlank()) continue
-                poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338")
+
+                // Title comes from <img alt="TITLE">
+                val imgEl = el.selectFirst("img") ?: continue
+                val title = imgEl.attr("alt").trim().ifBlank { continue }
+
+                // Poster comes from data-src or src
+                val poster = imgEl.attr("data-src").ifBlank {
+                    imgEl.attr("src")
+                }.trim().ifBlank { continue }
+
                 out += newTvSeriesSearchResponse(title, fullHref) {
                     this.posterUrl = poster
                 }
             }
+
         } catch (e: Exception) {
             Log.e("TRT", "getTrtCocuk failed: ${e.message}")
         }
+
         return out
     }
+
 
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
