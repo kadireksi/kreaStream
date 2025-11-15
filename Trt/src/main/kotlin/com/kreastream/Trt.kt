@@ -21,8 +21,8 @@ class Trt : MainAPI() {
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
-    private val dummyTvUrl = tabiiUrl
-    private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
+    private val dummyTvUrl = "$tabiiUrl/tv"
+    private val dummyRadioUrl = "$tabiiUrl/radio"
 
     override val mainPage = mainPageOf(
         "series"  to "Güncel Diziler",
@@ -261,35 +261,7 @@ class Trt : MainAPI() {
 
         // Individual channel (direct stream URL)
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
-            val allChannels = getTvChannels() + getRadioChannels()
-            val channel = allChannels.find { it.streamUrl == url }
-            
-            return if (channel != null) {
-                // Create a single episode for this channel for easy zapping
-                val episode = newEpisode(url) {
-                    name = channel.name
-                    posterUrl = channel.logoUrl
-                    episode = 1
-                    season = 1
-                    description = channel.description
-                }
-                
-                newTvSeriesLoadResponse(channel.name, url, TvType.Live, listOf(episode)) {
-                    this.posterUrl = channel.logoUrl
-                    this.plot = channel.description
-                }
-            } else {
-                // Fallback for direct URLs
-                val episode = newEpisode(url) {
-                    name = "TRT Stream"
-                    episode = 1
-                    season = 1
-                }
-                
-                newTvSeriesLoadResponse("TRT Stream", url, TvType.Live, listOf(episode)) {
-                    this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-                }
-            }
+            return loadIndividualChannel(url)
         }
 
         // Series
@@ -351,6 +323,38 @@ class Trt : MainAPI() {
         }
     }
 
+    private suspend fun loadIndividualChannel(url: String): LoadResponse {
+        val allChannels = getTvChannels() + getRadioChannels()
+        val channel = allChannels.find { it.streamUrl == url }
+        
+        return if (channel != null) {
+            // Create a single episode for this channel for easy zapping
+            val episode = newEpisode(url) {
+                name = channel.name
+                posterUrl = channel.logoUrl
+                episode = 1
+                season = 1
+                description = channel.description
+            }
+            
+            newTvSeriesLoadResponse(channel.name, url, TvType.Live, listOf(episode)) {
+                this.posterUrl = channel.logoUrl
+                this.plot = channel.description
+            }
+        } else {
+            // Fallback for direct URLs
+            val episode = newEpisode(url) {
+                name = "TRT Stream"
+                episode = 1
+                season = 1
+            }
+            
+            newTvSeriesLoadResponse("TRT Stream", url, TvType.Live, listOf(episode)) {
+                this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+            }
+        }
+    }
+
     private suspend fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
         val episodes = channels.mapIndexed { i, ch ->
             newEpisode(ch.streamUrl) {
@@ -395,7 +399,7 @@ class Trt : MainAPI() {
     ): Boolean {
         // For direct stream URLs (live TV/radio)
         if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
-            callback.invoke(
+            callback(
                 newExtractorLink(
                     name = "TRT",
                     source = this.name,
@@ -409,23 +413,37 @@ class Trt : MainAPI() {
             return true
         }
 
-        // For series episodes
+        // For series episodes - TRT native source parsing
         try {
             val doc = app.get(data, timeout = 10).document
+            
+            // Method 1: Look for TRT native player config
             val script = doc.select("script")
-                .find { it.html().contains("playerConfig") }
+                .find { it.html().contains("playerConfig") || it.html().contains("streamUrl") }
                 ?.html()
-            val m3u8 = script?.let {
-                Regex("""streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""")
-                    .find(it)?.groupValues?.get(1)
+            
+            // Try to extract m3u8 from TRT native player
+            val m3u8 = script?.let { html ->
+                // Pattern for TRT native stream URLs
+                val patterns = listOf(
+                    """streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
+                    """videoUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
+                    """file["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
+                    """src["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""
+                )
+                
+                for (pattern in patterns) {
+                    Regex(pattern).find(html)?.groupValues?.get(1)?.let { return@let it }
+                }
+                null
             }
 
             if (m3u8 != null) {
-                callback.invoke(
+                callback(
                     newExtractorLink(
                         name = "TRT",
                         source = this.name,
-                        url = m3u8,
+                        url = m3u8
                     ) {
                         this.referer = trt1Url
                         this.quality = Qualities.Unknown.value
@@ -435,6 +453,38 @@ class Trt : MainAPI() {
                 return true
             }
 
+            // Method 2: Look for JSON data in script tags
+            val jsonScript = doc.select("script")
+                .find { it.html().contains("__NEXT_DATA__") || it.html().contains("videoData") }
+                ?.html()
+            
+            if (jsonScript != null) {
+                val jsonPatterns = listOf(
+                    """streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
+                    """video_url["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""",
+                    """url["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""
+                )
+                
+                for (pattern in jsonPatterns) {
+                    val found = Regex(pattern).find(jsonScript)?.groupValues?.get(1)
+                    if (found != null) {
+                        callback(
+                            newExtractorLink(
+                                name = "TRT",
+                                source = this.name,
+                                url = found
+                            ) {
+                                this.referer = trt1Url
+                                this.quality = Qualities.Unknown.value
+                                //this.isM3u8 = true
+                            }
+                        )
+                        return true
+                    }
+                }
+            }
+
+            // Method 3: YouTube fallback
             val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
                 ?.attr("src")
                 ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
@@ -446,7 +496,27 @@ class Trt : MainAPI() {
                 loadExtractor(yt, tabiiUrl, subtitleCallback, callback)
                 return true
             }
-        } catch (e: Exception) {}
+
+            // Method 4: Look for video elements with src
+            val videoSrc = doc.selectFirst("video source[src*='.m3u8']")?.attr("src")
+            if (videoSrc != null) {
+                callback(
+                    newExtractorLink(
+                        name = "TRT",
+                        source = this.name,
+                        url = videoSrc
+                    ) {
+                        this.referer = trt1Url
+                        this.quality = Qualities.Unknown.value
+                        //this.isM3u8 = true
+                    }
+                )
+                return true
+            }
+
+        } catch (e: Exception) {
+            Log.e("TRT", "Error loading links: ${e.message}")
+        }
 
         return false
     }
