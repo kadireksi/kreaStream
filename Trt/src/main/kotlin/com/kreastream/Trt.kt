@@ -215,34 +215,24 @@ class Trt : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
-            "live" -> {
-                val tvChannels = getTvChannels()
-                val radioChannels = getRadioChannels()
-                
-                // Create proper TV channel items with actual channel data
-                val tvItems = tvChannels.take(6).map { channel ->
-                    newTvSeriesSearchResponse(
-                        name = channel.name,
-                        url = channel.streamUrl,
-                        type = TvType.Live,
-                    ) {
-                        this.posterUrl = channel.logoUrl
-                    }
+            "live" -> listOf(
+                newTvSeriesSearchResponse(
+                    name = "TRT TV Kanalları",
+                    url = dummyTvUrl,
+                    type = TvType.Live,
+                ) {
+                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.year = 1964
+                },
+                 newTvSeriesSearchResponse(
+                    name = "TRT Radyo Kanalları",
+                    url = dummyRadioUrl,
+                    type = TvType.Live
+                ) {
+                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
+                    this.year = 1927
                 }
-                
-                // Create radio items
-                val radioItems = radioChannels.take(6).map { channel ->
-                    newTvSeriesSearchResponse(
-                        name = channel.name,
-                        url = channel.streamUrl,
-                        type = TvType.Live
-                    ) {
-                        this.posterUrl = channel.logoUrl
-                    }
-                }
-                
-                tvItems + radioItems
-            }
+            )
             "series"  -> getTrtSeries(archive = false, page = page)
             "archive" -> getTrtSeries(archive = true,  page = page)
             else -> emptyList()
@@ -257,23 +247,6 @@ class Trt : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // TV Channel (direct m3u8)
-        if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
-            val channels = getTvChannels() + getRadioChannels()
-            val channel = channels.find { it.streamUrl == url }
-            
-            return if (channel != null) {
-                newMovieLoadResponse(channel.name, url, TvType.Live, url) {
-                    this.posterUrl = channel.logoUrl
-                    this.plot = channel.description
-                }
-            } else {
-                newMovieLoadResponse("TRT Stream", url, TvType.Live, url) {
-                    this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-                }
-            }
-        }
-
         // TV Channels collection
         if (url == dummyTvUrl) {
             val channels = getTvChannels()
@@ -284,6 +257,39 @@ class Trt : MainAPI() {
         if (url == dummyRadioUrl) {
             val channels = getRadioChannels()
             return buildLiveRadioResponse(channels)
+        }
+
+        // Individual channel (direct stream URL)
+        if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
+            val allChannels = getTvChannels() + getRadioChannels()
+            val channel = allChannels.find { it.streamUrl == url }
+            
+            return if (channel != null) {
+                // Create a single episode for this channel for easy zapping
+                val episode = newEpisode(url) {
+                    name = channel.name
+                    posterUrl = channel.logoUrl
+                    episode = 1
+                    season = 1
+                    description = channel.description
+                }
+                
+                newTvSeriesLoadResponse(channel.name, url, TvType.Live, listOf(episode)) {
+                    this.posterUrl = channel.logoUrl
+                    this.plot = channel.description
+                }
+            } else {
+                // Fallback for direct URLs
+                val episode = newEpisode(url) {
+                    name = "TRT Stream"
+                    episode = 1
+                    season = 1
+                }
+                
+                newTvSeriesLoadResponse("TRT Stream", url, TvType.Live, listOf(episode)) {
+                    this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+                }
+            }
         }
 
         // Series
@@ -356,9 +362,9 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
+        return newTvSeriesLoadResponse("TRT TV Kanalları", dummyTvUrl, TvType.Live, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT TV canlı yayın"
+            this.plot = "${channels.size} TRT TV kanalı - Kanallar arasında geçiş yapmak için bölümleri kullanın"
             this.year = 1964
         }
     }
@@ -374,9 +380,9 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
+        return newTvSeriesLoadResponse("TRT Radyo Kanalları", dummyRadioUrl, TvType.Live, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT Radyo canlı yayın"
+            this.plot = "${channels.size} TRT Radyo kanalı - Kanallar arasında geçiş yapmak için bölümleri kullanın"
             this.year = 1927
         }
     }
@@ -387,19 +393,16 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // For direct stream URLs (live TV/radio), use them directly without quality variants
+        // For direct stream URLs (live TV/radio)
         if (data.contains(".m3u8", ignoreCase = true) || data.contains(".aac", ignoreCase = true)) {
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = "TRT Stream",
-                    url = data
-                ){
-                    this.referer = tabiiUrl
-                    this.quality = Qualities.Unknown.value
-                    //this.isM3u8 = data.contains(".m3u8")
-                }
-            )
+            newExtractorLink(
+                source = name,
+                name = "TRT",
+                url = data,
+                referer = tabiiUrl,
+                quality = Qualities.Unknown.value,
+                isM3u8 = data.contains(".m3u8")
+            )?.let(callback)
             return true
         }
 
@@ -415,18 +418,14 @@ class Trt : MainAPI() {
             }
 
             if (m3u8 != null) {
-                // Use direct m3u8 without generating quality variants
-                callback(
-                    new(
-                        source = name,
-                        name = "TRT",
-                        url = m3u8
-                    ){
-                        this.referer = trt1Url
-                        this.quality = Qualities.Unknown.value
-                        //this.isM3u8 = true
-                    }
-                )
+                newExtractorLink(
+                    source = name,
+                    name = "TRT",
+                    url = m3u8,
+                    referer = trt1Url,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = true
+                )?.let(callback)
                 return true
             }
 
@@ -449,22 +448,25 @@ class Trt : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
 
+        // Search in TV channels
         getTvChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                out += newTvSeriesSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
                     this.posterUrl = ch.logoUrl
                 }
             }
 
+        // Search in radio channels
         getRadioChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                out += newTvSeriesSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
                     this.posterUrl = ch.logoUrl
                 }
             }
 
+        // Search in series
         try {
             val sUrl = "$trt1Url/arama/$query?contenttype=series"
             app.get(sUrl, timeout = 10).document
