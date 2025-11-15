@@ -9,7 +9,6 @@ import kotlinx.coroutines.delay
 import android.util.Log
 import java.util.Locale
 
-
 class Trt : MainAPI() {
     override var mainUrl = "https://www.tabii.com"
     override var name = "TRT"
@@ -66,7 +65,6 @@ class Trt : MainAPI() {
                 val name = ch.getString("title")
                 val slug = ch.getString("slug")
 
-                // Logo
                 var logoUrl = ""
                 val images = ch.getJSONArray("images")
                 for (j in 0 until images.length()) {
@@ -79,7 +77,6 @@ class Trt : MainAPI() {
                 }
                 if (logoUrl.isBlank()) continue
 
-                // Stream
                 var streamUrl = ""
                 val media = ch.getJSONArray("media")
                 for (j in 0 until media.length()) {
@@ -92,10 +89,9 @@ class Trt : MainAPI() {
                 if (streamUrl.isBlank()) continue
                 if(!name.contains("tabii")) {
                     result += TvChannel(name, slug, streamUrl, logoUrl, "$name")
-                } 
+                }
             }
         } catch (e: Exception) {}
-
         return result
     }
 
@@ -201,35 +197,39 @@ class Trt : MainAPI() {
         return list.distinct()
     }
 
-    private suspend fun getTrtCocuk(
-        archive: Boolean = false,
-        page: Int = 1
-    ): List<SearchResponse> {
+    /**
+     * Get series (shows) list from TRT Çocuk main list page
+     * (container-fluid.mpage contains anchors to series: /ekip-siberay)
+     */
+    private suspend fun getTrtCocuk(page: Int = 1): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
-        val url = "$trtCocukBase/programlar" + if (page > 1) "?page=$page" else ""
+        val url = "$trtCocukBase" + if (page > 1) "?page=$page" else ""
 
         try {
             val doc = app.get(url, timeout = 15).document
-            val anchors = doc.select("a[href^='/']")
 
-            for (el in anchors) {
-                val hrefRaw = el.attr("href")
-                if (hrefRaw.isBlank()) continue
+            // Target the program list container. This should match the structure you pasted.
+            val anchors = doc.select("div.container-fluid.mpage a[href^='/']")
 
-                val fullHref = trtCocukBase + hrefRaw
-                if (out.any { it.url == fullHref }) continue
+            for (a in anchors) {
+                val href = a.attr("href").trim()
+                if (href.isBlank()) continue
 
-                val imgEl = el.selectFirst("img") ?: continue
-                val title = imgEl.attr("alt").trim()
+                // Skip video links here; we only want series links (e.g. /ekip-siberay)
+                if (href.startsWith("/video")) continue
+
+                val fullUrl = if (href.startsWith("http")) href else trtCocukBase + href
+                if (out.any { it.url == fullUrl }) continue
+
+                val img = a.selectFirst("img")
+                val title = img?.attr("alt")?.trim() ?: a.text().trim()
                 if (title.isBlank()) continue
 
-                val poster = imgEl.attr("data-src").ifBlank {
-                    imgEl.attr("src")
-                }.trim()
-                if (poster.isBlank()) continue
+                val poster = img?.attr("data-src")?.ifBlank { img.attr("src") }?.trim() ?: ""
 
-                out += newTvSeriesSearchResponse(title, fullHref) {
+                out += newTvSeriesSearchResponse(title, fullUrl) {
                     this.posterUrl = poster
+                    this.referer = trtCocukBase
                 }
             }
 
@@ -240,7 +240,59 @@ class Trt : MainAPI() {
         return out
     }
 
+    /**
+     * Get episodes for a TRT Çocuk series page.
+     * Series page contains anchors to /video/... (episode pages).
+     * We return Episode objects that point to those /video/... URLs so loadLinks can resolve them.
+     */
+    private suspend fun getTrtCocukEpisodes(seriesUrl: String): List<Episode> {
+        val episodes = mutableListOf<Episode>()
+        try {
+            val doc = app.get(seriesUrl, timeout = 15).document
 
+            // Select episode anchors that point to /video/slug-...-bolum
+            val anchors = doc.select("a[href^='/video/']")
+
+            for (a in anchors) {
+                val href = a.attr("href").trim()
+                if (href.isBlank()) continue
+
+                val fullHref = if (href.startsWith("http")) href else trtCocukBase + href
+
+                // Title: prefer p.oneline (sample had <p class="oneline">), fall back to img alt or link text
+                val title = a.selectFirst("p.oneline")?.text()?.trim()
+                    ?: a.selectFirst("img")?.attr("alt")?.trim()
+                    ?: a.text().trim()
+                if (title.isBlank()) continue
+
+                // Poster: data-src or src on img inside anchor
+                val imgEl = a.selectFirst("img")
+                val poster = imgEl?.attr("data-src")?.ifBlank { imgEl.attr("src") }?.trim()
+
+                // Episode number from title if possible
+                val num = Regex("""(\d{1,4})\s*[.\-]?\s*Bölüm""", RegexOption.IGNORE_CASE)
+                    .find(title)?.groupValues?.get(1)?.toIntOrNull()
+
+                // Build Episode using newEpisode builder so it integrates with your load system
+                val ep = newEpisode(fullHref) {
+                    name = title
+                    if (!poster.isNullOrBlank()) posterUrl = poster
+                    episode = num ?: 0
+                    season = 1
+                    description = ""
+                }
+
+                episodes += ep
+            }
+
+            // Some series pages may include a carousel or other lists elsewhere; try to also pick videos from slide sections
+            // (already covered by a[href^='/video/']), so nothing extra required.
+
+        } catch (e: Exception) {
+            Log.e("TRT", "getTrtCocukEpisodes failed: ${e.message}")
+        }
+        return episodes
+    }
 
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
@@ -322,7 +374,7 @@ class Trt : MainAPI() {
             "archive" -> getTrtSeries(archive = true,  page = page)
             "programs" -> getTrtPrograms(archive = false, page = page)
             "archivePrograms" -> getTrtPrograms(archive = true,  page = page)
-            "trtcocuk" -> getTrtCocuk(archive = false, page = page)
+            "trtcocuk" -> getTrtCocuk(page = page)
             else -> emptyList()
         }
 
@@ -352,7 +404,29 @@ class Trt : MainAPI() {
             }
         }
 
-        // TRT Çocuk Video
+        // TRT Çocuk Series (series page like https://www.trtcocuk.net.tr/ekip-siberay)
+        if (url.contains("trtcocuk.net.tr") && !url.contains("/video")) {
+            try {
+                val doc = app.get(url, timeout = 15).document
+                val title = doc.selectFirst("h1, .page-title, .title")?.text()?.trim()
+                    ?: doc.selectFirst("meta[property=og:title]")?.attr("content") ?: "TRT Çocuk"
+                val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
+                var poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
+                    ?: doc.selectFirst("img")?.absUrl("src")
+                poster = poster?.replace(Regex("w\\d+/h\\d+"), "w600/h338")
+
+                val episodes = getTrtCocukEpisodes(url)
+
+                return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                    this.posterUrl = poster
+                    this.plot = plot
+                }
+            } catch (e: Exception) {
+                throw ErrorLoadingException("TRT Çocuk dizi yüklenemedi: ${e.message}")
+            }
+        }
+
+        // TRT Çocuk Video page (episode page)
         if (url.contains("trtcocuk.net.tr/video")) {
             try {
                 val doc = app.get(url, timeout = 15).document
@@ -379,7 +453,7 @@ class Trt : MainAPI() {
             }
         }
 
-        // Series
+        // Series (TRT1)
         try {
             val doc = app.get(url, timeout = 15).document
             val title = doc.selectFirst("h1")?.text()?.trim()
@@ -494,7 +568,7 @@ class Trt : MainAPI() {
             return true
         }
 
-        // TRT Çocuk links
+        // TRT Çocuk links (episode pages)
         if (data.contains("trtcocuk.net.tr/video")) {
             try {
                 val doc = app.get(data, timeout = 10).document
@@ -525,9 +599,12 @@ class Trt : MainAPI() {
                 }
 
                 // m3u8 in scripts
-                doc.select("script").forEach { s ->
+                val scripts = doc.select("script")
+                for (s in scripts) {
                     val html = s.html()
-                    Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""").find(html)?.value?.let { found ->
+                    val m = Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""").find(html)
+                    if (m != null) {
+                        val found = m.value
                         callback(newExtractorLink(
                             source = name,
                             name = "TRT Çocuk",
@@ -601,7 +678,7 @@ class Trt : MainAPI() {
                 }
             }
 
-        // TRT Çocuk search (simple filter from main page, or full search if API exists)
+        // TRT Çocuk search (simple filter from main page)
         try {
             getTrtCocuk().filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
         } catch (_: Exception) {}
