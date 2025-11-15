@@ -86,7 +86,7 @@ class Trt : MainAPI() {
                     }
                 }
                 if (streamUrl.isBlank()) continue
-                if(!name.contains("tabii Spor")) {
+                if(!name.contains("tabii")) {
                     result += TvChannel(name, slug, streamUrl, logoUrl, "$name")
                 } 
             }
