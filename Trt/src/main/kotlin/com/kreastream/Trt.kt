@@ -184,18 +184,18 @@ class Trt : MainAPI() {
         )
     }
 
-    // private fun generateQualityVariants(base: String): List<String> {
-    //     val list = mutableListOf(base)
-    //     try {
-    //         if (base.contains("medya.trt.com.tr")) {
-    //             val prefix = base.substringBeforeLast("/").removeSuffix("_master")
-    //             listOf("360", "480", "720", "1080").forEach { q ->
-    //                 list += "$prefix" + "_$q.m3u8"
-    //             }
-    //         }
-    //     } catch (_: Exception) {}
-    //     return list.distinct()
-    // }
+    private fun generateQualityVariants(base: String): List<String> {
+        val list = mutableListOf(base)
+        try {
+            if (base.contains("medya.trt.com.tr")) {
+                val prefix = base.substringBeforeLast("/").removeSuffix("_master")
+                listOf("360", "480", "720", "1080").forEach { q ->
+                    list += "$prefix" + "_$q.m3u8"
+                }
+            }
+        } catch (_: Exception) {}
+        return list.distinct()
+    }
 
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
@@ -382,17 +382,17 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // if (data.contains(".m3u8", ignoreCase = true)) {
-        //     generateQualityVariants(data).forEach { u ->
-        //         M3u8Helper.generateM3u8(
-        //             source = name,
-        //             streamUrl = u,
-        //             referer = tabiiUrl,
-        //             headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
-        //         ).forEach(callback)
-        //     }
-        //     return true
-        // }
+        if (data.contains(".m3u8", ignoreCase = true)) {
+            generateQualityVariants(data).forEach { u ->
+                M3u8Helper.generateM3u8(
+                    source = name,
+                    streamUrl = u,
+                    referer = tabiiUrl,
+                    headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
+                ).forEach(callback)
+            }
+            return true
+        }
 
         try {
             val doc = app.get(data, timeout = 10).document
@@ -405,13 +405,13 @@ class Trt : MainAPI() {
             }
 
             if (m3u8 != null) {
-                //generateQualityVariants(m3u8).forEach { u ->
+                generateQualityVariants(m3u8).forEach { u ->
                     M3u8Helper.generateM3u8(
                         source = name,
-                        streamUrl = m3u8,
+                        streamUrl = u,
                         referer = trt1Url,
                         headers = mapOf("Referer" to trt1Url)
-                    )(callback)//.forEach(callback)
+                    ).forEach(callback)
                 }
                 return true
             }
