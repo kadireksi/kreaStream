@@ -502,10 +502,11 @@ class Trt : MainAPI() {
                     callback(newExtractorLink(
                         source = name,
                         name = "TRT Çocuk",
-                        url = videoSrc,
-                        referer = trtCocukBase,
-                        quality = Qualities.Unknown.value
-                    ))
+                        url = videoSrc
+                    ) {
+                        this.referer = trtCocukBase
+                        this.quality = Qualities.Unknown.value
+                    })
                     return true
                 }
 
@@ -516,10 +517,11 @@ class Trt : MainAPI() {
                         callback(newExtractorLink(
                             source = name,
                             name = "TRT Çocuk",
-                            url = found,
-                            referer = trtCocukBase,
-                            quality = Qualities.Unknown.value
-                        ))
+                            url = found
+                        ) {
+                            this.referer = trtCocukBase
+                            this.quality = Qualities.Unknown.value
+                        })
                         return true
                     }
                 }
