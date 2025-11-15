@@ -24,6 +24,29 @@ class Trt : MainAPI() {
     private val dummyTvUrl = "$tabiiUrl/tv"
     private val dummyRadioUrl = "$tabiiUrl/radio"
 
+    sealed class LiveChannel {
+        abstract val name: String
+        abstract val streamUrl: String
+        abstract val logoUrl: String
+        abstract val description: String
+    }
+
+    data class TvChannel(
+        override val name: String,
+        val slug: String,
+        override val streamUrl: String,
+        override val logoUrl: String,
+        override val description: String = ""
+    ) : LiveChannel()
+
+    data class RadioChannel(
+        override val name: String,
+        val slug: String,
+        override val streamUrl: String,
+        override val logoUrl: String,
+        override val description: String = ""
+    ) : LiveChannel()
+
     override val mainPage = mainPageOf(
         "series" to "Güncel Diziler",
         "archive" to "Eski Diziler",
@@ -432,30 +455,26 @@ class Trt : MainAPI() {
     private suspend fun loadIndividualChannel(url: String): LoadResponse {
         val tvChannels = getTvChannels()
         val radioChannels = getRadioChannels()
-        val allChannels = tvChannels + radioChannels.map { RadioChannel(it.name, it.slug, it.streamUrl, it.logoUrl, it.description) }
-        val channel = allChannels.find { it.streamUrl == url }
+        val allChannels: List<LiveChannel> = tvChannels + radioChannels
 
-        return if (channel != null) {
-            val episode = newEpisode(channel.streamUrl) {
-                name = channel.name
-                posterUrl = channel.logoUrl
-                episode = 1
-                season = 1
-                description = channel.description
-            }
-            newTvSeriesLoadResponse(channel.name, url, TvType.Live, listOf(episode)) {
-                this.posterUrl = channel.logoUrl
-                this.plot = channel.description
-            }
-        } else {
-            val episode = newEpisode(url) {
-                name = "TRT Stream"
-                episode = 1
-                season = 1
-            }
-            newTvSeriesLoadResponse("TRT Stream", url, TvType.Live, listOf(episode)) {
-                this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            }
+        val channel = allChannels.find { it.streamUrl.equals(url, ignoreCase = true) }
+
+        val episode = newEpisode(url) {
+            name = channel?.name ?: "TRT Canlı"
+            posterUrl = channel?.logoUrl
+            description = channel?.description
+            episode = 1
+            season = 1
+        }
+
+        return newTvSeriesLoadResponse(
+            name = channel?.name ?: "TRT Canlı Yayın",
+            url = url,
+            type = TvType.Live,
+            episodes = listOf(episode)
+        ) {
+            this.posterUrl = channel?.logoUrl ?: "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+            this.plot = channel?.description ?: "TRT canlı yayın akışı"
         }
     }
 
