@@ -531,8 +531,8 @@ class Trt : MainAPI() {
                     sr.posterUrl = ch.logoUrl
                     sr
                 }
-                homePageLists += HomePageList("📺 TRT TV Kanalları", tvItems, false)
-                homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, false)
+                homePageLists += HomePageList("📺 TRT TV Kanalları", tvItems, true)
+                homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, true)
             }
             "series" -> {
                 val items = getTrtSeries(archive = false, page = page)
