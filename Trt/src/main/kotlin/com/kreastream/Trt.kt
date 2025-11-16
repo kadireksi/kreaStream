@@ -435,7 +435,7 @@ class Trt : MainAPI() {
         return episodes
     }
 
-    private fun extractEpisodeNumber(title: String): Int {
+    private fun extractEpisodeNumber(title: String): Int? {
         return try {
             // Try common episode patterns
             val patterns = listOf(
@@ -448,12 +448,12 @@ class Trt : MainAPI() {
             for (pattern in patterns) {
                 val match = pattern.find(title)
                 if (match != null) {
-                    return match.groupValues[1].toIntOrNull() ?: 0
+                    return match.groupValues[1].toIntOrNull()
                 }
             }
-            0
+            null
         } catch (e: Exception) {
-            0
+            null
         }
     }
 
@@ -516,7 +516,8 @@ class Trt : MainAPI() {
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val items = when (request.data) {
+        val homePageLists = mutableListOf<HomePageList>()
+        when (request.data) {
             "live" -> {
                 val tvChannels = getTvChannels()
                 val tvItems = tvChannels.map { channel ->
@@ -530,32 +531,53 @@ class Trt : MainAPI() {
                         this.posterUrl = channel.logoUrl
                     }
                 }
-                listOf(
-                    HomePageList("📺 TRT TV Kanalları", tvItems, false),
-                    HomePageList("📻 TRT Radyo Kanalları", radioItems, false)
-                )
+                homePageLists += HomePageList("📺 TRT TV Kanalları", tvItems, false)
+                homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, false)
             }
-            "series"  -> getTrtSeries(archive = false, page = page)
-            "archiveSeries" -> getTrtSeries(archive = true,  page = page)
-            "programs" -> getTrtPrograms(archive = false, page = page)
-            "archivePrograms" -> getTrtPrograms(archive = true,  page = page)
-            "trtcocuk" -> getTrtCocuk(page = page)
-            else -> emptyList()
+            "series" -> {
+                val items = getTrtSeries(archive = false, page = page)
+                if (items.isNotEmpty()) {
+                    homePageLists += HomePageList(request.name, items, true)
+                }
+            }
+            "archiveSeries" -> {
+                val items = getTrtSeries(archive = true, page = page)
+                if (items.isNotEmpty()) {
+                    homePageLists += HomePageList(request.name, items, true)
+                }
+            }
+            "programs" -> {
+                val items = getTrtPrograms(archive = false, page = page)
+                if (items.isNotEmpty()) {
+                    homePageLists += HomePageList(request.name, items, true)
+                }
+            }
+            "archivePrograms" -> {
+                val items = getTrtPrograms(archive = true, page = page)
+                if (items.isNotEmpty()) {
+                    homePageLists += HomePageList(request.name, items, true)
+                }
+            }
+            "trtcocuk" -> {
+                val items = getTrtCocuk(page = page)
+                if (items.isNotEmpty()) {
+                    homePageLists += HomePageList(request.name, items, true)
+                }
+            }
         }
 
-        val hasNext = request.data in listOf("series", "archiveSeries", "trtcocuk", "programs", "archivePrograms") && items.isNotEmpty()
+        val hasNext = request.data in listOf("series", "archiveSeries", "trtcocuk", "programs", "archivePrograms") && homePageLists.isNotEmpty()
 
-        return newHomePageResponse(
-            if (request.data == "live") items else listOf(HomePageList(request.name, items, true)),
-            hasNext = hasNext
-        )
+        return newHomePageResponse(homePageLists, hasNext = hasNext)
     }
 
     override suspend fun load(url: String): LoadResponse {
 
         // Direct m3u8 stream
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
-            return newMovieLoadResponse("TRT Canlı", url, TvType.Live, url)
+            return newMovieLoadResponse("TRT Canlı", url, TvType.Live) {
+                this.data = url
+            }
         }
 
         // In the load function, update the TRT Çocuk series section:
@@ -715,9 +737,9 @@ class Trt : MainAPI() {
             callback(newExtractorLink(
                 source = name,
                 name = "Audio AAC",
-                url = data,
-                referer = mainUrl
+                url = data
             ) {
+                this.referer = mainUrl
                 this.quality = Qualities.Unknown.value
             })
             return true
