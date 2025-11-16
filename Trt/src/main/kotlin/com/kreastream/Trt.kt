@@ -21,12 +21,12 @@ class Trt : MainAPI() {
     private val trtCocukBase = "https://www.trtcocuk.net.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
-    private val tvFolderUrl = "trt_tv_folder"
-    private val radioFolderUrl = "trt_radio_folder"
+    private val dummyTvUrl = tabiiUrl
+    private val dummyRadioUrl = tabiiUrl
 
     override val mainPage = mainPageOf(
         "series"  to "Güncel Diziler",
-        "archive" to "Eski Diziler",
+        "archiveSeries" to "Arşiv Diziler",
         "programs" to "Programlar",
         "archivePrograms" to "Arşiv Programlar",
         "trtcocuk" to "TRT Çocuk",
@@ -514,6 +514,44 @@ class Trt : MainAPI() {
         }
     }
 
+    private suspend fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
+        val episodes = channels.mapIndexed { i, ch ->
+            newEpisode(ch.streamUrl) {
+                name = ch.name
+                posterUrl = ch.logoUrl
+                episode = i + 1
+                season = 1
+                description = ch.description
+                this.data = ch.streamUrl
+            }
+        }
+
+        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
+            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+            this.plot = "TRT TV canlı yayın"
+            this.year = 1964
+        }
+    }
+
+    private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
+        val episodes = channels.mapIndexed { i, ch ->
+            newEpisode(ch.streamUrl) {
+                name = ch.name
+                posterUrl = ch.logoUrl
+                episode = i + 1
+                season = 1
+                description = ch.description
+                this.data = ch.streamUrl
+            }
+        }
+
+        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
+            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+            this.plot = "TRT Radyo canlı yayın"
+            this.year = 1927
+        }
+    }
+    
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -549,14 +587,14 @@ class Trt : MainAPI() {
                 }
             }
             "series"  -> getTrtSeries(archive = false, page = page)
-            "archive" -> getTrtSeries(archive = true,  page = page)
+            "archiveSeries" -> getTrtSeries(archive = true,  page = page)
             "programs" -> getTrtPrograms(archive = false, page = page)
             "archivePrograms" -> getTrtPrograms(archive = true,  page = page)
             "trtcocuk" -> getTrtCocuk(page = page)
             else -> emptyList()
         }
 
-        val hasNext = request.data in listOf("series", "archive", "trtcocuk", "programs", "archivePrograms") && items.isNotEmpty()
+        val hasNext = request.data in listOf("series", "archiveSeries", "trtcocuk", "programs", "archivePrograms") && items.isNotEmpty()
 
         return newHomePageResponse(
             listOf(HomePageList(request.name, items, true)),
@@ -565,40 +603,15 @@ class Trt : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // TV Folder
-        if (url == tvFolderUrl) {
-            return newTvSeriesLoadResponse("TRT TV Kanalları", url, TvType.Live, emptyList()) {
-                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
-                this.plot = "TRT TV canlı yayın kanalları"
-            }
+
+        if (url == dummyTvUrl) {
+            val channels = getTvChannels()
+            return buildLiveTVResponse(channels)
         }
 
-        // Radio Folder
-        if (url == radioFolderUrl) {
-            return newTvSeriesLoadResponse("TRT Radyo Kanalları", url, TvType.Live, emptyList()) {
-                this.posterUrl = "https://trtdinle.com/trt-dinle-fb-share.jpg"
-                this.plot = "TRT Radyo canlı yayın"
-            }
-        }
-
-        // Individual TV channel stream
-        val tvChannels = getTvChannels()
-        val tvChannel = tvChannels.find { it.streamUrl == url }
-        if (tvChannel != null) {
-            return newMovieLoadResponse(tvChannel.name, url, TvType.Live, url) {
-                this.posterUrl = tvChannel.logoUrl
-                this.plot = tvChannel.description
-            }
-        }
-
-        // Individual Radio channel stream
-        val radioChannels = getRadioChannels()
-        val radioChannel = radioChannels.find { it.streamUrl == url }
-        if (radioChannel != null) {
-            return newMovieLoadResponse(radioChannel.name, url, TvType.Live, url) {
-                this.posterUrl = radioChannel.logoUrl
-                this.plot = radioChannel.description
-            }
+        if (url == dummyRadioUrl) {
+            val channels = getRadioChannels()
+            return buildLiveRadioResponse(channels)  // No fallback needed
         }
 
         // Direct m3u8 stream
