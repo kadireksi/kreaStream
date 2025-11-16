@@ -559,14 +559,14 @@ class Trt : MainAPI() {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
                     name = "📺 TRT TV Kanalları",
-                    url = tvFolderUrl,
+                    url = dummyTvUrl,
                     type = TvType.Live
                 ) {
                     this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                 },
                 newTvSeriesSearchResponse(
                     name = "📻 TRT Radyo Kanalları",
-                    url = radioFolderUrl,
+                    url = dummyRadioUrl,
                     type = TvType.Live
                 ) {
                     this.posterUrl = "https://trtdinle.com/trt-dinle-fb-share.jpg"
