@@ -215,13 +215,14 @@ class Trt : MainAPI() {
         try {
             val doc = app.get(url, timeout = 15).document
 
-            // Updated selector based on the HTML structure
-            val anchors = doc.select("div.row div.col-xl-2.col-lg-3.col-md-4.col-sm-6.col-6.py-3 a[href^='/']")
+            // More specific selector based on the exact HTML structure
+            val anchors = doc.select("div.row > div > a[href^='/']")
             Log.d("TRTÇocuk", "Found ${anchors.size} anchors")
             
             for (a in anchors) {
                 val href = a.attr("href").trim()
-                if (href.isBlank() || href.startsWith("/video")) continue
+                // Skip video links and empty hrefs
+                if (href.isBlank() || href.startsWith("/video") || href == "/") continue
 
                 val fullUrl = if (href.startsWith("http")) href else trtCocukBase + href
                 if (out.any { it.url == fullUrl }) continue
@@ -235,6 +236,8 @@ class Trt : MainAPI() {
                 out += newTvSeriesSearchResponse(title, fullUrl) {
                     this.posterUrl = poster
                 }
+                
+                Log.d("TRTÇocuk", "Added series: $title -> $fullUrl")
             }
 
         } catch (e: Exception) {
@@ -249,44 +252,60 @@ class Trt : MainAPI() {
         try {
             val doc = app.get(seriesUrl, timeout = 15).document
 
-            // Look for episodes in the slideshow/carousel first
-            val carouselEpisodes = doc.select("div.vueperslides__track a[href^='/video/']")
+            // Look for episodes in multiple possible locations
+            val selectors = listOf(
+                "div.vueperslides__track a[href^='/video/']",
+                "a[href^='/video/']",
+                "div.vImglighter a[href^='/video/']"
+            )
             
-            // Also look for other episode links in the page
-            val allEpisodeLinks = doc.select("a[href^='/video/']")
-            
-            // Combine both selectors and remove duplicates
-            val allEpisodes = (carouselEpisodes + allEpisodeLinks).distinctBy { it.attr("href") }
+            val allEpisodes = mutableListOf<org.jsoup.nodes.Element>()
+            selectors.forEach { selector ->
+                allEpisodes.addAll(doc.select(selector))
+            }
 
-            for (a in allEpisodes) {
+            // Remove duplicates by href
+            val uniqueEpisodes = allEpisodes.distinctBy { it.attr("href") }
+
+            Log.d("TRTÇocuk", "Found ${uniqueEpisodes.size} episodes for $seriesUrl")
+
+            for (a in uniqueEpisodes) {
                 val href = a.attr("href").trim()
                 if (href.isBlank()) continue
 
                 val fullHref = if (href.startsWith("http")) href else trtCocukBase + href
 
+                // Try multiple title sources
                 val title = a.selectFirst("p.oneline")?.text()?.trim()
-                    ?: a.selectFirst("img")?.attr("alt")?.trim()
                     ?: a.selectFirst("img")?.attr("title")?.trim()
+                    ?: a.selectFirst("img")?.attr("alt")?.trim()
                     ?: a.text().trim()
+                
                 if (title.isBlank()) continue
 
                 val imgEl = a.selectFirst("img")
                 val poster = imgEl?.attr("data-src")?.ifBlank { imgEl.attr("src") }?.trim()
 
-                // Extract episode number more reliably
-                val num = Regex("""(\d{1,4})\s*\.?\s*[Bb]ölüm""").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                    ?: Regex("""[Bb]ölüm\s*(\d{1,4})""").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                    ?: Regex("""\b(\d{1,4})\b""").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                // Extract episode number with better patterns
+                val num = try {
+                    Regex("""(\d{1,4})\s*\.?\s*[Bb]ölüm""").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                        ?: Regex("""[Bb]ölüm\s*(\d{1,4})""").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                        ?: Regex("""\b(\d{1,4})\b""").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                        ?: 0
+                } catch (e: Exception) {
+                    0
+                }
 
                 val ep = newEpisode(fullHref) {
                     name = title
                     if (!poster.isNullOrBlank()) posterUrl = poster
-                    episode = num ?: 0
+                    episode = num
                     season = 1
                     description = ""
                 }
 
                 episodes += ep
+                Log.d("TRTÇocuk", "Added episode: $title (episode: $num)")
             }
 
         } catch (e: Exception) {
