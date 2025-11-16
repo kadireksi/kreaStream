@@ -671,7 +671,7 @@ class Trt : MainAPI() {
 
             val basePath = if (url.contains("/diziler/")) "diziler" else "programlar"
             val slug = url.removePrefix("$trt1Url/$basePath/").substringBefore("/")
-            val episodesPath = if (basePath == "diziler") "bolum" else "bolumler"
+            val episodesPath = "bolum"
             val episodes = mutableListOf<Episode>()
             var pageNum = 1
             var more = true
