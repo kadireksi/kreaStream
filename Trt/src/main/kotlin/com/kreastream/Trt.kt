@@ -29,7 +29,7 @@ class Trt : MainAPI() {
         "archive" to "Eski Diziler",
         "programs" to "Programlar",
         "archivePrograms" to "Arşiv Programlar",
-        "trtcocuk" to "TRT Çocuk",
+        "$trtCocukBase/video" to "TRT Çocuk",
         "live" to "TRT Tv & Radyo"
     )
 
@@ -213,78 +213,52 @@ class Trt : MainAPI() {
         
         try {
             val url = "$trtCocukBase/video" + if (page > 1) "?page=$page" else ""
-            val response = app.get(url, timeout = 15)
-            val html = response.text
+            Log.d("TRTÇocuk", "Fetching URL: $url")
             
-            // Try to extract data from the Nuxt.js state
-            val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})(?=;|</script>)""", RegexOption.DOT_MATCHES_ALL)
-            val match = nuxtDataRegex.find(html)
-            
-            if (match != null) {
-                val nuxtJsonString = match.groupValues[1]
-                try {
-                    val nuxtData = JSONObject(nuxtJsonString)
-                    val dataArray = nuxtData.getJSONArray("data")
-                    
-                    if (dataArray.length() > 0) {
-                        val firstData = dataArray.getJSONObject(0)
-                        if (firstData.has("data")) {
-                            val dataObj = firstData.getJSONObject("data")
-                            if (dataObj.has("list")) {
-                                val listArray = dataObj.getJSONArray("list")
-                                
-                                for (i in 0 until listArray.length()) {
-                                    val item = listArray.getJSONObject(i)
-                                    val title = item.getString("title")
-                                    val path = item.getString("path")
-                                    val fullUrl = "$trtCocukBase$path"
-                                    
-                                    // Get poster image - try different image fields
-                                    var poster = ""
-                                    val imageFields = listOf("artWork", "mobileCover", "logo")
-                                    for (field in imageFields) {
-                                        if (item.has(field) && !item.isNull(field)) {
-                                            poster = item.getString(field)
-                                            if (poster.isNotBlank()) break
-                                        }
-                                    }
-                                    
-                                    out += newTvSeriesSearchResponse(title, fullUrl) {
-                                        this.posterUrl = poster
-                                    }
-                                    
-                                    Log.d("TRTÇocuk", "Added from Nuxt data: $title -> $fullUrl")
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("TRTÇocuk", "Error parsing Nuxt data: ${e.message}")
-                }
-            }
-            
-            // Fallback: Also try to parse the HTML structure as before
-            if (out.isEmpty()) {
-                val doc = response.document
-                val anchors = doc.select("div.row > div > a[href^='/']")
-                Log.d("TRTÇocuk", "Fallback: Found ${anchors.size} anchors")
-                
-                for (a in anchors) {
-                    val href = a.attr("href").trim()
-                    if (href.isBlank() || href.startsWith("/video") || href == "/") continue
+            val doc = app.get(url, timeout = 15).document
 
-                    val fullUrl = if (href.startsWith("http")) href else trtCocukBase + href
+            // Look for show containers
+            val showContainers = doc.select("div.col-xl-2, div.col-lg-3, div.col-md-4, div.col-sm-6, div.col-6")
+            Log.d("TRTÇocuk", "Found ${showContainers.size} show containers")
+            
+            for (container in showContainers) {
+                try {
+                    val a = container.selectFirst("a[href]") ?: continue
+                    val href = a.attr("href").trim()
+                    
+                    // Skip invalid hrefs
+                    if (href.isBlank() || href == "/" || href.startsWith("#")) continue
+                    
+                    val fullUrl = if (href.startsWith("http")) href else "$trtCocukBase$href"
+                    
+                    // Skip if already added
                     if (out.any { it.url == fullUrl }) continue
 
+                    // Get title from img alt attribute
                     val img = a.selectFirst("img")
-                    val title = img?.attr("alt")?.trim() ?: a.text().trim()
+                    val title = img?.attr("alt")?.trim() ?: continue
+                    
                     if (title.isBlank()) continue
 
-                    val poster = img?.attr("data-src")?.ifBlank { img.attr("src") }?.trim() ?: ""
+                    // Get poster URL
+                    var poster = img.attr("src")?.trim() ?: ""
+                    if (poster.isBlank()) {
+                        poster = img.attr("data-src")?.trim() ?: ""
+                    }
+                    
+                    // Make poster URL absolute if it's relative
+                    if (poster.isNotBlank() && !poster.startsWith("http")) {
+                        poster = "$trtCocukBase$poster"
+                    }
 
+                    Log.d("TRTÇocuk", "Found show: $title -> $fullUrl (poster: $poster)")
+                    
                     out += newTvSeriesSearchResponse(title, fullUrl) {
                         this.posterUrl = poster
                     }
+                    
+                } catch (e: Exception) {
+                    Log.e("TRTÇocuk", "Error processing container: ${e.message}")
                 }
             }
 
@@ -299,68 +273,98 @@ class Trt : MainAPI() {
     private suspend fun getTrtCocukEpisodes(seriesUrl: String): List<Episode> {
         val episodes = mutableListOf<Episode>()
         try {
+            Log.d("TRTÇocuk", "Fetching episodes from: $seriesUrl")
             val doc = app.get(seriesUrl, timeout = 15).document
 
-            // Look for episodes in multiple possible locations
-            val selectors = listOf(
-                "div.vueperslides__track a[href^='/video/']",
-                "a[href^='/video/']",
-                "div.vImglighter a[href^='/video/']"
+            // Look for episode links in various possible locations
+            val episodeSelectors = listOf(
+                "a[href*='/video/']",
+                "div.vueperslides__track a",
+                "div.episode-item a",
+                "div.video-item a",
+                "a.video-link"
             )
             
-            val allEpisodes = mutableListOf<org.jsoup.nodes.Element>()
-            selectors.forEach { selector ->
-                allEpisodes.addAll(doc.select(selector))
+            val allEpisodeLinks = mutableListOf<org.jsoup.nodes.Element>()
+            episodeSelectors.forEach { selector ->
+                allEpisodeLinks.addAll(doc.select(selector))
             }
 
-            // Remove duplicates by href
-            val uniqueEpisodes = allEpisodes.distinctBy { it.attr("href") }
+            Log.d("TRTÇocuk", "Found ${allEpisodeLinks.size} potential episode links")
 
-            Log.d("TRTÇocuk", "Found ${uniqueEpisodes.size} episodes for $seriesUrl")
+            for (a in allEpisodeLinks) {
+                try {
+                    val href = a.attr("href").trim()
+                    if (href.isBlank() || !href.contains("/video/")) continue
 
-            for (a in uniqueEpisodes) {
-                val href = a.attr("href").trim()
-                if (href.isBlank()) continue
+                    val fullHref = if (href.startsWith("http")) href else "$trtCocukBase$href"
 
-                val fullHref = if (href.startsWith("http")) href else trtCocukBase + href
+                    // Get title from multiple possible locations
+                    var title = a.attr("title").trim()
+                    if (title.isBlank()) {
+                        title = a.selectFirst("img")?.attr("alt")?.trim() ?: ""
+                    }
+                    if (title.isBlank()) {
+                        title = a.text().trim()
+                    }
+                    if (title.isBlank()) continue
 
-                // Try multiple title sources
-                val title = a.selectFirst("p.oneline")?.text()?.trim()
-                    ?: a.selectFirst("img")?.attr("title")?.trim()
-                    ?: a.selectFirst("img")?.attr("alt")?.trim()
-                    ?: a.text().trim()
-                
-                if (title.isBlank()) continue
+                    // Get poster image
+                    val imgEl = a.selectFirst("img")
+                    var poster = imgEl?.attr("src")?.trim() ?: ""
+                    if (poster.isBlank()) {
+                        poster = imgEl?.attr("data-src")?.trim() ?: ""
+                    }
+                    if (poster.isNotBlank() && !poster.startsWith("http")) {
+                        poster = "$trtCocukBase$poster"
+                    }
 
-                val imgEl = a.selectFirst("img")
-                val poster = imgEl?.attr("data-src")?.ifBlank { imgEl.attr("src") }?.trim()
+                    // Extract episode number
+                    val num = extractEpisodeNumber(title)
 
-                // Extract episode number with better patterns
-                val num = try {
-                    Regex("""(\d{1,4})\s*\.?\s*[Bb]ölüm""").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                        ?: Regex("""[Bb]ölüm\s*(\d{1,4})""").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                        ?: Regex("""\b(\d{1,4})\b""").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                        ?: 0
+                    val ep = newEpisode(fullHref) {
+                        this.name = title
+                        if (poster.isNotBlank()) this.posterUrl = poster
+                        this.episode = num
+                        this.season = 1
+                    }
+
+                    episodes += ep
+                    Log.d("TRTÇocuk", "Added episode: $title (episode: $num) -> $fullHref")
+                    
                 } catch (e: Exception) {
-                    0
+                    Log.e("TRTÇocuk", "Error processing episode link: ${e.message}")
                 }
-
-                val ep = newEpisode(fullHref) {
-                    name = title
-                    if (!poster.isNullOrBlank()) posterUrl = poster
-                    episode = num
-                    season = 1
-                    description = ""
-                }
-
-                episodes += ep
-                Log.d("TRTÇocuk", "Added episode: $title (episode: $num)")
             }
 
         } catch (e: Exception) {
             Log.e("TRTÇocuk", "getTrtCocukEpisodes failed: ${e.message}")
         }
+        
+        Log.d("TRTÇocuk", "Total episodes found: ${episodes.size}")
         return episodes
+    }
+
+    private fun extractEpisodeNumber(title: String): Int {
+        return try {
+            // Try common episode patterns
+            val patterns = listOf(
+                Regex("""(\d{1,4})\s*\.?\s*[Bb]ölüm"""),
+                Regex("""[Bb]ölüm\s*(\d{1,4})"""),
+                Regex("""[Ee]pisode\s*(\d{1,4})"""),
+                Regex("""\b(\d{1,4})\b""")
+            )
+            
+            for (pattern in patterns) {
+                val match = pattern.find(title)
+                if (match != null) {
+                    return match.groupValues[1].toIntOrNull() ?: 0
+                }
+            }
+            0
+        } catch (e: Exception) {
+            0
+        }
     }
 
     private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
