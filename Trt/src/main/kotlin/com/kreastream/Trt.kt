@@ -29,7 +29,7 @@ class Trt : MainAPI() {
         "archive" to "Eski Diziler",
         "programs" to "Programlar",
         "archivePrograms" to "Arşiv Programlar",
-        "$trtCocukBase/video" to "TRT Çocuk",
+        "trtcocuk" to "TRT Çocuk",
         "live" to "TRT Tv & Radyo"
     )
 
