@@ -217,68 +217,6 @@ class Trt : MainAPI() {
             
             val doc = app.get(url, timeout = 15).document
 
-            // Look for show containers
-            val showContainers = doc.select("div.col-xl-2, div.col-lg-3, div.col-md-4, div.col-sm-6, div.col-6")
-            Log.d("TRTÇocuk", "Found ${showContainers.size} show containers")
-            
-            for (container in showContainers) {
-                try {
-                    val a = container.selectFirst("a[href]") ?: continue
-                    val href = a.attr("href").trim()
-                    
-                    // Skip invalid hrefs
-                    if (href.isBlank() || href == "/" || href.startsWith("#")) continue
-                    
-                    val fullUrl = if (href.startsWith("http")) href else "$trtCocukBase$href"
-                    
-                    // Skip if already added
-                    if (out.any { it.url == fullUrl }) continue
-
-                    // Get title from img alt attribute
-                    val img = a.selectFirst("img")
-                    val title = img?.attr("alt")?.trim() ?: continue
-                    
-                    if (title.isBlank()) continue
-
-                    // Get poster URL
-                    var poster = img?.attr("src")?.trim() ?: ""
-                    if (poster.isBlank()) {
-                        poster = img?.attr("data-src")?.trim() ?: ""
-                    }
-                    
-                    // Make poster URL absolute if it's relative
-                    if (poster.isNotBlank() && !poster.startsWith("http")) {
-                        poster = "$trtCocukBase$poster"
-                    }
-
-                    Log.d("TRTÇocuk", "Found show: $title -> $fullUrl (poster: $poster)")
-                    
-                    out += newTvSeriesSearchResponse(title, fullUrl) {
-                        this.posterUrl = poster
-                    }
-                    
-                } catch (e: Exception) {
-                    Log.e("TRTÇocuk", "Error processing container: ${e.message}")
-                }
-            }
-
-        } catch (e: Exception) {
-            Log.e("TRTÇocuk", "getTrtCocuk failed: ${e.message}")
-        }
-
-        Log.d("TRTÇocuk", "Total series found: ${out.size}")
-        return out
-    }
-
-    private suspend fun getTrtCocuk(page: Int = 1): List<SearchResponse> {
-        val out = mutableListOf<SearchResponse>()
-        
-        try {
-            val url = "$trtCocukBase/video" + if (page > 1) "?page=$page" else ""
-            Log.d("TRTÇocuk", "Fetching URL: $url")
-            
-            val doc = app.get(url, timeout = 15).document
-
             // Look for show containers - more specific selector
             val showContainers = doc.select("div.col-xl-2, div.col-lg-3, div.col-md-4, div.col-sm-6, div.col-6")
             Log.d("TRTÇocuk", "Found ${showContainers.size} show containers")
@@ -337,6 +275,165 @@ class Trt : MainAPI() {
 
         Log.d("TRTÇocuk", "Total series found: ${out.size}")
         return out
+    }
+
+    private suspend fun getTrtCocukEpisodes(seriesUrl: String): List<Episode> {
+        val episodes = mutableListOf<Episode>()
+        try {
+            Log.d("TRTÇocuk", "Fetching episodes from: $seriesUrl")
+            val response = app.get(seriesUrl, timeout = 15)
+            val html = response.text
+
+            // Try to extract data from Nuxt.js state first
+            val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})(?=;|</script>)""", RegexOption.DOT_MATCHES_ALL)
+            val match = nuxtDataRegex.find(html)
+            
+            if (match != null) {
+                val nuxtJsonString = match.groupValues[1]
+                try {
+                    val nuxtData = JSONObject(nuxtJsonString)
+                    val dataArray = nuxtData.getJSONArray("data")
+                    
+                    if (dataArray.length() > 0) {
+                        val firstData = dataArray.getJSONObject(0)
+                        if (firstData.has("data")) {
+                            val dataObj = firstData.getJSONObject("data")
+                            
+                            // Extract series info
+                            val seriesTitle = dataObj.optString("title", "")
+                            val seriesDescription = dataObj.optString("description", "")
+                            var seriesPoster = dataObj.optString("logo", "")
+                            if (seriesPoster.isBlank()) {
+                                seriesPoster = dataObj.optString("artWork", "")
+                            }
+                            if (seriesPoster.isBlank()) {
+                                seriesPoster = dataObj.optString("mobileCover", "")
+                            }
+                            
+                            // Extract videos/episodes
+                            if (dataObj.has("videos")) {
+                                val videosArray = dataObj.getJSONArray("videos")
+                                
+                                for (i in 0 until videosArray.length()) {
+                                    val video = videosArray.getJSONObject(i)
+                                    val title = video.getString("title")
+                                    val path = video.getString("path")
+                                    val fullUrl = "$trtCocukBase$path"
+                                    val mainImageUrl = video.optString("mainImageUrl", "")
+                                    val publishedDate = video.optString("publishedDate", "")
+                                    
+                                    // Extract episode number
+                                    val num = extractEpisodeNumber(title)
+                                    
+                                    val ep = newEpisode(fullUrl) {
+                                        this.name = title
+                                        if (mainImageUrl.isNotBlank()) this.posterUrl = mainImageUrl
+                                        this.episode = num
+                                        this.season = 1
+                                        this.description = seriesDescription
+                                    }
+                                    
+                                    episodes += ep
+                                    Log.d("TRTÇocuk", "Added episode from Nuxt: $title (episode: $num) -> $fullUrl")
+                                }
+                            }
+                            
+                            // Also check clipUps for additional content
+                            if (dataObj.has("clipUps") && episodes.isEmpty()) {
+                                val clipUpsArray = dataObj.getJSONArray("clipUps")
+                                
+                                for (i in 0 until clipUpsArray.length()) {
+                                    val clip = clipUpsArray.getJSONObject(i)
+                                    val title = clip.getString("title")
+                                    val path = clip.getString("path")
+                                    val fullUrl = "$trtCocukBase$path"
+                                    val mainImage = clip.optString("mainImage", "")
+                                    
+                                    val ep = newEpisode(fullUrl) {
+                                        this.name = title
+                                        if (mainImage.isNotBlank()) this.posterUrl = mainImage
+                                        this.episode = i + 1
+                                        this.season = 1
+                                    }
+                                    
+                                    episodes += ep
+                                    Log.d("TRTÇocuk", "Added clip from Nuxt: $title -> $fullUrl")
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("TRTÇocuk", "Error parsing Nuxt data: ${e.message}")
+                }
+            }
+            
+            // Fallback to HTML parsing if no episodes found in Nuxt data
+            if (episodes.isEmpty()) {
+                val doc = response.document
+                val episodeSelectors = listOf(
+                    "a[href*='/video/']",
+                    "div.vueperslides__track a",
+                    "div.episode-item a", 
+                    "div.video-item a",
+                    "a.video-link"
+                )
+                
+                val allEpisodeLinks = mutableListOf<org.jsoup.nodes.Element>()
+                episodeSelectors.forEach { selector ->
+                    allEpisodeLinks.addAll(doc.select(selector))
+                }
+
+                Log.d("TRTÇocuk", "Fallback: Found ${allEpisodeLinks.size} potential episode links")
+
+                for (a in allEpisodeLinks) {
+                    try {
+                        val href = a.attr("href").trim()
+                        if (href.isBlank() || !href.contains("/video/")) continue
+
+                        val fullHref = if (href.startsWith("http")) href else "$trtCocukBase$href"
+
+                        var title = a.attr("title").trim()
+                        if (title.isBlank()) {
+                            title = a.selectFirst("img")?.attr("alt")?.trim() ?: ""
+                        }
+                        if (title.isBlank()) {
+                            title = a.text().trim()
+                        }
+                        if (title.isBlank()) continue
+
+                        val imgEl = a.selectFirst("img")
+                        var poster = imgEl?.attr("src")?.trim() ?: ""
+                        if (poster.isBlank()) {
+                            poster = imgEl?.attr("data-src")?.trim() ?: ""
+                        }
+                        if (poster.isNotBlank() && !poster.startsWith("http")) {
+                            poster = "$trtCocukBase$poster"
+                        }
+
+                        val num = extractEpisodeNumber(title)
+
+                        val ep = newEpisode(fullHref) {
+                            this.name = title
+                            if (poster.isNotBlank()) this.posterUrl = poster
+                            this.episode = num
+                            this.season = 1
+                        }
+
+                        episodes += ep
+                        Log.d("TRTÇocuk", "Added episode from HTML: $title (episode: $num) -> $fullHref")
+                        
+                    } catch (e: Exception) {
+                        Log.e("TRTÇocuk", "Error processing episode link: ${e.message}")
+                    }
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e("TRTÇocuk", "getTrtCocukEpisodes failed: ${e.message}")
+        }
+        
+        Log.d("TRTÇocuk", "Total episodes found: ${episodes.size}")
+        return episodes
     }
 
     private fun extractEpisodeNumber(title: String): Int {
