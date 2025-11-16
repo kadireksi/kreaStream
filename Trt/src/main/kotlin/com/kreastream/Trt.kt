@@ -423,8 +423,8 @@ class Trt : MainAPI() {
                         Log.e("TRTÇocuk", "Error processing episode link: ${e.message}")
                     }
                 }
-                // Dedup by url
-                episodes += tempEpisodes.distinctBy(Episode::url)
+                // Dedup by data
+                episodes += tempEpisodes.distinctBy { it.data }
             }
 
         } catch (e: Exception) {
@@ -577,7 +577,7 @@ class Trt : MainAPI() {
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
             return newMovieLoadResponse(
                 name = "TRT Canlı",
-                dataUrl = url,
+                url = url,
                 type = TvType.Live,
                 data = url
             )
@@ -740,9 +740,9 @@ class Trt : MainAPI() {
             callback(newExtractorLink(
                 source = name,
                 name = "Audio AAC",
-                url = data
+                url = data,
+                referer = mainUrl
             ) {
-                this.referer = mainUrl
                 this.quality = Qualities.Unknown.value
             })
             return true
