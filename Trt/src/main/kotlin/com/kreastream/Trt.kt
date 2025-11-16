@@ -740,9 +740,9 @@ class Trt : MainAPI() {
             callback(newExtractorLink(
                 source = name,
                 name = "Audio AAC",
-                url = data,
-                referer = mainUrl
+                url = data
             ) {
+                this.referer = mainUrl
                 this.quality = Qualities.Unknown.value
             })
             return true
