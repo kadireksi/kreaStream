@@ -241,9 +241,9 @@ class Trt : MainAPI() {
                     if (title.isBlank()) continue
 
                     // Get poster URL
-                    var poster = img.attr("src").lazyLoad()?.trim() ?: ""
+                    var poster = img?.attr("src")?.trim() ?: ""
                     if (poster.isBlank()) {
-                        poster = img.attr("data-src").lazyLoad()?.trim() ?: ""
+                        poster = img?.attr("data-src")?.trim() ?: ""
                     }
                     
                     // Make poster URL absolute if it's relative
