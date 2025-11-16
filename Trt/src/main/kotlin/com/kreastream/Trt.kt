@@ -249,7 +249,7 @@ class Trt : MainAPI() {
                             poster = "$trtCocukBase$poster"
                         }
                         // Ensure we have a proper image URL - upscale resolution
-                        poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338")
+                        poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
                     }
 
                     Log.d("TRTÇocuk", "Found show: $title -> $fullUrl (poster: $poster)")
@@ -313,7 +313,8 @@ class Trt : MainAPI() {
                                     val title = video.getString("title")
                                     val path = video.getString("path")
                                     val fullUrl = "$trtCocukBase$path"
-                                    val mainImageUrl = video.optString("mainImageUrl", "")
+                                    var mainImageUrl = video.optString("mainImageUrl", "")
+                                    mainImageUrl = mainImageUrl.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
                                     val publishedDate = video.optString("publishedDate", "")
                                     
                                     // Extract episode number
@@ -341,7 +342,8 @@ class Trt : MainAPI() {
                                     val title = clip.getString("title")
                                     val path = clip.getString("path")
                                     val fullUrl = "$trtCocukBase$path"
-                                    val mainImage = clip.optString("mainImage", "")
+                                    var mainImage = clip.optString("mainImage", "")
+                                    mainImage = mainImage.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
                                     
                                     val ep = newEpisode(fullUrl) {
                                         this.name = title
@@ -370,7 +372,10 @@ class Trt : MainAPI() {
                     "div.episode-item a", 
                     "div.video-item a",
                     "a.video-link",
-                    "article a[href*='/video/']"
+                    "article a[href*='/video/']",
+                    "li a[href*='/video/']",
+                    "div.card a[href*='/video/']",
+                    "div.list-item a[href*='/video/']"
                 )
                 
                 val allEpisodeLinks = mutableListOf<org.jsoup.nodes.Element>()
@@ -405,7 +410,7 @@ class Trt : MainAPI() {
                         if (poster.isNotBlank() && !poster.startsWith("http")) {
                             poster = "$trtCocukBase$poster"
                         }
-                        poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338")
+                        poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
 
                         val num = extractEpisodeNumber(title) ?: 0
 
@@ -531,8 +536,8 @@ class Trt : MainAPI() {
                     sr.posterUrl = ch.logoUrl
                     sr
                 }
-                homePageLists += HomePageList("📺 TRT TV Kanalları", tvItems, true)
-                homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, true)
+                homePageLists += HomePageList("📺 TRT TV Kanalları", tvItems, false)
+                homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, false)
             }
             "series" -> {
                 val items = getTrtSeries(archive = false, page = page)
@@ -620,7 +625,7 @@ class Trt : MainAPI() {
                                 if (poster.isBlank()) {
                                     poster = dataObj.optString("backgroundImage", "")
                                 }
-                                poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338")
+                                poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
                             }
                         }
                     } catch (e: Exception) {
@@ -640,7 +645,7 @@ class Trt : MainAPI() {
                     if (poster.isBlank()) {
                         poster = doc.selectFirst("img")?.absUrl("src") ?: ""
                     }
-                    poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338")
+                    poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
                 }
 
                 val episodes = getTrtCocukEpisodes(url)
@@ -666,7 +671,7 @@ class Trt : MainAPI() {
 
             val basePath = if (url.contains("/diziler/")) "diziler" else "programlar"
             val slug = url.removePrefix("$trt1Url/$basePath/").substringBefore("/")
-            val episodesPath = if (basePath == "diziler") "bolum" else "bolumler"
+            val episodesPath = "bolum"
             val episodes = mutableListOf<Episode>()
             var pageNum = 1
             var more = true
