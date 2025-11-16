@@ -210,40 +210,89 @@ class Trt : MainAPI() {
 
     private suspend fun getTrtCocuk(page: Int = 1): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
-        val url = "$trtCocukBase" + if (page > 1) "?page=$page" else ""
-
+        
         try {
-            val doc = app.get(url, timeout = 15).document
-
-            // More specific selector based on the exact HTML structure
-            val anchors = doc.select("div.row > div > a[href^='/']")
-            Log.d("TRTÇocuk", "Found ${anchors.size} anchors")
+            val url = "$trtCocukBase/video" + if (page > 1) "?page=$page" else ""
+            val response = app.get(url, timeout = 15)
+            val html = response.text
             
-            for (a in anchors) {
-                val href = a.attr("href").trim()
-                // Skip video links and empty hrefs
-                if (href.isBlank() || href.startsWith("/video") || href == "/") continue
-
-                val fullUrl = if (href.startsWith("http")) href else trtCocukBase + href
-                if (out.any { it.url == fullUrl }) continue
-
-                val img = a.selectFirst("img")
-                val title = img?.attr("alt")?.trim() ?: a.text().trim()
-                if (title.isBlank()) continue
-
-                val poster = img?.attr("data-src")?.ifBlank { img.attr("src") }?.trim() ?: ""
-
-                out += newTvSeriesSearchResponse(title, fullUrl) {
-                    this.posterUrl = poster
+            // Try to extract data from the Nuxt.js state
+            val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})(?=;|</script>)""", RegexOption.DOT_MATCHES_ALL)
+            val match = nuxtDataRegex.find(html)
+            
+            if (match != null) {
+                val nuxtJsonString = match.groupValues[1]
+                try {
+                    val nuxtData = JSONObject(nuxtJsonString)
+                    val dataArray = nuxtData.getJSONArray("data")
+                    
+                    if (dataArray.length() > 0) {
+                        val firstData = dataArray.getJSONObject(0)
+                        if (firstData.has("data")) {
+                            val dataObj = firstData.getJSONObject("data")
+                            if (dataObj.has("list")) {
+                                val listArray = dataObj.getJSONArray("list")
+                                
+                                for (i in 0 until listArray.length()) {
+                                    val item = listArray.getJSONObject(i)
+                                    val title = item.getString("title")
+                                    val path = item.getString("path")
+                                    val fullUrl = "$trtCocukBase$path"
+                                    
+                                    // Get poster image - try different image fields
+                                    var poster = ""
+                                    val imageFields = listOf("artWork", "mobileCover", "logo")
+                                    for (field in imageFields) {
+                                        if (item.has(field) && !item.isNull(field)) {
+                                            poster = item.getString(field)
+                                            if (poster.isNotBlank()) break
+                                        }
+                                    }
+                                    
+                                    out += newTvSeriesSearchResponse(title, fullUrl) {
+                                        this.posterUrl = poster
+                                    }
+                                    
+                                    Log.d("TRTÇocuk", "Added from Nuxt data: $title -> $fullUrl")
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("TRTÇocuk", "Error parsing Nuxt data: ${e.message}")
                 }
+            }
+            
+            // Fallback: Also try to parse the HTML structure as before
+            if (out.isEmpty()) {
+                val doc = response.document
+                val anchors = doc.select("div.row > div > a[href^='/']")
+                Log.d("TRTÇocuk", "Fallback: Found ${anchors.size} anchors")
                 
-                Log.d("TRTÇocuk", "Added series: $title -> $fullUrl")
+                for (a in anchors) {
+                    val href = a.attr("href").trim()
+                    if (href.isBlank() || href.startsWith("/video") || href == "/") continue
+
+                    val fullUrl = if (href.startsWith("http")) href else trtCocukBase + href
+                    if (out.any { it.url == fullUrl }) continue
+
+                    val img = a.selectFirst("img")
+                    val title = img?.attr("alt")?.trim() ?: a.text().trim()
+                    if (title.isBlank()) continue
+
+                    val poster = img?.attr("data-src")?.ifBlank { img.attr("src") }?.trim() ?: ""
+
+                    out += newTvSeriesSearchResponse(title, fullUrl) {
+                        this.posterUrl = poster
+                    }
+                }
             }
 
         } catch (e: Exception) {
             Log.e("TRTÇocuk", "getTrtCocuk failed: ${e.message}")
         }
 
+        Log.d("TRTÇocuk", "Total series found: ${out.size}")
         return out
     }
 
