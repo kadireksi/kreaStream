@@ -317,7 +317,7 @@ class Trt : MainAPI() {
                                     val publishedDate = video.optString("publishedDate", "")
                                     
                                     // Extract episode number
-                                    val num = extractEpisodeNumber(title)
+                                    val num = extractEpisodeNumber(title) ?: 0
                                     
                                     val ep = newEpisode(fullUrl) {
                                         this.name = title
@@ -407,7 +407,7 @@ class Trt : MainAPI() {
                         }
                         poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338")
 
-                        val num = extractEpisodeNumber(title)
+                        val num = extractEpisodeNumber(title) ?: 0
 
                         val ep = newEpisode(fullHref) {
                             this.name = title
@@ -424,7 +424,7 @@ class Trt : MainAPI() {
                     }
                 }
                 // Dedup by url
-                episodes += tempEpisodes.distinctBy { it.url }
+                episodes += tempEpisodes.distinctBy(Episode::url)
             }
 
         } catch (e: Exception) {
@@ -520,16 +520,16 @@ class Trt : MainAPI() {
         when (request.data) {
             "live" -> {
                 val tvChannels = getTvChannels()
-                val tvItems = tvChannels.map { channel ->
-                    newMovieSearchResponse(channel.name, channel.streamUrl, TvType.Live) {
-                        this.posterUrl = channel.logoUrl
-                    }
+                val tvItems = tvChannels.map { ch ->
+                    val sr = newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live)
+                    sr.posterUrl = ch.logoUrl
+                    sr
                 }
                 val radioChannels = getRadioChannels()
-                val radioItems = radioChannels.map { channel ->
-                    newMovieSearchResponse(channel.name, channel.streamUrl, TvType.Live) {
-                        this.posterUrl = channel.logoUrl
-                    }
+                val radioItems = radioChannels.map { ch ->
+                    val sr = newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live)
+                    sr.posterUrl = ch.logoUrl
+                    sr
                 }
                 homePageLists += HomePageList("📺 TRT TV Kanalları", tvItems, false)
                 homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, false)
@@ -575,9 +575,12 @@ class Trt : MainAPI() {
 
         // Direct m3u8 stream
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
-            return newMovieLoadResponse("TRT Canlı", url, TvType.Live) {
-                this.data = url
-            }
+            return newMovieLoadResponse(
+                name = "TRT Canlı",
+                dataUrl = url,
+                type = TvType.Live,
+                data = url
+            )
         }
 
         // In the load function, update the TRT Çocuk series section:
@@ -846,18 +849,18 @@ class Trt : MainAPI() {
         getTvChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
-                    this.posterUrl = ch.logoUrl
-                }
+                val sr = newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live)
+                sr.posterUrl = ch.logoUrl
+                out += sr
             }
 
         // Search Radio channels
         getRadioChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
-                out += newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
-                    this.posterUrl = ch.logoUrl
-                }
+                val sr = newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live)
+                sr.posterUrl = ch.logoUrl
+                out += sr
             }
 
         // TRT Çocuk search
