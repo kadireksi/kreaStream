@@ -513,13 +513,11 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Handle direct YouTube URLs
+
         if (data.startsWith("https://www.youtube.com") || data.contains("youtube.com") || data.contains("youtu.be")) {
-            val youTubeExtractor = Yt()
-            return youTubeExtractor.getUrl(data, mainUrl, subtitleCallback, callback)
+            return loadExtractor(data, mainUrl, subtitleCallback, callback)
         }
 
-        // Handle regular m3u8 streams (non-live)
         if (data.contains(".m3u8", ignoreCase = true)) {
             M3u8Helper.generateM3u8(
                 source = name,
@@ -540,13 +538,10 @@ class Trt : MainAPI() {
             return true
         }
 
-        // TRT1 series/programs - Improved native source extraction
         if (data.contains(trt1Url)) {
             try {
                 val doc = app.get(data, timeout = 10).document
                 val scripts = doc.select("script")
-
-                // Look for playerConfig or similar in scripts
                 for (script in scripts) {
                     val scriptContent = script.html()
                     if (scriptContent.contains("playerConfig", ignoreCase = true) || scriptContent.contains("streamUrl", ignoreCase = true)) {
@@ -568,7 +563,6 @@ class Trt : MainAPI() {
                     }
                 }
 
-                // Fallback: Broad regex search for m3u8 in any script
                 for (script in scripts) {
                     val html = script.html()
                     val m = Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""", RegexOption.IGNORE_CASE).find(html)
@@ -585,7 +579,6 @@ class Trt : MainAPI() {
                     }
                 }
 
-                // YouTube fallback (as before)
                 val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
                     ?.attr("src")
                     ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
@@ -609,7 +602,6 @@ class Trt : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val out = mutableListOf<SearchResponse>()
 
-        // Search TV channels
         getTvChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
@@ -618,7 +610,6 @@ class Trt : MainAPI() {
                 out += sr
             }
 
-        // Search Radio channels
         getRadioChannels()
             .filter { it.name.contains(query, ignoreCase = true) }
             .forEach { ch ->
