@@ -332,8 +332,14 @@ class Trt : MainAPI() {
             else -> false
         }
 
+        val isHorizontal = when (request.data) {
+            "live" -> true
+            "series", "archiveSeries", "programs", "archivePrograms" -> true
+            else -> false
+        }
+
         return newHomePageResponse(
-            listOf(HomePageList(request.name, items)),
+            listOf(HomePageList(request.name, items, isHorizontal)),
             hasNext = hasNext
         )
     }
@@ -425,7 +431,6 @@ class Trt : MainAPI() {
                     }
                 }
 
-                // Process raw episodes to assign proper numbers
                 val numbered = rawEpisodes.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
                 val unnumbered = rawEpisodes.filter { it.extractedNum == null || it.extractedNum == 0 }
                 
@@ -459,24 +464,20 @@ class Trt : MainAPI() {
             }
         }
 
-        // If we reach here, it's an unknown URL
         throw ErrorLoadingException("Geçersiz URL: $url")
     }
 
     private fun extractM3u8FromJson(jsonStr: String): String? {
         return try {
-            // Clean up the JSON string if necessary (remove var/let/const assignments)
             var cleanJson = jsonStr.trim()
             if (cleanJson.startsWith("var ") || cleanJson.startsWith("let ") || cleanJson.startsWith("const ")) {
                 cleanJson = cleanJson.substringAfterLast("= ").trim().trimEnd(';')
             }
             if (cleanJson.startsWith("{") && cleanJson.endsWith("}")) {
                 val config = JSONObject(cleanJson)
-                // Direct streamUrl
                 var streamUrl = config.optString("streamUrl")
                 if (streamUrl.contains(".m3u8")) return streamUrl
 
-                // Look in nested objects like sources, media, hls, etc.
                 fun findInJson(obj: JSONObject): String? {
                     if (obj.has("streamUrl")) {
                         val url = obj.getString("streamUrl")
@@ -500,7 +501,6 @@ class Trt : MainAPI() {
                             }
                         }
                     }
-                    // Recursive search in nested objects
                     val keys = obj.keys()
                     while (keys.hasNext()) {
                         val key = keys.next()
@@ -518,7 +518,6 @@ class Trt : MainAPI() {
             null
         } catch (e: Exception) {
             Log.e("TRT", "JSON parsing error: ${e.message}")
-            // Fallback to regex
             Regex("""["']?streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""", RegexOption.IGNORE_CASE)
                 .find(jsonStr)?.groupValues?.get(1)
         }
