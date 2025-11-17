@@ -22,10 +22,6 @@ class Trt : MainAPI() {
     private val dummyTvUrl = tabiiUrl
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
 
-    override fun getExtractorList(): List<ExtractorApi> = listOf(
-        Yt()
-    )
-    
     override val mainPage = mainPageOf(
         "series"  to "Güncel Diziler",
         "archiveSeries" to "Arşiv Diziler",
@@ -519,7 +515,7 @@ class Trt : MainAPI() {
     ): Boolean {
         // Handle direct YouTube URLs
         if (data.startsWith("https://www.youtube.com") || data.contains("youtube.com") || data.contains("youtu.be")) {
-            val youTubeExtractor = YouTubeExtractor()
+            val youTubeExtractor = Yt()
             return youTubeExtractor.getUrl(data, mainUrl, subtitleCallback, callback)
         }
 
