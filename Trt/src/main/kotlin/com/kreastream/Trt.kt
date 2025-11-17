@@ -282,6 +282,8 @@ class Trt : MainAPI() {
             val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})(?=;|</script>)""", RegexOption.DOT_MATCHES_ALL)
             val match = nuxtDataRegex.find(html)
             
+            val rawEpisodes = mutableListOf<RawEpisode>()
+            
             if (match != null) {
                 val nuxtJsonString = match.groupValues[1]
                 try {
@@ -318,23 +320,15 @@ class Trt : MainAPI() {
                                     val publishedDate = video.optString("publishedDate", "")
                                     
                                     // Extract episode number
-                                    val num = extractEpisodeNumber(title) ?: 0
+                                    val num = extractEpisodeNumber(title)
                                     
-                                    val ep = newEpisode(fullUrl) {
-                                        this.name = title
-                                        if (mainImageUrl.isNotBlank()) this.posterUrl = mainImageUrl
-                                        this.episode = num
-                                        this.season = 1
-                                        this.description = seriesDescription
-                                    }
-                                    
-                                    episodes += ep
-                                    Log.d("TRTÇocuk", "Added episode from Nuxt: $title (episode: $num) -> $fullUrl")
+                                    rawEpisodes += RawEpisode(title, fullUrl, mainImageUrl, seriesDescription, num)
+                                    Log.d("TRTÇocuk", "Added raw episode from Nuxt: $title (episode: $num) -> $fullUrl")
                                 }
                             }
                             
                             // Also check clipUps for additional content
-                            if (dataObj.has("clipUps") && episodes.isEmpty()) {
+                            if (dataObj.has("clipUps")) {
                                 val clipUpsArray = dataObj.getJSONArray("clipUps")
                                 
                                 for (i in 0 until clipUpsArray.length()) {
@@ -345,15 +339,10 @@ class Trt : MainAPI() {
                                     var mainImage = clip.optString("mainImage", "")
                                     mainImage = mainImage.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
                                     
-                                    val ep = newEpisode(fullUrl) {
-                                        this.name = title
-                                        if (mainImage.isNotBlank()) this.posterUrl = mainImage
-                                        this.episode = i + 1
-                                        this.season = 1
-                                    }
+                                    val num = extractEpisodeNumber(title)
                                     
-                                    episodes += ep
-                                    Log.d("TRTÇocuk", "Added clip from Nuxt: $title -> $fullUrl")
+                                    rawEpisodes += RawEpisode(title, fullUrl, mainImage, "", num)
+                                    Log.d("TRTÇocuk", "Added raw clip from Nuxt: $title (episode: $num) -> $fullUrl")
                                 }
                             }
                         }
@@ -364,7 +353,7 @@ class Trt : MainAPI() {
             }
             
             // Fallback to HTML parsing if no episodes found in Nuxt data
-            if (episodes.isEmpty()) {
+            if (rawEpisodes.isEmpty()) {
                 val doc = response.document
                 val episodeSelectors = listOf(
                     "a[href*='/video/']",
@@ -385,7 +374,6 @@ class Trt : MainAPI() {
 
                 Log.d("TRTÇocuk", "Fallback: Found ${allEpisodeLinks.size} potential episode links")
 
-                val tempEpisodes = mutableListOf<Episode>()
                 for (a in allEpisodeLinks) {
                     try {
                         val href = a.attr("href").trim()
@@ -412,24 +400,43 @@ class Trt : MainAPI() {
                         }
                         poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
 
-                        val num = extractEpisodeNumber(title) ?: 0
+                        val num = extractEpisodeNumber(title)
 
-                        val ep = newEpisode(fullHref) {
-                            this.name = title
-                            if (poster.isNotBlank()) this.posterUrl = poster
-                            this.episode = num
-                            this.season = 1
-                        }
-
-                        tempEpisodes += ep
-                        Log.d("TRTÇocuk", "Added episode from HTML: $title (episode: $num) -> $fullHref")
+                        rawEpisodes += RawEpisode(title, fullHref, poster, "", num)
+                        Log.d("TRTÇocuk", "Added raw episode from HTML: $title (episode: $num) -> $fullHref")
                         
                     } catch (e: Exception) {
                         Log.e("TRTÇocuk", "Error processing episode link: ${e.message}")
                     }
                 }
-                // Dedup by data
-                episodes += tempEpisodes.distinctBy { it.data }
+            }
+            
+            // Process raw episodes to assign proper numbers
+            val numbered = rawEpisodes.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
+            val unnumbered = rawEpisodes.filter { it.extractedNum == null || it.extractedNum == 0 }
+            
+            var nextEpNum = if (numbered.isNotEmpty()) numbered.last().extractedNum!! + 1 else 1
+            
+            for (raw in numbered) {
+                val ep = newEpisode(raw.url) {
+                    this.name = raw.title
+                    if (raw.posterUrl.isNotBlank()) this.posterUrl = raw.posterUrl
+                    this.episode = raw.extractedNum!!
+                    this.season = 1
+                    this.description = raw.description
+                }
+                episodes += ep
+            }
+            
+            for (raw in unnumbered) {
+                val ep = newEpisode(raw.url) {
+                    this.name = raw.title
+                    if (raw.posterUrl.isNotBlank()) this.posterUrl = raw.posterUrl
+                    this.episode = nextEpNum++
+                    this.season = 1
+                    this.description = raw.description
+                }
+                episodes += ep
             }
 
         } catch (e: Exception) {
@@ -439,6 +446,14 @@ class Trt : MainAPI() {
         Log.d("TRTÇocuk", "Total episodes found: ${episodes.size}")
         return episodes
     }
+
+    data class RawEpisode(
+        val title: String,
+        val url: String,
+        val posterUrl: String,
+        val description: String,
+        val extractedNum: Int?
+    )
 
     private fun extractEpisodeNumber(title: String): Int? {
         return try {
@@ -672,10 +687,9 @@ class Trt : MainAPI() {
             val basePath = if (url.contains("/diziler/")) "diziler" else "programlar"
             val slug = url.removePrefix("$trt1Url/$basePath/").substringBefore("/")
             val episodesPath = "bolum"
-            val episodes = mutableListOf<Episode>()
+            val rawEpisodes = mutableListOf<RawEpisode>()
             var pageNum = 1
             var more = true
-            var episodeCounter = 1
 
             while (more && pageNum <= 30) {
                 try {
@@ -685,7 +699,7 @@ class Trt : MainAPI() {
                         "$trt1Url/$basePath/$slug/$episodesPath/$pageNum"
                     }
                     val epDoc = app.get(epUrl, timeout = 10).document
-                    val pageEps = epDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
+                    val pageRaws = epDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
                         .mapNotNull { el ->
                             val epTitle = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
                                 ?: return@mapNotNull null
@@ -694,24 +708,44 @@ class Trt : MainAPI() {
                             img = img?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
                                 ?.replace("/q75/", "/q85/")
                             val desc = el.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
-                            val epNum = extractEpisodeNumber(epTitle) ?: episodeCounter++
+                            val extracted = extractEpisodeNumber(epTitle)
 
-                            newEpisode(fixTrtUrl(href)) {
-                                name = epTitle
-                                posterUrl = img
-                                episode = epNum
-                                description = desc
-                            }
+                            RawEpisode(epTitle, fixTrtUrl(href), img, desc, extracted)
                         }
 
-                    if (pageEps.isNotEmpty()) {
-                        episodes += pageEps
+                    if (pageRaws.isNotEmpty()) {
+                        rawEpisodes += pageRaws
                         pageNum++
                         delay(100)
                     } else more = false
                 } catch (e: Exception) { 
                     more = false 
                     Log.e("TRT", "Error loading episodes page $pageNum: ${e.message}")
+                }
+            }
+
+            // Process raw episodes to assign proper numbers
+            val numbered = rawEpisodes.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
+            val unnumbered = rawEpisodes.filter { it.extractedNum == null || it.extractedNum == 0 }
+            
+            var nextEpNum = if (numbered.isNotEmpty()) numbered.last().extractedNum!! + 1 else 1
+            
+            val episodes = mutableListOf<Episode>()
+            for (raw in numbered) {
+                episodes += newEpisode(raw.url) {
+                    name = raw.title
+                    posterUrl = raw.posterUrl
+                    episode = raw.extractedNum!!
+                    description = raw.description
+                }
+            }
+            
+            for (raw in unnumbered) {
+                episodes += newEpisode(raw.url) {
+                    name = raw.title
+                    posterUrl = raw.posterUrl
+                    episode = nextEpNum++
+                    description = raw.description
                 }
             }
 
