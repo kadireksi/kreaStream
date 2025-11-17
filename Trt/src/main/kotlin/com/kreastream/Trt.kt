@@ -229,7 +229,7 @@ class Trt : MainAPI() {
 
             Log.d("TRT", "Loading content from: $url")
             
-            val document = app.get(url, timeout = 15).document
+            val document = app.get(url, timeout = 30).document
             val items = document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
                 .mapNotNull { el ->
                     val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
@@ -292,64 +292,59 @@ class Trt : MainAPI() {
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-    val items = when (request.data) {
-        "live" -> listOf(
-            newTvSeriesSearchResponse(
-                name = "📺 TRT TV",
-                url = dummyTvUrl,
-                type = TvType.TvSeries
-            ) {
-                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
-                this.year = 1964
-            },
-            newTvSeriesSearchResponse(
-                name = "📻 TRT Radyo", 
-                url = dummyRadioUrl,
-                type = TvType.TvSeries
-            ) {
-                this.posterUrl = "https://www.trtdinle.com/trt-dinle-fb-share.jpg"
-                this.year = 1927
-            }
-        )
-        "series"  -> getTrtContent("diziler", archive = false, page = page)
-        "archiveSeries" -> getTrtContent("diziler", archive = true, page = page)
-        "programs" -> getTrtContent("programlar", archive = false, page = page)
-        "archivePrograms" -> getTrtContent("programlar", archive = true, page = page)
-        else -> emptyList()
-    }
-
-    // Check if there are more pages
-    val hasNext = when (request.data) {
-        "series", "archiveSeries", "programs", "archivePrograms" -> {
-            // If we got items on the current page, assume there might be more pages
-            // We'll check the actual next page only for the first page to avoid too many requests
-            if (page == 1) {
-                val nextPageItems = getTrtContent(
-                    if (request.data.contains("series")) "diziler" else "programlar",
-                    archive = request.data.contains("archive"),
-                    page = page + 1
-                )
-                nextPageItems.isNotEmpty()
-            } else {
-                // For pages > 1, if we got items, assume there might be more
-                items.isNotEmpty()
-            }
+        val items = when (request.data) {
+            "live" -> listOf(
+                newTvSeriesSearchResponse(
+                    name = "📺 TRT TV",
+                    url = dummyTvUrl,
+                    type = TvType.TvSeries
+                ) {
+                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.year = 1964
+                },
+                newTvSeriesSearchResponse(
+                    name = "📻 TRT Radyo", 
+                    url = dummyRadioUrl,
+                    type = TvType.TvSeries
+                ) {
+                    this.posterUrl = "https://www.trtdinle.com/trt-dinle-fb-share.jpg"
+                    this.year = 1927
+                }
+            )
+            "series"  -> getTrtContent("diziler", archive = false, page = page)
+            "archiveSeries" -> getTrtContent("diziler", archive = true, page = page)
+            "programs" -> getTrtContent("programlar", archive = false, page = page)
+            "archivePrograms" -> getTrtContent("programlar", archive = true, page = page)
+            else -> emptyList()
         }
-        else -> false
-    }
 
-    // Set isHorizontal = true for horizontal scrolling
-    val isHorizontal = when (request.data) {
-        "live" -> true
-        "series", "archiveSeries", "programs", "archivePrograms" -> true
-        else -> false
-    }
+        val hasNext = when (request.data) {
+            "series", "archiveSeries", "programs", "archivePrograms" -> {
+                if (page == 1) {
+                    val nextPageItems = getTrtContent(
+                        if (request.data.contains("series")) "diziler" else "programlar",
+                        archive = request.data.contains("archive"),
+                        page = page + 1
+                    )
+                    nextPageItems.isNotEmpty()
+                } else {
+                    items.isNotEmpty()
+                }
+            }
+            else -> false
+        }
 
-    return newHomePageResponse(
-        listOf(HomePageList(request.name, items, isHorizontal)),
-        hasNext = hasNext
-    )
-}
+        val isHorizontal = when (request.data) {
+            "live" -> true
+            "series", "archiveSeries", "programs", "archivePrograms" -> true
+            else -> false
+        }
+
+        return newHomePageResponse(
+            listOf(HomePageList(request.name, items, isHorizontal)),
+            hasNext = hasNext
+        )
+    }
 
     override suspend fun load(url: String): LoadResponse {
 
