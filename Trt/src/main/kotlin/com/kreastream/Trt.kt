@@ -260,7 +260,7 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.Live, episodes) {
+        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             this.plot = "TRT TV Yayınları"
             this.year = 1964
@@ -279,7 +279,7 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.Live, episodes) {
+        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
             this.plot = "TRT Radyo Yayınları"
             this.year = 1927
@@ -293,7 +293,7 @@ class Trt : MainAPI() {
                 newTvSeriesSearchResponse(
                     name = "TRT TV",
                     url = dummyTvUrl,
-                    type = TvType.Live
+                    type = TvType.TvSeries
                 ) {
                     this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                     this.year = 1964
@@ -301,7 +301,7 @@ class Trt : MainAPI() {
                  newTvSeriesSearchResponse(
                     name = "TRT Radyo",
                     url = dummyRadioUrl,
-                    type = TvType.Live
+                    type = TvType.TvSeries
                 ) {
                     this.posterUrl = "https://www.trtdinle.com/trt-dinle-fb-share.jpg"
                     this.year = 1927
@@ -339,7 +339,7 @@ class Trt : MainAPI() {
             return newMovieLoadResponse(
                 name = "TRT Canlı",
                 url = url,
-                type = TvType.Live,
+                type = TvType.TvSeries,
                 data = url
             )
         }
