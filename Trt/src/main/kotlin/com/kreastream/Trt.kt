@@ -420,7 +420,7 @@ class Trt : MainAPI() {
             for (raw in numbered) {
                 val ep = newEpisode(raw.url) {
                     this.name = raw.title
-                    if (raw.posterUrl.isNotBlank()) this.posterUrl = raw.posterUrl
+                    raw.posterUrl?.takeIf { it.isNotBlank() }?.let { this.posterUrl = it }
                     this.episode = raw.extractedNum!!
                     this.season = 1
                     this.description = raw.description
@@ -431,7 +431,7 @@ class Trt : MainAPI() {
             for (raw in unnumbered) {
                 val ep = newEpisode(raw.url) {
                     this.name = raw.title
-                    if (raw.posterUrl.isNotBlank()) this.posterUrl = raw.posterUrl
+                    raw.posterUrl?.takeIf { it.isNotBlank() }?.let { this.posterUrl = it }
                     this.episode = nextEpNum++
                     this.season = 1
                     this.description = raw.description
@@ -450,7 +450,7 @@ class Trt : MainAPI() {
     data class RawEpisode(
         val title: String,
         val url: String,
-        val posterUrl: String,
+        val posterUrl: String?,
         val description: String,
         val extractedNum: Int?
     )
@@ -734,7 +734,7 @@ class Trt : MainAPI() {
             for (raw in numbered) {
                 episodes += newEpisode(raw.url) {
                     name = raw.title
-                    posterUrl = raw.posterUrl
+                    this.posterUrl = raw.posterUrl
                     episode = raw.extractedNum!!
                     description = raw.description
                 }
@@ -743,7 +743,7 @@ class Trt : MainAPI() {
             for (raw in unnumbered) {
                 episodes += newEpisode(raw.url) {
                     name = raw.title
-                    posterUrl = raw.posterUrl
+                    this.posterUrl = raw.posterUrl
                     episode = nextEpNum++
                     description = raw.description
                 }
