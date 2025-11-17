@@ -276,13 +276,14 @@ class Trt : MainAPI() {
         try {
             Log.d("TRTÇocuk", "Fetching episodes from: $seriesUrl")
             val response = app.get(seriesUrl, timeout = 15)
-            val html = response.text
+            val doc = response.document
 
-            // Try to extract data from Nuxt.js state first
-            val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})(?=;|</script>)""", RegexOption.DOT_MATCHES_ALL)
-            val match = nuxtDataRegex.find(html)
-            
             val rawEpisodes = mutableListOf<RawEpisode>()
+            
+            // Try to extract data from Nuxt.js state first - optimized to script content
+            val nuxtScript = doc.select("script").first { it.html().contains("__NUXT__") }?.html() ?: ""
+            val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*\});?""", RegexOption.DOT_MATCHES_ALL)
+            val match = nuxtDataRegex.find(nuxtScript)
             
             if (match != null) {
                 val nuxtJsonString = match.groupValues[1]
@@ -354,27 +355,14 @@ class Trt : MainAPI() {
             
             // Fallback to HTML parsing if no episodes found in Nuxt data
             if (rawEpisodes.isEmpty()) {
-                val doc = response.document
-                val episodeSelectors = listOf(
-                    "a[href*='/video/']",
-                    "div.vueperslides__track a",
-                    "div.episode-item a", 
-                    "div.video-item a",
-                    "a.video-link",
-                    "article a[href*='/video/']",
-                    "li a[href*='/video/']",
-                    "div.card a[href*='/video/']",
-                    "div.list-item a[href*='/video/']"
-                )
+                val episodeSelectors = "a[href*='/video/'], div.vueperslides__track a, div.episode-item a, div.video-item a, a.video-link, article a[href*='/video/'], li a[href*='/video/'], div.card a[href*='/video/'], div.list-item a[href*='/video/']"
                 
-                val allEpisodeLinks = mutableListOf<org.jsoup.nodes.Element>()
-                episodeSelectors.forEach { selector ->
-                    allEpisodeLinks.addAll(doc.select(selector))
-                }
+                val allEpisodeLinks = doc.select(episodeSelectors)
 
                 Log.d("TRTÇocuk", "Fallback: Found ${allEpisodeLinks.size} potential episode links")
 
-                for (a in allEpisodeLinks) {
+                val tempRawEpisodes = mutableListOf<RawEpisode>()
+                for (a in allEpisodeLinks.distinctBy { it.attr("href") }) {  // Dedup early by href
                     try {
                         val href = a.attr("href").trim()
                         if (href.isBlank() || !href.contains("/video/")) continue
@@ -402,13 +390,14 @@ class Trt : MainAPI() {
 
                         val num = extractEpisodeNumber(title)
 
-                        rawEpisodes += RawEpisode(title, fullHref, poster, "", num)
+                        tempRawEpisodes += RawEpisode(title, fullHref, poster.ifBlank { null }, "", num)
                         Log.d("TRTÇocuk", "Added raw episode from HTML: $title (episode: $num) -> $fullHref")
                         
                     } catch (e: Exception) {
                         Log.e("TRTÇocuk", "Error processing episode link: ${e.message}")
                     }
                 }
+                rawEpisodes += tempRawEpisodes.distinctBy { it.url }
             }
             
             // Process raw episodes to assign proper numbers
