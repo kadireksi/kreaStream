@@ -21,11 +21,12 @@ class Trt : MainAPI() {
     private val liveBase  = "$tabiiUrl/watch/live"
 
     override val mainPage = mainPageOf(
+        "tv" to "TRT TV Kanalları",
+        "radio" to "TRT Radyo Kanalları",
         "series"  to "Güncel Diziler",
         "archiveSeries" to "Arşiv Diziler",
         "programs" to "Programlar",
-        "archivePrograms" to "Arşiv Programlar",
-        "live" to "TRT Tv & Radyo"
+        "archivePrograms" to "Arşiv Programlar"
     )
 
     data class TvChannel(
@@ -251,21 +252,13 @@ class Trt : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val homePageLists = mutableListOf<HomePageList>()
         when (request.data) {
-            "live" -> {
-                val tvChannels = getTvChannels()
-                val tvItems = tvChannels.map { ch ->
-                    val sr = newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live)
-                    sr.posterUrl = ch.logoUrl
-                    sr
-                }
-                val radioChannels = getRadioChannels()
-                val radioItems = radioChannels.map { ch ->
-                    val sr = newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live)
-                    sr.posterUrl = ch.logoUrl
-                    sr
-                }
-                homePageLists += HomePageList("📺 TRT TV Kanalları", tvItems, true)
-                homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, true)
+            "tv" -> {
+                val tvItem = newTvSeriesSearchResponse("TRT TV Kanalları", "trt/tv")
+                homePageLists += HomePageList(request.name, listOf(tvItem), hasNext = false)
+            }
+            "radio" -> {
+                val radioItem = newTvSeriesSearchResponse("TRT Radyo Kanalları", "trt/radio")
+                homePageLists += HomePageList(request.name, listOf(radioItem), hasNext = false)
             }
             "series" -> {
                 val items = getTrtContent("diziler", archive = false, page = page)
@@ -318,6 +311,40 @@ class Trt : MainAPI() {
                 type = TvType.TvSeries,
                 data = url
             )
+        }
+
+        if (url == "trt/tv") {
+            val tvChannels = getTvChannels()
+            val episodes = tvChannels.mapIndexed { index, ch ->
+                newEpisode(ch.streamUrl) {
+                    name = ch.name
+                    this.posterUrl = ch.logoUrl
+                    this.description = ch.description
+                    this.episode = index + 1
+                    this.season = 1
+                }
+            }
+            val posterUrl = tvChannels.firstOrNull()?.logoUrl ?: ""
+            return newTvSeriesLoadResponse("TRT TV Kanalları", url, TvType.TvSeries, episodes) {
+                this.posterUrl = posterUrl
+            }
+        }
+
+        if (url == "trt/radio") {
+            val radioChannels = getRadioChannels()
+            val episodes = radioChannels.mapIndexed { index, ch ->
+                newEpisode(ch.streamUrl) {
+                    name = ch.name
+                    this.posterUrl = ch.logoUrl
+                    this.description = ch.description
+                    this.episode = index + 1
+                    this.season = 1
+                }
+            }
+            val posterUrl = radioChannels.firstOrNull()?.logoUrl ?: ""
+            return newTvSeriesLoadResponse("TRT Radyo Kanalları", url, TvType.TvSeries, episodes) {
+                this.posterUrl = posterUrl
+            }
         }
 
         // TRT1 Series/Programs
@@ -488,7 +515,8 @@ class Trt : MainAPI() {
                 source = name,
                 streamUrl = data,
                 referer = tabiiUrl,
-                headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
+                headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl),
+                subtitleCallback = subtitleCallback
             ).forEach(callback)
             return true
         } else if (data.endsWith(".aac", ignoreCase = true)) {
@@ -524,7 +552,8 @@ class Trt : MainAPI() {
                                 headers = mapOf(
                                     "Referer" to trt1Url,
                                     "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                                )
+                                ),
+                                subtitleCallback = subtitleCallback
                             ).forEach(callback)
                             return true
                         }
@@ -542,7 +571,8 @@ class Trt : MainAPI() {
                             source = name,
                             streamUrl = found,
                             referer = trt1Url,
-                            headers = mapOf("Referer" to trt1Url)
+                            headers = mapOf("Referer" to trt1Url),
+                            subtitleCallback = subtitleCallback
                         ).forEach(callback)
                         return true
                     }
