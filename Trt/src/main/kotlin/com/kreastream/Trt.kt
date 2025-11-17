@@ -724,6 +724,67 @@ class Trt : MainAPI() {
         }
     }
 
+    private fun extractM3u8FromJson(jsonStr: String): String? {
+        return try {
+            // Clean up the JSON string if necessary (remove var/let/const assignments)
+            var cleanJson = jsonStr.trim()
+            if (cleanJson.startsWith("var ") || cleanJson.startsWith("let ") || cleanJson.startsWith("const ")) {
+                cleanJson = cleanJson.substringAfterLast("= ").trim().trimEnd(';')
+            }
+            if (cleanJson.startsWith("{") && cleanJson.endsWith("}")) {
+                val config = JSONObject(cleanJson)
+                // Direct streamUrl
+                var streamUrl = config.optString("streamUrl")
+                if (streamUrl.contains(".m3u8")) return streamUrl
+
+                // Look in nested objects like sources, media, hls, etc.
+                fun findInJson(obj: JSONObject): String? {
+                    if (obj.has("streamUrl")) {
+                        val url = obj.getString("streamUrl")
+                        if (url.contains(".m3u8")) return url
+                    }
+                    if (obj.has("sources")) {
+                        val sources = obj.getJSONArray("sources")
+                        for (i in 0 until sources.length()) {
+                            val src = sources.getJSONObject(i)
+                            if (src.optString("type") == "application/x-mpegURL" || src.optString("file").contains(".m3u8")) {
+                                return src.optString("file", src.optString("src", src.optString("url")))
+                            }
+                        }
+                    }
+                    if (obj.has("media") || obj.has("playlist")) {
+                        val arr = if (obj.has("media")) obj.getJSONArray("media") else obj.getJSONArray("playlist")
+                        for (i in 0 until arr.length()) {
+                            val item = arr.getJSONObject(i)
+                            if (item.optString("type") == "hls" || item.optString("format") == "hls") {
+                                return item.optString("url", item.optString("src", item.optString("streamUrl")))
+                            }
+                        }
+                    }
+                    // Recursive search in nested objects
+                    val keys = obj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val value = obj.get(key)
+                        if (value is JSONObject) {
+                            val found = findInJson(value)
+                            if (found != null) return found
+                        }
+                    }
+                    return null
+                }
+
+                return findInJson(config)
+            }
+            null
+        } catch (e: Exception) {
+            Log.e("TRT", "JSON parsing error: ${e.message}")
+            // Fallback to regex
+            Regex("""["']?streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""", RegexOption.IGNORE_CASE)
+                .find(jsonStr)?.groupValues?.get(1)
+        }
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -806,42 +867,71 @@ class Trt : MainAPI() {
             }
         }
 
-        // TRT1 series/programs
-        try {
-            val doc = app.get(data, timeout = 10).document
-            val script = doc.select("script")
-                .find { it.html().contains("playerConfig") }
-                ?.html()
-            val m3u8 = script?.let {
-                Regex("""streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""")
-                    .find(it)?.groupValues?.get(1)
-            }
+        // TRT1 series/programs - Improved native source extraction
+        if (data.contains(trt1Url)) {
+            try {
+                val doc = app.get(data, timeout = 10).document
+                val scripts = doc.select("script")
 
-            if (m3u8 != null) {
-                generateQualityVariants(m3u8).forEach { u ->
-                    M3u8Helper.generateM3u8(
-                        source = name,
-                        streamUrl = u,
-                        referer = trt1Url,
-                        headers = mapOf("Referer" to trt1Url)
-                    ).forEach(callback)
+                // Look for playerConfig or similar in scripts
+                for (script in scripts) {
+                    val scriptContent = script.html()
+                    if (scriptContent.contains("playerConfig", ignoreCase = true) || scriptContent.contains("streamUrl", ignoreCase = true)) {
+                        Log.d("TRT", "Found potential player script: ${scriptContent.length} chars")
+                        val m3u8Url = extractM3u8FromJson(scriptContent)
+                        if (m3u8Url != null) {
+                            Log.d("TRT", "Extracted native m3u8: $m3u8Url")
+                            generateQualityVariants(m3u8Url).forEach { u ->
+                                M3u8Helper.generateM3u8(
+                                    source = name,
+                                    streamUrl = u,
+                                    referer = trt1Url,
+                                    headers = mapOf(
+                                        "Referer" to trt1Url,
+                                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                    )
+                                ).forEach(callback)
+                            }
+                            return true
+                        }
+                    }
                 }
-                return true
-            }
 
-            val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
-                ?.attr("src")
-                ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
-                ?: Regex("""https://www\.youtube\.com/watch\?v=([a-zA-Z0-9_-]+)""")
-                    .find(doc.html())?.groupValues?.get(1)
-                    ?.let { "https://www.youtube.com/watch?v=$it" }
+                // Fallback: Broad regex search for m3u8 in any script
+                for (script in scripts) {
+                    val html = script.html()
+                    val m = Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""", RegexOption.IGNORE_CASE).find(html)
+                    if (m != null) {
+                        val found = m.value
+                        Log.d("TRT", "Found m3u8 via regex: $found")
+                        generateQualityVariants(found).forEach { u ->
+                            M3u8Helper.generateM3u8(
+                                source = name,
+                                streamUrl = u,
+                                referer = trt1Url,
+                                headers = mapOf("Referer" to trt1Url)
+                            ).forEach(callback)
+                        }
+                        return true
+                    }
+                }
 
-            if (yt != null) {
-                loadExtractor(yt, tabiiUrl, subtitleCallback, callback)
-                return true
+                // YouTube fallback (as before)
+                val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
+                    ?.attr("src")
+                    ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
+                    ?: Regex("""https://www\.youtube\.com/watch\?v=([a-zA-Z0-9_-]+)""")
+                        .find(doc.html())?.groupValues?.get(1)
+                        ?.let { "https://www.youtube.com/watch?v=$it" }
+
+                if (yt != null) {
+                    Log.d("TRT", "Falling back to YouTube: $yt")
+                    loadExtractor(yt, tabiiUrl, subtitleCallback, callback)
+                    return true
+                }
+            } catch (e: Exception) {
+                Log.e("TRT", "loadLinks error for $data: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e("TRT", "loadLinks error for $data: ${e.message}")
         }
 
         return false
