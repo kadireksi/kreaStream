@@ -256,7 +256,7 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = null // This removes the download button
+                //this.data = null // This removes the download button
             }
         }
 
@@ -275,7 +275,7 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = null // This removes the download button
+                //this.data = null // This removes the download button
             }
         }
 
