@@ -253,12 +253,26 @@ class Trt : MainAPI() {
         val homePageLists = mutableListOf<HomePageList>()
         when (request.data) {
             "tv" -> {
-                val tvItem = newTvSeriesSearchResponse("TRT TV Kanalları", "trt/tv")
-                homePageLists += HomePageList(request.name, listOf(tvItem))
+                val tvChannels = getTvChannels()
+                val tvItems = tvChannels.map { ch ->
+                    newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                        this.posterUrl = ch.logoUrl
+                    }
+                }
+                if (tvItems.isNotEmpty()) {
+                    homePageLists += HomePageList(request.name, tvItems)
+                }
             }
             "radio" -> {
-                val radioItem = newTvSeriesSearchResponse("TRT Radyo Kanalları", "trt/radio")
-                homePageLists += HomePageList(request.name, listOf(radioItem))
+                val radioChannels = getRadioChannels()
+                val radioItems = radioChannels.map { ch ->
+                    newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
+                        this.posterUrl = ch.logoUrl
+                    }
+                }
+                if (radioItems.isNotEmpty()) {
+                    homePageLists += HomePageList(request.name, radioItems)
+                }
             }
             "series" -> {
                 val items = getTrtContent("diziler", archive = false, page = page)
@@ -290,7 +304,6 @@ class Trt : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-
         // Direct m3u8 stream
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
             return newMovieLoadResponse(
@@ -311,6 +324,7 @@ class Trt : MainAPI() {
             )
         }
 
+        // TRT TV Channels as episodes for channel surfing
         if (url == "trt/tv") {
             val tvChannels = getTvChannels()
             val episodes = tvChannels.mapIndexed { index, ch ->
@@ -322,12 +336,13 @@ class Trt : MainAPI() {
                     this.season = 1
                 }
             }
-            val posterUrl = tvChannels.firstOrNull()?.logoUrl ?: ""
             return newTvSeriesLoadResponse("TRT TV Kanalları", url, TvType.TvSeries, episodes) {
-                this.posterUrl = posterUrl
+                this.posterUrl = tvChannels.firstOrNull()?.logoUrl ?: ""
+                this.plot = "TRT TV kanallarını izleyin. Kanallar arasında geçiş yapmak için bölümler listesini kullanın."
             }
         }
 
+        // TRT Radio Channels as episodes for channel surfing
         if (url == "trt/radio") {
             val radioChannels = getRadioChannels()
             val episodes = radioChannels.mapIndexed { index, ch ->
@@ -339,9 +354,9 @@ class Trt : MainAPI() {
                     this.season = 1
                 }
             }
-            val posterUrl = radioChannels.firstOrNull()?.logoUrl ?: ""
             return newTvSeriesLoadResponse("TRT Radyo Kanalları", url, TvType.TvSeries, episodes) {
-                this.posterUrl = posterUrl
+                this.posterUrl = radioChannels.firstOrNull()?.logoUrl ?: ""
+                this.plot = "TRT Radyo kanallarını dinleyin. Kanallar arasında geçiş yapmak için bölümler listesini kullanın."
             }
         }
 
