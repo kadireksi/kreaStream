@@ -515,7 +515,9 @@ class Trt : MainAPI() {
     ): Boolean {
 
         if (data.startsWith("https://www.youtube.com") || data.contains("youtube.com") || data.contains("youtu.be")) {
-            return loadExtractor(data, mainUrl, subtitleCallback, callback)
+            val youTubeExtractor = Yt()
+            youTubeExtractor.getUrl(data, mainUrl, subtitleCallback, callback)
+            return true
         }
 
         if (data.contains(".m3u8", ignoreCase = true)) {
