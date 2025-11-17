@@ -334,7 +334,12 @@ class Trt : MainAPI() {
             }
         }
 
-        return newHomePageResponse(homePageLists)
+        val hasNext = request.data in listOf("series", "archiveSeries", "programs", "archivePrograms") && items.isNotEmpty()
+
+        return newHomePageResponse(
+            listOf(HomePageList(request.name, items, true)),
+            hasNext = hasNext
+        )
     }
 
     override suspend fun load(url: String): LoadResponse {
