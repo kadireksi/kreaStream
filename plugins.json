@@ -3,7 +3,7 @@
         "iconUrl": "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 30819,
+        "fileSize": 30954,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -13,9 +13,9 @@
             "TvSeries",
             "Live"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "Trt",
-        "description": "TRT Canl\u0131 Yay\u0131n ve Diziler",
+        "description": "TRT TV & Radyo & Diziler & Programlar",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Trt.cs3",
         "name": "Trt"
     }
