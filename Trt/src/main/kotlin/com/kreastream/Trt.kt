@@ -288,8 +288,7 @@ class Trt : MainAPI() {
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val homePageLists = mutableListOf<HomePageList>()
-        when (request.data) {
+        val items = when (request.data) {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
                     name = "TRT TV",
@@ -308,30 +307,11 @@ class Trt : MainAPI() {
                     this.year = 1927
                 }
             )
-            "series" -> {
-                val items = getTrtContent("diziler", archive = false, page = page)
-                if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items)
-                }
-            }
-            "archiveSeries" -> {
-                val items = getTrtContent("diziler", archive = true, page = page)
-                if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items)
-                }
-            }
-            "programs" -> {
-                val items = getTrtContent("programlar", archive = false, page = page)
-                if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items)
-                }
-            }
-            "archivePrograms" -> {
-                val items = getTrtContent("programlar", archive = true, page = page)
-                if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items)
-                }
-            }
+            "series"  -> getTrtContent("diziler", archive = false, page = page)
+            "archiveSeries" -> getTrtContent("diziler", archive = true,  page = page)
+            "programs" -> getTrtContent("programlar", archive = false, page = page)
+            "archivePrograms" -> getTrtContent("programlar", archive = true,  page = page)
+            else -> emptyList()
         }
 
         val hasNext = request.data in listOf("series", "archiveSeries", "programs", "archivePrograms") && items.isNotEmpty()
