@@ -477,12 +477,12 @@ class Trt : MainAPI() {
         }
     }
 
-    private suspend fun getTrtSeries(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
+    private suspend fun getTrtContent(contentType: String, archive: Boolean = false, page: Int = 1): List<SearchResponse> {
         return try {
             val url = if (page == 1) {
-                "$trt1Url/diziler?archive=$archive&order=title_asc"
+                "$trt1Url/$contentType?archive=$archive&order=title_asc"
             } else {
-                "$trt1Url/diziler/$page?archive=$archive&order=title_asc"
+                "$trt1Url/$contentType/$page?archive=$archive&order=title_asc"
             }
 
             app.get(url, timeout = 15).document
@@ -500,35 +500,7 @@ class Trt : MainAPI() {
                     }
                 }
         } catch (e: Exception) {
-            Log.e("TRT", "getTrtSeries error: ${e.message}")
-            emptyList()
-        }
-    }
-
-    private suspend fun getTrtPrograms(archive: Boolean = false, page: Int = 1): List<SearchResponse> {
-        return try {
-            val url = if (page == 1) {
-                "$trt1Url/programlar?archive=$archive&order=title_asc"
-            } else {
-                "$trt1Url/programlar/$page?archive=$archive&order=title_asc"
-            }
-
-            app.get(url, timeout = 15).document
-                .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
-                .mapNotNull { el ->
-                    val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
-                        ?: return@mapNotNull null
-                    val href = el.attr("href")
-                    var poster = el.selectFirst("img")?.absUrl("src")
-                    poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                        ?.replace("/q75/", "/q85/")
-
-                    newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
-                        this.posterUrl = poster
-                    }
-                }
-        } catch (e: Exception) {
-            Log.e("TRT", "getTrtPrograms error: ${e.message}")
+            Log.e("TRT", "getTrtContent error for $contentType: ${e.message}")
             emptyList()
         }
     }
@@ -555,25 +527,25 @@ class Trt : MainAPI() {
                 homePageLists += HomePageList("📻 TRT Radyo Kanalları", radioItems, true)
             }
             "series" -> {
-                val items = getTrtSeries(archive = false, page = page)
+                val items = getTrtContent("diziler", archive = false, page = page)
                 if (items.isNotEmpty()) {
                     homePageLists += HomePageList(request.name, items, true)
                 }
             }
             "archiveSeries" -> {
-                val items = getTrtSeries(archive = true, page = page)
+                val items = getTrtContent("diziler", archive = true, page = page)
                 if (items.isNotEmpty()) {
                     homePageLists += HomePageList(request.name, items, true)
                 }
             }
             "programs" -> {
-                val items = getTrtPrograms(archive = false, page = page)
+                val items = getTrtContent("programlar", archive = false, page = page)
                 if (items.isNotEmpty()) {
                     homePageLists += HomePageList(request.name, items, true)
                 }
             }
             "archivePrograms" -> {
-                val items = getTrtPrograms(archive = true, page = page)
+                val items = getTrtContent("programlar", archive = true, page = page)
                 if (items.isNotEmpty()) {
                     homePageLists += HomePageList(request.name, items, true)
                 }
@@ -1020,9 +992,10 @@ class Trt : MainAPI() {
             Log.e("TRT", "TRT Çocuk search error: ${e.message}")
         }
 
-        // TRT1 series search
+        // TRT1 series and programs search
         try {
-            getTrtSeries().filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
+            getTrtContent("diziler").filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
+            getTrtContent("programlar").filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
         } catch (e: Exception) {
             Log.e("TRT", "TRT1 search error: ${e.message}")
         }
