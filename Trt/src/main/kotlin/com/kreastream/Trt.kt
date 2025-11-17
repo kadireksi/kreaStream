@@ -227,28 +227,45 @@ class Trt : MainAPI() {
                 "$trt1Url/$contentType/$page?archive=$archive&order=title_asc"
             }
 
-            Log.d("TRT", "Loading content from: $url")
+            Log.d("TRT_DEBUG", "🔄 Loading $contentType (archive=$archive) page $page from: $url")
             
-            val document = app.get(url, timeout = 30).document
+            val response = app.get(url, timeout = 15)
+            val document = response.document
+            
+            Log.d("TRT_DEBUG", "📄 Response status: ${response.statusCode}, URL: ${response.url}")
+            
             val items = document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
-                .mapNotNull { el ->
-                    val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
-                        ?: return@mapNotNull null
-                    val href = el.attr("href")
-                    var poster = el.selectFirst("img")?.absUrl("src")
-                    poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                        ?.replace("/q75/", "/q85/")
+            Log.d("TRT_DEBUG", "🔍 Found ${items.size} container elements")
 
-                    newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
-                        this.posterUrl = poster
-                    }
+            val results = items.mapNotNull { el ->
+                val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
+                if (title == null) {
+                    Log.d("TRT_DEBUG", "❌ No title found in element")
+                    return@mapNotNull null
                 }
+                
+                val href = el.attr("href")
+                if (href.isBlank()) {
+                    Log.d("TRT_DEBUG", "❌ No href found for: $title")
+                    return@mapNotNull null
+                }
+                
+                var poster = el.selectFirst("img")?.absUrl("src")
+                poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                    ?.replace("/q75/", "/q85/")
 
-            Log.d("TRT", "Found ${items.size} items on page $page")
-            items
+                Log.d("TRT_DEBUG", "✅ Found item: $title -> $href")
+
+                newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
+                    this.posterUrl = poster
+                }
+            }
+
+            Log.d("TRT_DEBUG", "🎯 Successfully parsed ${results.size} $contentType items on page $page")
+            results
 
         } catch (e: Exception) {
-            Log.e("TRT", "getTrtContent error for $contentType page $page: ${e.message}")
+            Log.e("TRT_DEBUG", "💥 getTrtContent error for $contentType page $page: ${e.message}")
             emptyList()
         }
     }
@@ -292,6 +309,8 @@ class Trt : MainAPI() {
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        Log.d("TRT_DEBUG", "🏠 getMainPage called: data=${request.data}, page=$page")
+        
         val items = when (request.data) {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
@@ -318,21 +337,35 @@ class Trt : MainAPI() {
             else -> emptyList()
         }
 
+        Log.d("TRT_DEBUG", "📦 Items count for ${request.data} page $page: ${items.size}")
+
         val hasNext = when (request.data) {
             "series", "archiveSeries", "programs", "archivePrograms" -> {
-                if (page == 1) {
-                    val nextPageItems = getTrtContent(
-                        if (request.data.contains("series")) "diziler" else "programlar",
-                        archive = request.data.contains("archive"),
-                        page = page + 1
-                    )
-                    nextPageItems.isNotEmpty()
+                if (items.isNotEmpty()) {
+                    if (page <= 3) {
+                        Log.d("TRT_DEBUG", "🔍 Checking next page existence for ${request.data}...")
+                        val nextPageItems = getTrtContent(
+                            if (request.data.contains("series")) "diziler" else "programlar",
+                            archive = request.data.contains("archive"),
+                            page = page + 1
+                        )
+                        val hasNextPage = nextPageItems.isNotEmpty()
+                        Log.d("TRT_DEBUG", "📄 Next page exists: $hasNextPage (found ${nextPageItems.size} items)")
+                        hasNextPage
+                    } else {
+                        // For pages beyond 3, assume there might be more if we got items
+                        Log.d("TRT_DEBUG", "📄 Assuming more pages might exist for page $page")
+                        true
+                    }
                 } else {
-                    items.isNotEmpty()
+                    Log.d("TRT_DEBUG", "📄 No items on current page, no next page")
+                    false
                 }
             }
             else -> false
         }
+
+        Log.d("TRT_DEBUG", "➡️ Has next page: $hasNext")
 
         val isHorizontal = when (request.data) {
             "live" -> true
