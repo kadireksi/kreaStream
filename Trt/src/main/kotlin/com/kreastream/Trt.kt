@@ -291,7 +291,7 @@ class Trt : MainAPI() {
         val items = when (request.data) {
             "live" -> listOf(
                 newTvSeriesSearchResponse(
-                    name = "TRT TV",
+                    name = "📺 TRT TV",
                     url = dummyTvUrl,
                     type = TvType.TvSeries
                 ) {
@@ -299,7 +299,7 @@ class Trt : MainAPI() {
                     this.year = 1964
                 },
                  newTvSeriesSearchResponse(
-                    name = "TRT Radyo",
+                    name = "📻 TRT Radyo",
                     url = dummyRadioUrl,
                     type = TvType.TvSeries
                 ) {
@@ -337,9 +337,9 @@ class Trt : MainAPI() {
 
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
             return newMovieLoadResponse(
-                name = "TRT Canlı",
+                name = "📺  📻 TRT Canlı",
                 url = url,
-                type = TvType.Live,
+                type = TvType.TvSeries,
                 data = url
             )
         }
