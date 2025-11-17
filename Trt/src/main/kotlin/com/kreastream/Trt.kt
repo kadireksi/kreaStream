@@ -297,7 +297,6 @@ class Trt : MainAPI() {
                             val dataObj = firstData.getJSONObject("data")
                             
                             // Extract series info
-                            val seriesTitle = dataObj.optString("title", "")
                             val seriesDescription = dataObj.optString("description", "")
                             var seriesPoster = dataObj.optString("logo", "")
                             if (seriesPoster.isBlank()) {
@@ -318,12 +317,11 @@ class Trt : MainAPI() {
                                     val fullUrl = "$trtCocukBase$path"
                                     var mainImageUrl = video.optString("mainImageUrl", "")
                                     mainImageUrl = mainImageUrl.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-                                    val publishedDate = video.optString("publishedDate", "")
                                     
                                     // Extract episode number
                                     val num = extractEpisodeNumber(title)
                                     
-                                    rawEpisodes += RawEpisode(title, fullUrl, mainImageUrl, seriesDescription, num)
+                                    rawEpisodes += RawEpisode(title, fullUrl, mainImageUrl.ifBlank { seriesPoster }, seriesDescription, num)
                                     Log.d("TRTÇocuk", "Added raw episode from Nuxt: $title (episode: $num) -> $fullUrl")
                                 }
                             }
@@ -342,7 +340,7 @@ class Trt : MainAPI() {
                                     
                                     val num = extractEpisodeNumber(title)
                                     
-                                    rawEpisodes += RawEpisode(title, fullUrl, mainImage, "", num)
+                                    rawEpisodes += RawEpisode(title, fullUrl, mainImage.ifBlank { seriesPoster }, "", num)
                                     Log.d("TRTÇocuk", "Added raw clip from Nuxt: $title (episode: $num) -> $fullUrl")
                                 }
                             }
@@ -355,16 +353,17 @@ class Trt : MainAPI() {
             
             // Fallback to HTML parsing if no episodes found in Nuxt data
             if (rawEpisodes.isEmpty()) {
-                val episodeSelectors = "a[href*='/video/'], div.vueperslides__track a, div.episode-item a, div.video-item a, a.video-link, article a[href*='/video/'], li a[href*='/video/'], div.card a[href*='/video/'], div.list-item a[href*='/video/']"
+                val episodeSelectors = "a[href*='/video/'], [data-href*='/video/'], div.vueperslides__track a, div.episode-item a, div.video-item a, a.video-link, article a[href*='/video/'], li a[href*='/video/'], div.card a[href*='/video/'], div.list-item a[href*='/video/']"
                 
-                val allEpisodeLinks = doc.select(episodeSelectors)
+                val allEpisodeLinks = doc.select(episodeSelectors).distinctBy { it.attr("href").ifBlank { it.attr("data-href") } }
 
                 Log.d("TRTÇocuk", "Fallback: Found ${allEpisodeLinks.size} potential episode links")
 
                 val tempRawEpisodes = mutableListOf<RawEpisode>()
-                for (a in allEpisodeLinks.distinctBy { it.attr("href") }) {  // Dedup early by href
+                for (a in allEpisodeLinks) {
                     try {
-                        val href = a.attr("href").trim()
+                        var href = a.attr("href").trim()
+                        if (href.isBlank()) href = a.attr("data-href").trim()
                         if (href.isBlank() || !href.contains("/video/")) continue
 
                         val fullHref = if (href.startsWith("http")) href else "$trtCocukBase$href"
@@ -399,10 +398,50 @@ class Trt : MainAPI() {
                 }
                 rawEpisodes += tempRawEpisodes.distinctBy { it.url }
             }
+
+            // Ultimate fallback: Generate sequential episode URLs if still empty
+            if (rawEpisodes.isEmpty()) {
+                val slug = seriesUrl.removePrefix(trtCocukBase).trim('/')
+                if (slug.isNotBlank()) {
+                    var seriesPoster = doc.selectFirst("meta[property=og:image]")?.attr("content") ?: ""
+                    if (seriesPoster.isBlank()) {
+                        seriesPoster = doc.selectFirst("img[alt*=$slug], img[src*=$slug]")?.absUrl("src") ?: ""
+                    }
+                    seriesPoster = seriesPoster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
+
+                    var i = 1
+                    while (i <= 100) {  // Limit to prevent infinite loop
+                        val episodePath = "$slug-$i"
+                        val episodeUrl = "$trtCocukBase/video/$episodePath"
+                        try {
+                            val epResponse = app.get(episodeUrl, timeout = 10)
+                            if (epResponse.code != 200) break
+
+                            val epDoc = epResponse.document
+                            val epTitle = epDoc.selectFirst("h1, title")?.text()?.trim() ?: "$slug $i. Bölüm"
+                            val epPoster = epDoc.selectFirst("meta[property=og:image]")?.attr("content") ?: seriesPoster
+                            val epPosterFixed = epPoster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
+                            val epNum = extractEpisodeNumber(epTitle) ?: i
+
+                            if (epTitle.contains("yok", ignoreCase = true) || epTitle.contains("not found", ignoreCase = true)) break
+
+                            rawEpisodes += RawEpisode(epTitle, episodeUrl, epPosterFixed.ifBlank { null }, "", epNum)
+                            Log.d("TRTÇocuk", "Added generated episode: $epTitle (episode: $epNum) -> $episodeUrl")
+
+                            i++
+                            delay(200)  // Rate limit
+                        } catch (e: Exception) {
+                            Log.e("TRTÇocuk", "Error fetching generated episode $i: ${e.message}")
+                            break
+                        }
+                    }
+                }
+            }
             
-            // Process raw episodes to assign proper numbers
-            val numbered = rawEpisodes.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
-            val unnumbered = rawEpisodes.filter { it.extractedNum == null || it.extractedNum == 0 }
+            // Process raw episodes to assign proper numbers and dedup
+            val uniqueRaw = rawEpisodes.distinctBy { it.url.lowercase() }
+            val numbered = uniqueRaw.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
+            val unnumbered = uniqueRaw.filter { it.extractedNum == null || it.extractedNum == 0 }.sortedBy { it.title }
             
             var nextEpNum = if (numbered.isNotEmpty()) numbered.last().extractedNum!! + 1 else 1
             
@@ -427,6 +466,9 @@ class Trt : MainAPI() {
                 }
                 episodes += ep
             }
+
+            // Sort episodes by number
+            episodes.sortBy { it.episode }
 
         } catch (e: Exception) {
             Log.e("TRTÇocuk", "getTrtCocukEpisodes failed: ${e.message}")
