@@ -46,6 +46,14 @@ class Trt : MainAPI() {
         val description: String = ""
     )
 
+    data class RawEpisode(
+        val title: String,
+        val url: String,
+        val posterUrl: String?,
+        val description: String,
+        val extractedNum: Int?
+    )
+
     private suspend fun getTvChannels(): List<TvChannel> {
         val result = mutableListOf<TvChannel>()
         try {
@@ -107,7 +115,7 @@ class Trt : MainAPI() {
                 name = "TRT Radyo 1",
                 slug = "trt-radyo-1",
                 streamUrl = "https://trt.radyotvonline.net/trt_1.aac",
-                logoUrl = "ttps://cdn-i.pr.trt.com.tr/trtdinle//w480/h360/q70/12467415.jpeg",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle//w480/h360/q70/12467415.jpeg",
                 description = "Haber, kültür ve klasik müzik"
             ),
             RadioChannel(
@@ -190,14 +198,6 @@ class Trt : MainAPI() {
         )
     }
 
-    data class RawEpisode(
-        val title: String,
-        val url: String,
-        val posterUrl: String?,
-        val description: String,
-        val extractedNum: Int?
-    )
-
     private fun extractEpisodeNumber(title: String): Int? {
         return try {
             // Try common episode patterns
@@ -256,12 +256,11 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                //this.data = null // This removes the download button
             }
         }
 
-        return newTvSeriesLoadResponse("TRT TV", dummyTvUrl, TvType.TvSeries, episodes) {
-            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+        return newTvSeriesLoadResponse("📺 TRT TV", dummyTvUrl, TvType.TvSeries, episodes) {
+            this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
             this.plot = "TRT TV canlı yayın. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
             this.year = 1964
         }
@@ -275,12 +274,11 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                //this.data = null // This removes the download button
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
-            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+        return newTvSeriesLoadResponse("📻 TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
+            this.posterUrl = "https://www.trtdinle.com/trt-dinle-fb-share.jpg"
             this.plot = "TRT Radyo canlı yayın. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
             this.year = 1927
         }
@@ -299,8 +297,8 @@ class Trt : MainAPI() {
                     this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
                     this.year = 1964
                 },
-                 newTvSeriesSearchResponse(
-                    name = "📻 TRT Radyo",
+                newTvSeriesSearchResponse(
+                    name = "📻 TRT Radyo", 
                     url = dummyRadioUrl,
                     type = TvType.TvSeries
                 ) {
@@ -325,7 +323,6 @@ class Trt : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
 
-        // TV
         if (url == dummyTvUrl) {
             val channels = getTvChannels()
             return buildLiveTVResponse(channels)
@@ -342,7 +339,9 @@ class Trt : MainAPI() {
                 url = url,
                 type = TvType.TvSeries,
                 data = url
-            )
+            ) {
+                this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+            }
         }
 
         if (url.startsWith("https://www.youtube.com")) {
