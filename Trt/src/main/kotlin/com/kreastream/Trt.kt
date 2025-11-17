@@ -10,7 +10,7 @@ import android.util.Log
 import java.util.Locale
 
 class Trt : MainAPI() {
-    override var mainUrl = "https://www.tabii.com"
+    override var mainUrl = "https://trt1.com.tr"
     override var name = "TRT"
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
@@ -19,6 +19,8 @@ class Trt : MainAPI() {
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url   = "https://www.trt1.com.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
+    private val dummyTvUrl = tabiiUrl
+    private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
 
     override val mainPage = mainPageOf(
         "series"  to "Güncel Diziler",
