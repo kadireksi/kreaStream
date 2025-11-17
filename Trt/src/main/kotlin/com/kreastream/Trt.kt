@@ -256,13 +256,13 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = null
+                this.data = null // This removes the download button
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
+        return newTvSeriesLoadResponse("TRT TV", dummyTvUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT TV Yayınları"
+            this.plot = "TRT TV canlı yayın. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
             this.year = 1964
         }
     }
@@ -275,16 +275,17 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = null
+                this.data = null // This removes the download button
             }
         }
 
         return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT Radyo Yayınları"
+            this.plot = "TRT Radyo canlı yayın. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
             this.year = 1927
         }
     }
+
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
