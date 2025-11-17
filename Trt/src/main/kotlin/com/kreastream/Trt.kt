@@ -226,21 +226,15 @@ class Trt : MainAPI() {
             } else {
                 "$trt1Url/$contentType/$page?archive=$archive&order=title_asc"
             }
-
-            Log.d("TRT_DEBUG", "🔄 Loading $contentType (archive=$archive) page $page from: $url")
             
             val response = app.get(url, timeout = 15)
             val document = response.document
             
-            Log.d("TRT_DEBUG", "📄 Response status: ${response.statusCode}, URL: ${response.url}")
-            
             val items = document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
-            Log.d("TRT_DEBUG", "🔍 Found ${items.size} container elements")
 
             val results = items.mapNotNull { el ->
                 val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
                 if (title == null) {
-                    Log.d("TRT_DEBUG", "❌ No title found in element")
                     return@mapNotNull null
                 }
                 
@@ -254,18 +248,14 @@ class Trt : MainAPI() {
                 poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
                     ?.replace("/q75/", "/q85/")
 
-                Log.d("TRT_DEBUG", "✅ Found item: $title -> $href")
-
                 newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
                     this.posterUrl = poster
                 }
             }
 
-            Log.d("TRT_DEBUG", "🎯 Successfully parsed ${results.size} $contentType items on page $page")
             results
 
         } catch (e: Exception) {
-            Log.e("TRT_DEBUG", "💥 getTrtContent error for $contentType page $page: ${e.message}")
             emptyList()
         }
     }
