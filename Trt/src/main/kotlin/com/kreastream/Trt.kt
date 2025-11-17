@@ -200,7 +200,6 @@ class Trt : MainAPI() {
 
     private fun extractEpisodeNumber(title: String): Int? {
         return try {
-            // Try common episode patterns
             val patterns = listOf(
                 Regex("""(\d{1,4})\s*\.?\s*[Bb]ölüm"""),
                 Regex("""[Bb]ölüm\s*(\d{1,4})"""),
@@ -319,7 +318,6 @@ class Trt : MainAPI() {
             else -> emptyList()
         }
 
-        // Check if there are more pages by trying to load the next page
         val hasNext = when (request.data) {
             "series", "archiveSeries", "programs", "archivePrograms" -> {
                 val nextPageItems = getTrtContent(
@@ -413,10 +411,6 @@ class Trt : MainAPI() {
                                 val extracted = extractEpisodeNumber(epTitle)
 
                                 var episodeUrl = fixTrtUrl(href)
-                                if (slug == "baba-candir" && epTitle.trim().lowercase() == "final") {
-                                    episodeUrl = "https://www.youtube.com/watch?v=baW3qcmcXxU"
-                                }
-
                                 RawEpisode(epTitle, episodeUrl, img, desc, extracted)
                             }
 
