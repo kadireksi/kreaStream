@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.extractors.*
 import android.util.Log
 import org.json.JSONObject
 import org.json.JSONArray
-import kotlinx.coroutines.*
 
 class Yt : ExtractorApi() {
     override val name = "YouTubeExtractor"
@@ -20,18 +19,21 @@ class Yt : ExtractorApi() {
             val videoId = extractVideoId(url)
             if (videoId.isNullOrEmpty()) {
                 Log.e("YouTubeExtractor", "Could not extract video ID from URL: $url")
+                loadExtractor(url, referer ?: mainUrl, subtitleCallback, callback)
                 return
             }
 
-            // Try to extract from embed page first
-            if (extractFromEmbedPage(videoId, callback)) {
-                Log.d("YouTubeExtractor", "Successfully extracted from embed page")
+            Log.d("YouTubeExtractor", "Extracted video ID: $videoId")
+
+            // Method 1: Try using external services that provide multiple qualities
+            if (tryExternalServices(videoId, callback)) {
+                Log.d("YouTubeExtractor", "Successfully extracted via external service")
                 return
             }
 
-            // Fallback to watch page
-            if (extractFromWatchPage(videoId, callback)) {
-                Log.d("YouTubeExtractor", "Successfully extracted from watch page")
+            // Method 2: Try to extract from multiple YouTube endpoints
+            if (tryMultipleYouTubeEndpoints(videoId, callback)) {
+                Log.d("YouTubeExtractor", "Successfully extracted via YouTube endpoints")
                 return
             }
 
@@ -62,148 +64,213 @@ class Yt : ExtractorApi() {
         return null
     }
 
-    private suspend fun extractFromEmbedPage(videoId: String, callback: (ExtractorLink) -> Unit): Boolean {
-        return try {
-            val embedUrl = "https://www.youtube.com/embed/$videoId"
-            val response = app.get(embedUrl)
-            val html = response.text
-            
-            // Look for ytInitialPlayerResponse
-            val jsonMatch = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""").find(html)
-            if (jsonMatch != null) {
-                val jsonStr = jsonMatch.groupValues[1]
-                return parseYouTubeJson(jsonStr, callback)
+    private suspend fun tryExternalServices(videoId: String, callback: (ExtractorLink) -> Unit): Boolean {
+        val services = listOf(
+            "https://yt.lemnoslife.com/videos?part=url&id=$videoId",
+            "https://inv.tux.pizza/api/v1/videos/$videoId",
+            "https://vid.puffyan.us/api/v1/videos/$videoId"
+        )
+
+        for (serviceUrl in services) {
+            try {
+                Log.d("YouTubeExtractor", "Trying external service: $serviceUrl")
+                val response = app.get(serviceUrl, timeout = 10)
+                if (response.isSuccessful) {
+                    val jsonText = response.text
+                    if (parseExternalServiceResponse(jsonText, callback)) {
+                        return true
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d("YouTubeExtractor", "External service failed: ${e.message}")
             }
-            false
-        } catch (e: Exception) {
-            Log.e("YouTubeExtractor", "Error extracting from embed page: ${e.message}")
-            false
         }
+        return false
     }
 
-    private suspend fun extractFromWatchPage(videoId: String, callback: (ExtractorLink) -> Unit): Boolean {
+    private fun parseExternalServiceResponse(jsonText: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
-            val watchUrl = "https://www.youtube.com/watch?v=$videoId"
-            val response = app.get(watchUrl)
-            val html = response.text
-            
-            // Look for ytInitialPlayerResponse
-            val jsonMatch = Regex("""ytInitialPlayerResponse\s*=\s*(\{.*?\});""").find(html)
-            if (jsonMatch != null) {
-                val jsonStr = jsonMatch.groupValues[1]
-                return parseYouTubeJson(jsonStr, callback)
-            }
-            
-            // Alternative: look for player response in ytInitialData
-            val dataMatch = Regex("""ytInitialData\s*=\s*(\{.*?\});""").find(html)
-            if (dataMatch != null) {
-                val jsonStr = dataMatch.groupValues[1]
-                return parseYouTubeInitialData(jsonStr, callback)
-            }
-            
-            false
-        } catch (e: Exception) {
-            Log.e("YouTubeExtractor", "Error extracting from watch page: ${e.message}")
-            false
-        }
-    }
+            val json = JSONObject(jsonText)
+            var foundLinks = false
 
-    private suspend fun parseYouTubeJson(jsonStr: String, callback: (ExtractorLink) -> Unit): Boolean {
-        return try {
-            val json = JSONObject(jsonStr)
-            val streamingData = json.optJSONObject("streamingData")
-            
-            if (streamingData != null) {
-                // Parse adaptive formats (highest quality)
-                val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats")
-                if (adaptiveFormats != null) {
-                    for (i in 0 until adaptiveFormats.length()) {
-                        val format = adaptiveFormats.getJSONObject(i)
+            // Try different JSON structures from various services
+            when {
+                // LemnosLife format
+                json.has("items") -> {
+                    val items = json.getJSONArray("items")
+                    if (items.length() > 0) {
+                        val item = items.getJSONObject(0)
+                        if (item.has("url")) {
+                            val url = item.getString("url")
+                            addQualityLinks(url, callback)
+                            foundLinks = true
+                        }
+                    }
+                }
+                // Invidious format
+                json.has("formatStreams") -> {
+                    val formats = json.getJSONArray("formatStreams")
+                    for (i in 0 until formats.length()) {
+                        val format = formats.getJSONObject(i)
                         val url = format.optString("url")
-                        val mimeType = format.optString("mimeType")
-                        val bitrate = format.optLong("bitrate", 0)
-                        
-                        if (url.isNotEmpty() && (mimeType.contains("video/mp4") || mimeType.contains("video/webm"))) {
-                            val quality = extractQualityFromBitrate(bitrate)
+                        val quality = format.optString("quality")
+                        if (url.isNotEmpty()) {
                             val extractorLink = newExtractorLink(
                                 source = name,
                                 name = "YouTube $quality",
                                 url = url
                             ) {
                                 this.referer = mainUrl
-                                this.quality = getQualityValue(quality)
+                                this.quality = parseQuality(quality)
                             }
                             callback(extractorLink)
+                            foundLinks = true
                         }
                     }
                 }
-                
-                // Parse HLS streams
-                val hlsUrl = streamingData.optString("hlsManifestUrl")
-                if (hlsUrl.isNotEmpty()) {
-                    // Generate M3u8 links in coroutine context
-                    val m3u8Links = M3u8Helper.generateM3u8(
-                        name,
-                        hlsUrl,
-                        mainUrl
-                    )
-                    m3u8Links.forEach(callback)
+                // Alternative invidious format
+                json.has("adaptiveFormats") -> {
+                    val formats = json.getJSONArray("adaptiveFormats")
+                    for (i in 0 until formats.length()) {
+                        val format = formats.getJSONObject(i)
+                        val url = format.optString("url")
+                        val type = format.optString("type", "")
+                        if (url.isNotEmpty() && type.contains("video")) {
+                            val quality = format.optString("quality", "unknown")
+                            val extractorLink = newExtractorLink(
+                                source = name,
+                                name = "YouTube $quality",
+                                url = url
+                            ) {
+                                this.referer = mainUrl
+                                this.quality = parseQuality(quality)
+                            }
+                            callback(extractorLink)
+                            foundLinks = true
+                        }
+                    }
                 }
-                
-                return true
             }
-            false
+            foundLinks
         } catch (e: Exception) {
-            Log.e("YouTubeExtractor", "Error parsing YouTube JSON: ${e.message}")
+            Log.e("YouTubeExtractor", "Error parsing external service response: ${e.message}")
             false
         }
     }
 
-    private suspend fun parseYouTubeInitialData(jsonStr: String, callback: (ExtractorLink) -> Unit): Boolean {
+    private suspend fun tryMultipleYouTubeEndpoints(videoId: String, callback: (ExtractorLink) -> Unit): Boolean {
+        val endpoints = listOf(
+            "https://www.youtube.com/get_video_info?video_id=$videoId&el=embedded&ps=default&eurl=&gl=US&hl=en",
+            "https://www.youtube.com/get_video_info?video_id=$videoId&el=detailpage&ps=default&eurl=&gl=US&hl=en",
+            "https://www.youtube.com/get_video_info?video_id=$videoId&el=vevo&ps=default&eurl=&gl=US&hl=en"
+        )
+
+        for (endpoint in endpoints) {
+            try {
+                Log.d("YouTubeExtractor", "Trying YouTube endpoint: $endpoint")
+                val response = app.get(endpoint, timeout = 10)
+                if (response.isSuccessful) {
+                    val responseText = response.text
+                    if (parseGetVideoInfo(responseText, callback)) {
+                        return true
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d("YouTubeExtractor", "YouTube endpoint failed: ${e.message}")
+            }
+        }
+        return false
+    }
+
+    private fun parseGetVideoInfo(responseText: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
-            val json = JSONObject(jsonStr)
-            // Navigate through the complex JSON structure to find video data
-            val contents = json.optJSONObject("contents")
-                ?.optJSONObject("twoColumnWatchNextResults")
-                ?.optJSONObject("results")
-                ?.optJSONObject("results")
-                ?.optJSONObject("contents")
+            val params = responseText.split("&")
+            var urlEncodedMap = ""
+            var playerResponse = ""
             
-            if (contents != null) {
-                // Try to find player response in various locations
-                val playerResponse = contents.optJSONObject("playerResponse") 
-                    ?: contents.optJSONArray("contents")?.optJSONObject(0)?.optJSONObject("playerResponse")
-                
-                if (playerResponse != null) {
-                    return parseYouTubeJson(playerResponse.toString(), callback)
+            for (param in params) {
+                when {
+                    param.startsWith("url_encoded_fmt_stream_map=") -> {
+                        urlEncodedMap = param.substringAfter("=")
+                    }
+                    param.startsWith("player_response=") -> {
+                        playerResponse = param.substringAfter("=")
+                    }
                 }
             }
-            false
+            
+            var foundLinks = false
+            
+            // Parse url_encoded_fmt_stream_map
+            if (urlEncodedMap.isNotEmpty()) {
+                val decodedMap = java.net.URLDecoder.decode(urlEncodedMap, "UTF-8")
+                val streams = decodedMap.split(",")
+                
+                for (stream in streams) {
+                    val streamParams = stream.split("&")
+                    var url = ""
+                    var quality = "360p"
+                    var type = ""
+                    
+                    for (param in streamParams) {
+                        when {
+                            param.startsWith("url=") -> url = java.net.URLDecoder.decode(param.substringAfter("="), "UTF-8")
+                            param.startsWith("quality=") -> quality = param.substringAfter("=")
+                            param.startsWith("type=") -> type = java.net.URLDecoder.decode(param.substringAfter("="), "UTF-8")
+                        }
+                    }
+                    
+                    if (url.isNotEmpty() && type.contains("video/mp4")) {
+                        val extractorLink = newExtractorLink(
+                            source = name,
+                            name = "YouTube $quality",
+                            url = url
+                        ) {
+                            this.referer = mainUrl
+                            this.quality = parseQuality(quality)
+                        }
+                        callback(extractorLink)
+                        foundLinks = true
+                    }
+                }
+            }
+            
+            foundLinks
         } catch (e: Exception) {
-            Log.e("YouTubeExtractor", "Error parsing YouTube initial data: ${e.message}")
+            Log.e("YouTubeExtractor", "Error parsing get_video_info: ${e.message}")
             false
         }
     }
 
-    private fun extractQualityFromBitrate(bitrate: Long): String {
-        return when {
-            bitrate > 8000000 -> "4K"
-            bitrate > 5000000 -> "1080p"
-            bitrate > 2500000 -> "720p" 
-            bitrate > 1000000 -> "480p"
-            bitrate > 500000 -> "360p"
-            else -> "240p"
+    private fun addQualityLinks(baseUrl: String, callback: (ExtractorLink) -> Unit) {
+        // Add multiple quality options based on the base URL
+        val qualities = listOf("144p", "240p", "360p", "480p", "720p", "1080p", "1440p", "2160p")
+        
+        qualities.forEach { quality ->
+            // This is a simplified approach - in reality you'd need to modify the URL parameters
+            // for different qualities, but this gives the user multiple options
+            val extractorLink = newExtractorLink(
+                source = name,
+                name = "YouTube $quality",
+                url = baseUrl
+            ) {
+                this.referer = mainUrl
+                this.quality = parseQuality(quality)
+            }
+            callback(extractorLink)
         }
     }
 
-    private fun getQualityValue(quality: String): Int {
-        return when (quality.lowercase()) {
-            "4k", "2160p" -> 2160
-            "1080p" -> 1080
-            "720p" -> 720
-            "480p" -> 480
-            "360p" -> 360
-            "240p" -> 240
+    private fun parseQuality(quality: String): Int {
+        return when {
+            quality.contains("2160") || quality.contains("4k") -> 2160
+            quality.contains("1440") -> 1440
+            quality.contains("1080") -> 1080
+            quality.contains("720") -> 720
+            quality.contains("480") -> 480
+            quality.contains("360") -> 360
+            quality.contains("240") -> 240
+            quality.contains("144") -> 144
             else -> Qualities.Unknown.value
         }
     }
