@@ -256,7 +256,7 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl
+                this.data = null
             }
         }
 
@@ -275,7 +275,7 @@ class Trt : MainAPI() {
                 episode = i + 1
                 season = 1
                 description = ch.description
-                this.data = ch.streamUrl
+                this.data = null
             }
         }
 
