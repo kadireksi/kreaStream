@@ -21,12 +21,11 @@ class Trt : MainAPI() {
     private val liveBase  = "$tabiiUrl/watch/live"
 
     override val mainPage = mainPageOf(
-        "tv" to "TRT TV Kanalları",
-        "radio" to "TRT Radyo Kanalları",
         "series"  to "Güncel Diziler",
         "archiveSeries" to "Arşiv Diziler",
         "programs" to "Programlar",
-        "archivePrograms" to "Arşiv Programlar"
+        "archivePrograms" to "Arşiv Programlar",
+        "live" to "TRT TV & Radyo",
     )
 
     data class TvChannel(
@@ -252,11 +251,10 @@ class Trt : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val homePageLists = mutableListOf<HomePageList>()
         when (request.data) {
-            "tv" -> {
+            "live" -> {
                 val tvItem = newTvSeriesSearchResponse("TRT TV Kanalları", "trt/tv")
                 homePageLists += HomePageList(request.name, listOf(tvItem))
-            }
-            "radio" -> {
+
                 val radioItem = newTvSeriesSearchResponse("TRT Radyo Kanalları", "trt/radio")
                 homePageLists += HomePageList(request.name, listOf(radioItem))
             }
@@ -346,93 +344,98 @@ class Trt : MainAPI() {
             }
         }
 
-        // TRT1 Series/Programs
-        try {
-            val doc = app.get(url, timeout = 15).document
-            val title = doc.selectFirst("h1")?.text()?.trim()
-                ?: throw ErrorLoadingException("Başlık bulunamadı")
-            val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
-            var poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
-            poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                ?.replace("/q75/", "/q85/")
+        // TRT1 Series/Programs - only process actual TRT1 URLs
+        if (url.contains(trt1Url)) {
+            try {
+                val doc = app.get(url, timeout = 15).document
+                val title = doc.selectFirst("h1")?.text()?.trim()
+                    ?: throw ErrorLoadingException("Başlık bulunamadı")
+                val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
+                var poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
+                poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                    ?.replace("/q75/", "/q85/")
 
-            val basePath = if (url.contains("/diziler/")) "diziler" else "programlar"
-            val slug = url.removePrefix("$trt1Url/$basePath/").substringBefore("/")
-            val episodesPath = "bolum"
-            val rawEpisodes = mutableListOf<RawEpisode>()
-            var pageNum = 1
-            var more = true
+                val basePath = if (url.contains("/diziler/")) "diziler" else "programlar"
+                val slug = url.removePrefix("$trt1Url/$basePath/").substringBefore("/")
+                val episodesPath = "bolum"
+                val rawEpisodes = mutableListOf<RawEpisode>()
+                var pageNum = 1
+                var more = true
 
-            while (more && pageNum <= 30) {
-                try {
-                    val epUrl = if (pageNum == 1) {
-                        "$trt1Url/$basePath/$slug/$episodesPath"
-                    } else {
-                        "$trt1Url/$basePath/$slug/$episodesPath/$pageNum"
-                    }
-                    val epDoc = app.get(epUrl, timeout = 10).document
-                    val pageRaws = epDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
-                        .mapNotNull { el ->
-                            val epTitle = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
-                                ?: return@mapNotNull null
-                            val href = el.attr("href")
-                            var img = el.selectFirst("img")?.absUrl("src")
-                            img = img?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                                ?.replace("/q75/", "/q85/")
-                            val desc = el.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
-                            val extracted = extractEpisodeNumber(epTitle)
+                while (more && pageNum <= 30) {
+                    try {
+                        val epUrl = if (pageNum == 1) {
+                            "$trt1Url/$basePath/$slug/$episodesPath"
+                        } else {
+                            "$trt1Url/$basePath/$slug/$episodesPath/$pageNum"
+                        }
+                        val epDoc = app.get(epUrl, timeout = 10).document
+                        val pageRaws = epDoc.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
+                            .mapNotNull { el ->
+                                val epTitle = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
+                                    ?: return@mapNotNull null
+                                val href = el.attr("href")
+                                var img = el.selectFirst("img")?.absUrl("src")
+                                img = img?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                                    ?.replace("/q75/", "/q85/")
+                                val desc = el.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
+                                val extracted = extractEpisodeNumber(epTitle)
 
-                            var episodeUrl = fixTrtUrl(href)
-                            if (slug == "baba-candir" && epTitle.trim().lowercase() == "final") {
-                                episodeUrl = "https://www.youtube.com/watch?v=baW3qcmcXxU"
+                                var episodeUrl = fixTrtUrl(href)
+                                if (slug == "baba-candir" && epTitle.trim().lowercase() == "final") {
+                                    episodeUrl = "https://www.youtube.com/watch?v=baW3qcmcXxU"
+                                }
+
+                                RawEpisode(epTitle, episodeUrl, img, desc, extracted)
                             }
 
-                            RawEpisode(epTitle, episodeUrl, img, desc, extracted)
-                        }
-
-                    if (pageRaws.isNotEmpty()) {
-                        rawEpisodes += pageRaws
-                        pageNum++
-                        delay(100)
-                    } else more = false
-                } catch (e: Exception) { 
-                    more = false 
-                    Log.e("TRT", "Error loading episodes page $pageNum: ${e.message}")
+                        if (pageRaws.isNotEmpty()) {
+                            rawEpisodes += pageRaws
+                            pageNum++
+                            delay(100)
+                        } else more = false
+                    } catch (e: Exception) { 
+                        more = false 
+                        Log.e("TRT", "Error loading episodes page $pageNum: ${e.message}")
+                    }
                 }
-            }
 
-            // Process raw episodes to assign proper numbers
-            val numbered = rawEpisodes.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
-            val unnumbered = rawEpisodes.filter { it.extractedNum == null || it.extractedNum == 0 }
-            
-            var nextEpNum = if (numbered.isNotEmpty()) numbered.last().extractedNum!! + 1 else 1
-            
-            val episodes = mutableListOf<Episode>()
-            for (raw in numbered) {
-                episodes += newEpisode(raw.url) {
-                    name = raw.title
-                    this.posterUrl = raw.posterUrl
-                    episode = raw.extractedNum!!
-                    description = raw.description
+                // Process raw episodes to assign proper numbers
+                val numbered = rawEpisodes.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
+                val unnumbered = rawEpisodes.filter { it.extractedNum == null || it.extractedNum == 0 }
+                
+                var nextEpNum = if (numbered.isNotEmpty()) numbered.last().extractedNum!! + 1 else 1
+                
+                val episodes = mutableListOf<Episode>()
+                for (raw in numbered) {
+                    episodes += newEpisode(raw.url) {
+                        name = raw.title
+                        this.posterUrl = raw.posterUrl
+                        episode = raw.extractedNum!!
+                        description = raw.description
+                    }
                 }
-            }
-            
-            for (raw in unnumbered) {
-                episodes += newEpisode(raw.url) {
-                    name = raw.title
-                    this.posterUrl = raw.posterUrl
-                    episode = nextEpNum++
-                    description = raw.description
+                
+                for (raw in unnumbered) {
+                    episodes += newEpisode(raw.url) {
+                        name = raw.title
+                        this.posterUrl = raw.posterUrl
+                        episode = nextEpNum++
+                        description = raw.description
+                    }
                 }
-            }
 
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
-                this.plot = plot
+                return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                    this.posterUrl = poster
+                    this.plot = plot
+                }
+            } catch (e: Exception) {
+                throw ErrorLoadingException("Dizi yüklenemedi: ${e.message}")
             }
-        } catch (e: Exception) {
-            throw ErrorLoadingException("Dizi yüklenemedi: ${e.message}")
         }
+
+        // If we reach here, it's an unknown URL
+        throw ErrorLoadingException("Geçersiz URL: $url")
     }
 
     private fun extractM3u8FromJson(jsonStr: String): String? {
