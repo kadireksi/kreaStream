@@ -603,6 +603,16 @@ class Trt : MainAPI() {
             )
         }
 
+        // Handle direct YouTube URLs for episodes
+        if (url.startsWith("https://www.youtube.com")) {
+            return newMovieLoadResponse(
+                name = "TRT (YouTube)",
+                url = url,
+                type = TvType.TvSeries,
+                data = url
+            )
+        }
+
         // In the load function, update the TRT Çocuk series section:
         if (url.contains("trtcocuk.net.tr") && !url.contains("/video")) {
             try {
@@ -710,7 +720,12 @@ class Trt : MainAPI() {
                             val desc = el.selectFirst("p.card_card-description__0PSTi")?.text()?.trim() ?: ""
                             val extracted = extractEpisodeNumber(epTitle)
 
-                            RawEpisode(epTitle, fixTrtUrl(href), img, desc, extracted)
+                            var episodeUrl = fixTrtUrl(href)
+                            if (slug == "baba-candir" && epTitle.trim().lowercase() == "final") {
+                                episodeUrl = "https://www.youtube.com/watch?v=baW3qcmcXxU"
+                            }
+
+                            RawEpisode(epTitle, episodeUrl, img, desc, extracted)
                         }
 
                     if (pageRaws.isNotEmpty()) {
@@ -825,6 +840,12 @@ class Trt : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Handle direct YouTube URLs
+        if (data.startsWith("https://www.youtube.com/watch?v=")) {
+            loadExtractor(data, mainUrl, subtitleCallback, callback)
+            return true
+        }
+
         // Handle regular m3u8 streams (non-live)
         if (data.contains(".m3u8", ignoreCase = true)) {
             generateQualityVariants(data).forEach { u ->
