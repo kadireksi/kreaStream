@@ -107,7 +107,7 @@ class Trt : MainAPI() {
                 name = "TRT Radyo 1",
                 slug = "trt-radyo-1",
                 streamUrl = "https://trt.radyotvonline.net/trt_1.aac",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467415.jpeg",
+                logoUrl = "ttps://cdn-i.pr.trt.com.tr/trtdinle//w480/h360/q70/12467415.jpeg",
                 description = "Haber, kültür ve klasik müzik"
             ),
             RadioChannel(
@@ -125,6 +125,13 @@ class Trt : MainAPI() {
                 description = "Türk Halk Müziği"
             ),
             RadioChannel(
+                name = "Memleketim FM",
+                slug = "memleketim-fm",
+                streamUrl = "https://radio-trtmemleketimfm.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467512.jpeg",
+                description = "24 Saat Kesintisiz Müzik"
+            ),
+            RadioChannel(
                 name = "TRT Radyo Haber",
                 slug = "trt-radyo-haber",
                 streamUrl = "https://trt.radyotvonline.net/trt_haber.aac",
@@ -135,28 +142,21 @@ class Trt : MainAPI() {
                 name = "TRT Radyo 3",
                 slug = "trt-radyo-3",
                 streamUrl = "https://rd-trtradyo3.medya.trt.com.tr/master_128.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
                 description = "Klasik, caz, rock ve dünya müziği"
             ),
             RadioChannel(
-                name = "TRT Kurdi",
-                slug = "trt-kurdi",
-                streamUrl = "https://radio-trtradyo6.medya.trt.com.tr/master_128.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467508.jpeg",
-                description = "Kürtçe yayın"
-            ),
-            RadioChannel(
-                name = "TRT Arabi",
-                slug = "trt-arabi",
-                streamUrl = "https://radio-trtarabi.medya.trt.com.tr/master_128.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467526.jpeg",
-                description = "Arapça yayın"
+                name = "Erzurum Radyosu",
+                slug = "erzurum-radyosu",
+                streamUrl = "https://radio-trterzurum.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
+                description = "Bölgesel yayın"
             ),
             RadioChannel(
                 name = "Antalya Radyosu",
                 slug = "antalya-radyosu",
                 streamUrl = "https://radio-trtantalya.medya.trt.com.tr/master_128.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467521.jpeg",
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
@@ -167,17 +167,10 @@ class Trt : MainAPI() {
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
-                name = "Erzurum Radyosu",
-                slug = "erzurum-radyosu",
-                streamUrl = "https://radio-trterzurum.medya.trt.com.tr/master_128.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
-                description = "Bölgesel yayın"
-            ),
-            RadioChannel(
                 name = "Trabzon Radyosu",
                 slug = "trabzon-radyosu",
                 streamUrl = "https://radio-trttrabzon.medya.trt.com.tr/master_128.m3u8",
-                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467523.jpeg",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
                 description = "Bölgesel yayın"
             ),
             RadioChannel(
@@ -186,6 +179,13 @@ class Trt : MainAPI() {
                 streamUrl = "https://radio-trtgap.medya.trt.com.tr/master_128.m3u8",
                 logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467503.jpeg",
                 description = "Bölgesel yayın"
+            ),
+            RadioChannel(
+                name = "TRT Kurdi",
+                slug = "trt-kurdi",
+                streamUrl = "https://radio-trtradyo6.medya.trt.com.tr/master_128.m3u8",
+                logoUrl = "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467484.jpeg",
+                description = "Kürtçe Müzik Yayını"
             )
         )
     }
@@ -260,9 +260,9 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
+        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.Live, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT TV canlı yayın"
+            this.plot = "TRT TV Yayınları"
             this.year = 1964
         }
     }
@@ -279,9 +279,9 @@ class Trt : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
+        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.Live, episodes) {
             this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
-            this.plot = "TRT Radyo canlı yayın"
+            this.plot = "TRT Radyo Yayınları"
             this.year = 1927
         }
     }
@@ -303,7 +303,7 @@ class Trt : MainAPI() {
                     url = dummyRadioUrl,
                     type = TvType.Live
                 ) {
-                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
+                    this.posterUrl = "https://www.trtdinle.com/trt-dinle-fb-share.jpg"
                     this.year = 1927
                 }
             )
