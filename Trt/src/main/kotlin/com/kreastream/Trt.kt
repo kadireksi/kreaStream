@@ -339,7 +339,7 @@ class Trt : MainAPI() {
             return newMovieLoadResponse(
                 name = "TRT Canlı",
                 url = url,
-                type = TvType.TvSeries,
+                type = TvType.Live,
                 data = url
             )
         }
