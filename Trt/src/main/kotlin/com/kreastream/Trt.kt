@@ -253,26 +253,12 @@ class Trt : MainAPI() {
         val homePageLists = mutableListOf<HomePageList>()
         when (request.data) {
             "tv" -> {
-                val tvChannels = getTvChannels()
-                val tvItems = tvChannels.map { ch ->
-                    newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
-                        this.posterUrl = ch.logoUrl
-                    }
-                }
-                if (tvItems.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, tvItems)
-                }
+                val tvItem = newTvSeriesSearchResponse("TRT TV Kanalları", "trt/tv")
+                homePageLists += HomePageList(request.name, listOf(tvItem))
             }
             "radio" -> {
-                val radioChannels = getRadioChannels()
-                val radioItems = radioChannels.map { ch ->
-                    newMovieSearchResponse(ch.name, ch.streamUrl, TvType.Live) {
-                        this.posterUrl = ch.logoUrl
-                    }
-                }
-                if (radioItems.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, radioItems)
-                }
+                val radioItem = newTvSeriesSearchResponse("TRT Radyo Kanalları", "trt/radio")
+                homePageLists += HomePageList(request.name, listOf(radioItem))
             }
             "series" -> {
                 val items = getTrtContent("diziler", archive = false, page = page)
