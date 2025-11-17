@@ -3,11 +3,10 @@ package com.kreastream
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.extractors.*
-import org.jsoup.Jsoup
 import android.util.Log
 import org.json.JSONObject
 import org.json.JSONArray
-import java.net.URLDecoder
+import kotlinx.coroutines.*
 
 class Yt : ExtractorApi() {
     override val name = "YouTubeExtractor"
@@ -109,7 +108,7 @@ class Yt : ExtractorApi() {
         }
     }
 
-    private fun parseYouTubeJson(jsonStr: String, callback: (ExtractorLink) -> Unit): Boolean {
+    private suspend fun parseYouTubeJson(jsonStr: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
             val json = JSONObject(jsonStr)
             val streamingData = json.optJSONObject("streamingData")
@@ -142,14 +141,13 @@ class Yt : ExtractorApi() {
                 // Parse HLS streams
                 val hlsUrl = streamingData.optString("hlsManifestUrl")
                 if (hlsUrl.isNotEmpty()) {
-                    // Use coroutine scope for M3u8Helper
-                    kotlinx.coroutines.GlobalScope.launch {
-                        M3u8Helper.generateM3u8(
-                            name,
-                            hlsUrl,
-                            mainUrl
-                        ).forEach(callback)
-                    }
+                    // Generate M3u8 links in coroutine context
+                    val m3u8Links = M3u8Helper.generateM3u8(
+                        name,
+                        hlsUrl,
+                        mainUrl
+                    )
+                    m3u8Links.forEach(callback)
                 }
                 
                 return true
@@ -161,7 +159,7 @@ class Yt : ExtractorApi() {
         }
     }
 
-    private fun parseYouTubeInitialData(jsonStr: String, callback: (ExtractorLink) -> Unit): Boolean {
+    private suspend fun parseYouTubeInitialData(jsonStr: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
             val json = JSONObject(jsonStr)
             // Navigate through the complex JSON structure to find video data
