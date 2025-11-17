@@ -877,24 +877,9 @@ class Trt : MainAPI() {
 
         // TRT1 series search
         try {
-            val sUrl = "$trt1Url/arama/$query?contenttype=series"
-            app.get(sUrl, timeout = 10).document
-                .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
-                .mapNotNull { el ->
-                    val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
-                        ?: return@mapNotNull null
-                    val href = el.attr("href")
-                    if (!href.contains("/diziler/")) return@mapNotNull null
-                    var poster = el.selectFirst("img")?.absUrl("src")
-                    poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                        ?.replace("/q75/", "/q85/")
-
-                    newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
-                        this.posterUrl = poster
-                    }
-                }.forEach { out += it }
+            getTrtSeries().filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
         } catch (e: Exception) {
-            Log.e("TRT", "TRT1 series search error: ${e.message}")
+            Log.e("TRT", "TRT1 search error: ${e.message}")
         }
 
         return out
