@@ -88,7 +88,7 @@ class Yt : ExtractorApi() {
         return false
     }
 
-    private fun parseExternalServiceResponse(jsonText: String, callback: (ExtractorLink) -> Unit): Boolean {
+    private suspend fun parseExternalServiceResponse(jsonText: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
             val json = JSONObject(jsonText)
             var foundLinks = false
@@ -182,7 +182,7 @@ class Yt : ExtractorApi() {
         return false
     }
 
-    private fun parseGetVideoInfo(responseText: String, callback: (ExtractorLink) -> Unit): Boolean {
+    private suspend fun parseGetVideoInfo(responseText: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
             val params = responseText.split("&")
             var urlEncodedMap = ""
@@ -242,7 +242,7 @@ class Yt : ExtractorApi() {
         }
     }
 
-    private fun addQualityLinks(baseUrl: String, callback: (ExtractorLink) -> Unit) {
+    private suspend fun addQualityLinks(baseUrl: String, callback: (ExtractorLink) -> Unit) {
         // Add multiple quality options based on the base URL
         val qualities = listOf("144p", "240p", "360p", "480p", "720p", "1080p", "1440p", "2160p")
         
