@@ -288,7 +288,7 @@ class Trt : MainAPI() {
 
         val hasNext = request.data in listOf("series", "archiveSeries", "programs", "archivePrograms") && homePageLists.isNotEmpty()
 
-        return newHomePageResponse(homePageLists, hasNext = hasNext)
+        return newHomePageResponse(homePageLists)
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -515,8 +515,7 @@ class Trt : MainAPI() {
                 source = name,
                 streamUrl = data,
                 referer = tabiiUrl,
-                headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl),
-                subtitleCallback = subtitleCallback
+                headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
             ).forEach(callback)
             return true
         } else if (data.endsWith(".aac", ignoreCase = true)) {
@@ -552,8 +551,7 @@ class Trt : MainAPI() {
                                 headers = mapOf(
                                     "Referer" to trt1Url,
                                     "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                                ),
-                                subtitleCallback = subtitleCallback
+                                )
                             ).forEach(callback)
                             return true
                         }
@@ -571,8 +569,7 @@ class Trt : MainAPI() {
                             source = name,
                             streamUrl = found,
                             referer = trt1Url,
-                            headers = mapOf("Referer" to trt1Url),
-                            subtitleCallback = subtitleCallback
+                            headers = mapOf("Referer" to trt1Url)
                         ).forEach(callback)
                         return true
                     }
