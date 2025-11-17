@@ -246,18 +246,66 @@ class Trt : MainAPI() {
         }
     }
     
+    private suspend fun buildLiveTVResponse(channels: List<TvChannel>): LoadResponse {
+        val episodes = channels.mapIndexed { i, ch ->
+            newEpisode(ch.streamUrl) {
+                name = ch.name
+                posterUrl = ch.logoUrl
+                episode = i + 1
+                season = 1
+                description = ch.description
+                this.data = ch.streamUrl
+            }
+        }
+
+        return newTvSeriesLoadResponse("TRT Tv", dummyTvUrl, TvType.TvSeries, episodes) {
+            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+            this.plot = "TRT TV canlı yayın"
+            this.year = 1964
+        }
+    }
+
+    private suspend fun buildLiveRadioResponse(channels: List<RadioChannel>): LoadResponse {
+        val episodes = channels.mapIndexed { i, ch ->
+            newEpisode(ch.streamUrl) {
+                name = ch.name
+                posterUrl = ch.logoUrl
+                episode = i + 1
+                season = 1
+                description = ch.description
+                this.data = ch.streamUrl
+            }
+        }
+
+        return newTvSeriesLoadResponse("TRT Radyo", dummyRadioUrl, TvType.TvSeries, episodes) {
+            this.posterUrl = "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png"
+            this.plot = "TRT Radyo canlı yayın"
+            this.year = 1927
+        }
+    }
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val homePageLists = mutableListOf<HomePageList>()
         when (request.data) {
-            "live" -> {
-                val tvItem = newTvSeriesSearchResponse("TRT TV Kanalları", "trt/tv")
-                homePageLists += HomePageList(request.name, listOf(tvItem))
-
-                val radioItem = newTvSeriesSearchResponse("TRT Radyo Kanalları", "trt/radio")
-                homePageLists += HomePageList(request.name, listOf(radioItem))
-            }
+            "live" -> listOf(
+                newTvSeriesSearchResponse(
+                    name = "TRT TV",
+                    url = dummyTvUrl,
+                    type = TvType.Live
+                ) {
+                    this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+                    this.year = 1964
+                },
+                 newTvSeriesSearchResponse(
+                    name = "TRT Radyo",
+                    url = dummyRadioUrl,
+                    type = TvType.Live
+                ) {
+                    this.posterUrl = "https://port-rotf.pr.trt.com.tr/r/trtdinle//w480/h360/q70/12530507_0-0-2048-1536.jpeg"
+                    this.year = 1927
+                }
+            )
             "series" -> {
                 val items = getTrtContent("diziler", archive = false, page = page)
                 if (items.isNotEmpty()) {
@@ -288,7 +336,18 @@ class Trt : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // Direct m3u8 stream
+
+        // TV
+        if (url == dummyTvUrl) {
+            val channels = getTvChannels()
+            return buildLiveTVResponse(channels)
+        }
+
+        if (url == dummyRadioUrl) {
+            val channels = getRadioChannels()
+            return buildLiveRadioResponse(channels)
+        }
+
         if (url.contains(".m3u8", ignoreCase = true) || url.contains(".aac", ignoreCase = true)) {
             return newMovieLoadResponse(
                 name = "TRT Canlı",
@@ -298,7 +357,6 @@ class Trt : MainAPI() {
             )
         }
 
-        // Handle direct YouTube URLs for episodes
         if (url.startsWith("https://www.youtube.com")) {
             return newMovieLoadResponse(
                 name = "TRT (YouTube)",
@@ -308,43 +366,6 @@ class Trt : MainAPI() {
             )
         }
 
-        // TRT TV Channels as episodes for channel surfing
-        if (url == "trt/tv") {
-            val tvChannels = getTvChannels()
-            val episodes = tvChannels.mapIndexed { index, ch ->
-                newEpisode(ch.streamUrl) {
-                    name = ch.name
-                    this.posterUrl = ch.logoUrl
-                    this.description = ch.description
-                    this.episode = index + 1
-                    this.season = 1
-                }
-            }
-            return newTvSeriesLoadResponse("TRT TV Kanalları", url, TvType.TvSeries, episodes) {
-                this.posterUrl = tvChannels.firstOrNull()?.logoUrl ?: ""
-                this.plot = "TRT TV kanallarını izleyin. Kanallar arasında geçiş yapmak için bölümler listesini kullanın."
-            }
-        }
-
-        // TRT Radio Channels as episodes for channel surfing
-        if (url == "trt/radio") {
-            val radioChannels = getRadioChannels()
-            val episodes = radioChannels.mapIndexed { index, ch ->
-                newEpisode(ch.streamUrl) {
-                    name = ch.name
-                    this.posterUrl = ch.logoUrl
-                    this.description = ch.description
-                    this.episode = index + 1
-                    this.season = 1
-                }
-            }
-            return newTvSeriesLoadResponse("TRT Radyo Kanalları", url, TvType.TvSeries, episodes) {
-                this.posterUrl = radioChannels.firstOrNull()?.logoUrl ?: ""
-                this.plot = "TRT Radyo kanallarını dinleyin. Kanallar arasında geçiş yapmak için bölümler listesini kullanın."
-            }
-        }
-
-        // TRT1 Series/Programs - only process actual TRT1 URLs
         if (url.contains(trt1Url)) {
             try {
                 val doc = app.get(url, timeout = 15).document
@@ -619,13 +640,43 @@ class Trt : MainAPI() {
                 out += sr
             }
 
-        // TRT1 series and programs search
-        try {
-            getTrtContent("diziler").filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
-            getTrtContent("programlar").filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
-        } catch (e: Exception) {
-            Log.e("TRT", "TRT1 search error: ${e.message}")
-        }
+          try {
+            val sUrl = "$trt1Url/arama/$query?contenttype=series"
+            app.get(sUrl, timeout = 10).document
+                .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
+                .mapNotNull { el ->
+                    val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
+                        ?: return@mapNotNull null
+                    val href = el.attr("href")
+                    if (!href.contains("/diziler/")) return@mapNotNull null
+                    var poster = el.selectFirst("img")?.absUrl("src")
+                    poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                        ?.replace("/q75/", "/q85/")
+
+                    out += newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
+                        this.posterUrl = poster
+                    }
+                }
+        } catch (_: Exception) {}
+
+          try {
+            val sUrl = "$trt1Url/arama/$query?contenttype=program"
+            app.get(sUrl, timeout = 10).document
+                .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
+                .mapNotNull { el ->
+                    val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
+                        ?: return@mapNotNull null
+                    val href = el.attr("href")
+                    if (!href.contains("/programlar/")) return@mapNotNull null
+                    var poster = el.selectFirst("img")?.absUrl("src")
+                    poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
+                        ?.replace("/q75/", "/q85/")
+
+                    out += newTvSeriesSearchResponse(title, fixTrtUrl(href)) {
+                        this.posterUrl = poster
+                    }
+                }
+        } catch (_: Exception) {}
 
         return out
     }
