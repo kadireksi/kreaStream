@@ -126,13 +126,14 @@ class Yt : ExtractorApi() {
                         
                         if (url.isNotEmpty() && (mimeType.contains("video/mp4") || mimeType.contains("video/webm"))) {
                             val quality = extractQualityFromBitrate(bitrate)
-                            val extractorLink = ExtractorLink(
+                            val extractorLink = newExtractorLink(
                                 source = name,
                                 name = "YouTube $quality",
-                                url = url,
-                                referer = mainUrl,
-                                quality = getQualityValue(quality)
-                            )
+                                url = url
+                            ) {
+                                this.referer = mainUrl
+                                this.quality = getQualityValue(quality)
+                            }
                             callback(extractorLink)
                         }
                     }
@@ -141,11 +142,14 @@ class Yt : ExtractorApi() {
                 // Parse HLS streams
                 val hlsUrl = streamingData.optString("hlsManifestUrl")
                 if (hlsUrl.isNotEmpty()) {
-                    M3u8Helper.generateM3u8(
-                        name,
-                        hlsUrl,
-                        mainUrl
-                    ).forEach(callback)
+                    // Use coroutine scope for M3u8Helper
+                    kotlinx.coroutines.GlobalScope.launch {
+                        M3u8Helper.generateM3u8(
+                            name,
+                            hlsUrl,
+                            mainUrl
+                        ).forEach(callback)
+                    }
                 }
                 
                 return true
@@ -196,11 +200,12 @@ class Yt : ExtractorApi() {
 
     private fun getQualityValue(quality: String): Int {
         return when (quality.lowercase()) {
-            "4k", "2160p" -> Qualities.QuadHDR.value
-            "1080p" -> Qualities.1080p.value
-            "720p" -> Qualities.720p.value
-            "480p" -> Qualities.480p.value
-            "360p" -> Qualities.360p.value
+            "4k", "2160p" -> 2160
+            "1080p" -> 1080
+            "720p" -> 720
+            "480p" -> 480
+            "360p" -> 360
+            "240p" -> 240
             else -> Qualities.Unknown.value
         }
     }
