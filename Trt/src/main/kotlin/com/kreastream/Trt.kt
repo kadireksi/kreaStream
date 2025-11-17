@@ -18,7 +18,6 @@ class Trt : MainAPI() {
 
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url   = "https://www.trt1.com.tr"
-    private val trtCocukBase = "https://www.trtcocuk.net.tr"
     private val liveBase  = "$tabiiUrl/watch/live"
 
     override val mainPage = mainPageOf(
@@ -26,7 +25,6 @@ class Trt : MainAPI() {
         "archiveSeries" to "Arşiv Diziler",
         "programs" to "Programlar",
         "archivePrograms" to "Arşiv Programlar",
-        "trtcocuk" to "TRT Çocuk",
         "live" to "TRT Tv & Radyo"
     )
 
@@ -190,294 +188,6 @@ class Trt : MainAPI() {
         )
     }
 
-    private fun generateQualityVariants(base: String): List<String> {
-        val list = mutableListOf(base)
-        try {
-            if (base.contains("medya.trt.com.tr")) {
-                val prefix = base.substringBeforeLast("/").removeSuffix("_master")
-                listOf("360", "480", "720", "1080").forEach { q ->
-                    list += "$prefix" + "_$q.m3u8"
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("TRT", "generateQualityVariants error: ${e.message}")
-        }
-        return list.distinct()
-    }
-
-    private suspend fun getTrtCocuk(page: Int = 1): List<SearchResponse> {
-        val out = mutableListOf<SearchResponse>()
-        
-        try {
-            val url = "$trtCocukBase/video" + if (page > 1) "?page=$page" else ""
-            Log.d("TRTÇocuk", "Fetching URL: $url")
-            
-            val doc = app.get(url, timeout = 15).document
-
-            // Look for show containers - more specific selector
-            val showContainers = doc.select("div.col-xl-2, div.col-lg-3, div.col-md-4, div.col-sm-6, div.col-6")
-            Log.d("TRTÇocuk", "Found ${showContainers.size} show containers")
-            
-            for (container in showContainers) {
-                try {
-                    val a = container.selectFirst("a[href]") ?: continue
-                    val href = a.attr("href").trim()
-                    
-                    // Skip invalid hrefs
-                    if (href.isBlank() || href == "/" || href.startsWith("#") || href.contains("/video/")) continue
-                    
-                    val fullUrl = if (href.startsWith("http")) href else "$trtCocukBase$href"
-                    
-                    // Skip if already added
-                    if (out.any { it.url == fullUrl }) continue
-
-                    // Get title from img alt attribute
-                    val img = a.selectFirst("img")
-                    val title = img?.attr("alt")?.trim() ?: continue
-                    
-                    if (title.isBlank()) continue
-
-                    // Get poster URL - try multiple attributes
-                    var poster = img.attr("src")?.trim() ?: ""
-                    if (poster.isBlank()) {
-                        poster = img.attr("data-src")?.trim() ?: ""
-                    }
-                    
-                    // Make poster URL absolute if it's relative
-                    if (poster.isNotBlank()) {
-                        if (!poster.startsWith("http")) {
-                            poster = "$trtCocukBase$poster"
-                        }
-                        // Ensure we have a proper image URL - upscale resolution
-                        poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-                    }
-
-                    Log.d("TRTÇocuk", "Found show: $title -> $fullUrl (poster: $poster)")
-                    
-                    out += newTvSeriesSearchResponse(title, fullUrl) {
-                        this.posterUrl = poster
-                    }
-                    
-                } catch (e: Exception) {
-                    Log.e("TRTÇocuk", "Error processing container: ${e.message}")
-                }
-            }
-
-        } catch (e: Exception) {
-            Log.e("TRTÇocuk", "getTrtCocuk failed: ${e.message}")
-        }
-
-        Log.d("TRTÇocuk", "Total series found: ${out.size}")
-        return out
-    }
-
-    private suspend fun getTrtCocukEpisodes(seriesUrl: String): List<Episode> {
-        val episodes = mutableListOf<Episode>()
-        try {
-            Log.d("TRTÇocuk", "Fetching episodes from: $seriesUrl")
-            val response = app.get(seriesUrl, timeout = 15)
-            val doc = response.document
-
-            val rawEpisodes = mutableListOf<RawEpisode>()
-            
-            // Try to extract data from Nuxt.js state first - optimized to script content
-            val nuxtScript = doc.select("script").first { it.html().contains("__NUXT__") }?.html() ?: ""
-            val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*\});?""", RegexOption.DOT_MATCHES_ALL)
-            val match = nuxtDataRegex.find(nuxtScript)
-            
-            if (match != null) {
-                val nuxtJsonString = match.groupValues[1]
-                try {
-                    val nuxtData = JSONObject(nuxtJsonString)
-                    val dataArray = nuxtData.getJSONArray("data")
-                    
-                    if (dataArray.length() > 0) {
-                        val firstData = dataArray.getJSONObject(0)
-                        if (firstData.has("data")) {
-                            val dataObj = firstData.getJSONObject("data")
-                            
-                            // Extract series info
-                            val seriesDescription = dataObj.optString("description", "")
-                            var seriesPoster = dataObj.optString("logo", "")
-                            if (seriesPoster.isBlank()) {
-                                seriesPoster = dataObj.optString("artWork", "")
-                            }
-                            if (seriesPoster.isBlank()) {
-                                seriesPoster = dataObj.optString("mobileCover", "")
-                            }
-                            
-                            // Extract videos/episodes
-                            if (dataObj.has("videos")) {
-                                val videosArray = dataObj.getJSONArray("videos")
-                                
-                                for (i in 0 until videosArray.length()) {
-                                    val video = videosArray.getJSONObject(i)
-                                    val title = video.getString("title")
-                                    val path = video.getString("path")
-                                    val fullUrl = "$trtCocukBase$path"
-                                    var mainImageUrl = video.optString("mainImageUrl", "")
-                                    mainImageUrl = mainImageUrl.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-                                    
-                                    // Extract episode number
-                                    val num = extractEpisodeNumber(title)
-                                    
-                                    rawEpisodes += RawEpisode(title, fullUrl, mainImageUrl.ifBlank { seriesPoster }, seriesDescription, num)
-                                    Log.d("TRTÇocuk", "Added raw episode from Nuxt: $title (episode: $num) -> $fullUrl")
-                                }
-                            }
-                            
-                            // Also check clipUps for additional content
-                            if (dataObj.has("clipUps")) {
-                                val clipUpsArray = dataObj.getJSONArray("clipUps")
-                                
-                                for (i in 0 until clipUpsArray.length()) {
-                                    val clip = clipUpsArray.getJSONObject(i)
-                                    val title = clip.getString("title")
-                                    val path = clip.getString("path")
-                                    val fullUrl = "$trtCocukBase$path"
-                                    var mainImage = clip.optString("mainImage", "")
-                                    mainImage = mainImage.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-                                    
-                                    val num = extractEpisodeNumber(title)
-                                    
-                                    rawEpisodes += RawEpisode(title, fullUrl, mainImage.ifBlank { seriesPoster }, "", num)
-                                    Log.d("TRTÇocuk", "Added raw clip from Nuxt: $title (episode: $num) -> $fullUrl")
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("TRTÇocuk", "Error parsing Nuxt data: ${e.message}")
-                }
-            }
-            
-            // Fallback to HTML parsing if no episodes found in Nuxt data
-            if (rawEpisodes.isEmpty()) {
-                val episodeSelectors = "a[href*='/video/'], [data-href*='/video/'], div.vueperslides__track a, div.episode-item a, div.video-item a, a.video-link, article a[href*='/video/'], li a[href*='/video/'], div.card a[href*='/video/'], div.list-item a[href*='/video/']"
-                
-                val allEpisodeLinks = doc.select(episodeSelectors).distinctBy { it.attr("href").ifBlank { it.attr("data-href") } }
-
-                Log.d("TRTÇocuk", "Fallback: Found ${allEpisodeLinks.size} potential episode links")
-
-                val tempRawEpisodes = mutableListOf<RawEpisode>()
-                for (a in allEpisodeLinks) {
-                    try {
-                        var href = a.attr("href").trim()
-                        if (href.isBlank()) href = a.attr("data-href").trim()
-                        if (href.isBlank() || !href.contains("/video/")) continue
-
-                        val fullHref = if (href.startsWith("http")) href else "$trtCocukBase$href"
-
-                        var title = a.attr("title").trim()
-                        if (title.isBlank()) {
-                            title = a.selectFirst("img")?.attr("alt")?.trim() ?: ""
-                        }
-                        if (title.isBlank()) {
-                            title = a.text().trim()
-                        }
-                        if (title.isBlank()) continue
-
-                        val imgEl = a.selectFirst("img")
-                        var poster = imgEl?.attr("src")?.trim() ?: ""
-                        if (poster.isBlank()) {
-                            poster = imgEl?.attr("data-src")?.trim() ?: ""
-                        }
-                        if (poster.isNotBlank() && !poster.startsWith("http")) {
-                            poster = "$trtCocukBase$poster"
-                        }
-                        poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-
-                        val num = extractEpisodeNumber(title)
-
-                        tempRawEpisodes += RawEpisode(title, fullHref, poster.ifBlank { null }, "", num)
-                        Log.d("TRTÇocuk", "Added raw episode from HTML: $title (episode: $num) -> $fullHref")
-                        
-                    } catch (e: Exception) {
-                        Log.e("TRTÇocuk", "Error processing episode link: ${e.message}")
-                    }
-                }
-                rawEpisodes += tempRawEpisodes.distinctBy { it.url }
-            }
-
-            // Ultimate fallback: Generate sequential episode URLs if still empty
-            if (rawEpisodes.isEmpty()) {
-                val slug = seriesUrl.removePrefix(trtCocukBase).trim('/')
-                if (slug.isNotBlank()) {
-                    var seriesPoster = doc.selectFirst("meta[property=og:image]")?.attr("content") ?: ""
-                    if (seriesPoster.isBlank()) {
-                        seriesPoster = doc.selectFirst("img[alt*=$slug], img[src*=$slug]")?.absUrl("src") ?: ""
-                    }
-                    seriesPoster = seriesPoster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-
-                    var i = 1
-                    while (i <= 100) {  // Limit to prevent infinite loop
-                        val episodePath = "$slug-$i"
-                        val episodeUrl = "$trtCocukBase/video/$episodePath"
-                        try {
-                            val epResponse = app.get(episodeUrl, timeout = 10)
-                            if (epResponse.code != 200) break
-
-                            val epDoc = epResponse.document
-                            val epTitle = epDoc.selectFirst("h1, title")?.text()?.trim() ?: "$slug $i. Bölüm"
-                            val epPoster = epDoc.selectFirst("meta[property=og:image]")?.attr("content") ?: seriesPoster
-                            val epPosterFixed = epPoster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-                            val epNum = extractEpisodeNumber(epTitle) ?: i
-
-                            if (epTitle.contains("yok", ignoreCase = true) || epTitle.contains("not found", ignoreCase = true)) break
-
-                            rawEpisodes += RawEpisode(epTitle, episodeUrl, epPosterFixed.ifBlank { null }, "", epNum)
-                            Log.d("TRTÇocuk", "Added generated episode: $epTitle (episode: $epNum) -> $episodeUrl")
-
-                            i++
-                            delay(200)  // Rate limit
-                        } catch (e: Exception) {
-                            Log.e("TRTÇocuk", "Error fetching generated episode $i: ${e.message}")
-                            break
-                        }
-                    }
-                }
-            }
-            
-            // Process raw episodes to assign proper numbers and dedup
-            val uniqueRaw = rawEpisodes.distinctBy { it.url.lowercase() }
-            val numbered = uniqueRaw.filter { it.extractedNum != null && it.extractedNum!! > 0 }.sortedBy { it.extractedNum }
-            val unnumbered = uniqueRaw.filter { it.extractedNum == null || it.extractedNum == 0 }.sortedBy { it.title }
-            
-            var nextEpNum = if (numbered.isNotEmpty()) numbered.last().extractedNum!! + 1 else 1
-            
-            for (raw in numbered) {
-                val ep = newEpisode(raw.url) {
-                    this.name = raw.title
-                    raw.posterUrl?.takeIf { it.isNotBlank() }?.let { this.posterUrl = it }
-                    this.episode = raw.extractedNum!!
-                    this.season = 1
-                    this.description = raw.description
-                }
-                episodes += ep
-            }
-            
-            for (raw in unnumbered) {
-                val ep = newEpisode(raw.url) {
-                    this.name = raw.title
-                    raw.posterUrl?.takeIf { it.isNotBlank() }?.let { this.posterUrl = it }
-                    this.episode = nextEpNum++
-                    this.season = 1
-                    this.description = raw.description
-                }
-                episodes += ep
-            }
-
-            // Sort episodes by number
-            episodes.sortBy { it.episode }
-
-        } catch (e: Exception) {
-            Log.e("TRTÇocuk", "getTrtCocukEpisodes failed: ${e.message}")
-        }
-        
-        Log.d("TRTÇocuk", "Total episodes found: ${episodes.size}")
-        return episodes
-    }
-
     data class RawEpisode(
         val title: String,
         val url: String,
@@ -581,15 +291,9 @@ class Trt : MainAPI() {
                     homePageLists += HomePageList(request.name, items, true)
                 }
             }
-            "trtcocuk" -> {
-                val items = getTrtCocuk(page = page)
-                if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, true)
-                }
-            }
         }
 
-        val hasNext = request.data in listOf("series", "archiveSeries", "trtcocuk", "programs", "archivePrograms") && homePageLists.isNotEmpty()
+        val hasNext = request.data in listOf("series", "archiveSeries", "programs", "archivePrograms") && homePageLists.isNotEmpty()
 
         return newHomePageResponse(homePageLists, hasNext = hasNext)
     }
@@ -614,77 +318,6 @@ class Trt : MainAPI() {
                 type = TvType.TvSeries,
                 data = url
             )
-        }
-
-        // In the load function, update the TRT Çocuk series section:
-        if (url.contains("trtcocuk.net.tr") && !url.contains("/video")) {
-            try {
-                val response = app.get(url, timeout = 15)
-                val html = response.text
-                val doc = response.document
-                
-                // Try to get title from Nuxt data first
-                var title = "TRT Çocuk"
-                var plot = ""
-                var poster = ""
-                
-                val nuxtDataRegex = Regex("""window\.__NUXT__\s*=\s*(\{.*?\})(?=;|</script>)""", RegexOption.DOT_MATCHES_ALL)
-                val match = nuxtDataRegex.find(html)
-                
-                if (match != null) {
-                    try {
-                        val nuxtData = JSONObject(match.groupValues[1])
-                        val dataArray = nuxtData.getJSONArray("data")
-                        if (dataArray.length() > 0) {
-                            val firstData = dataArray.getJSONObject(0)
-                            if (firstData.has("data")) {
-                                val dataObj = firstData.getJSONObject("data")
-                                title = dataObj.optString("title", title)
-                                plot = dataObj.optString("description", plot)
-                                
-                                // Try multiple image sources
-                                poster = dataObj.optString("logo", "")
-                                if (poster.isBlank()) {
-                                    poster = dataObj.optString("artWork", "")
-                                }
-                                if (poster.isBlank()) {
-                                    poster = dataObj.optString("mobileCover", "")
-                                }
-                                if (poster.isBlank()) {
-                                    poster = dataObj.optString("backgroundImage", "")
-                                }
-                                poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e("TRTÇocuk", "Error parsing Nuxt data in load: ${e.message}")
-                    }
-                }
-                
-                // Fallback to HTML parsing
-                if (title == "TRT Çocuk") {
-                    title = doc.selectFirst("h1, .page-title, .title")?.text()?.trim() ?: title
-                }
-                if (plot.isBlank()) {
-                    plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: plot
-                }
-                if (poster.isBlank()) {
-                    poster = doc.selectFirst("meta[property=og:image]")?.attr("content") ?: ""
-                    if (poster.isBlank()) {
-                        poster = doc.selectFirst("img")?.absUrl("src") ?: ""
-                    }
-                    poster = poster.replace(Regex("w\\d+/h\\d+"), "w600/h338").replace("q70", "q90")
-                }
-
-                val episodes = getTrtCocukEpisodes(url)
-
-                return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                    this.posterUrl = poster
-                    this.plot = plot
-                }
-            } catch (e: Exception) {
-                throw ErrorLoadingException("TRT Çocuk dizi yüklenemedi: ${e.message}")
-            }
         }
 
         // TRT1 Series/Programs
@@ -851,14 +484,12 @@ class Trt : MainAPI() {
 
         // Handle regular m3u8 streams (non-live)
         if (data.contains(".m3u8", ignoreCase = true)) {
-            generateQualityVariants(data).forEach { u ->
-                M3u8Helper.generateM3u8(
-                    source = name,
-                    streamUrl = u,
-                    referer = tabiiUrl,
-                    headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
-                ).forEach(callback)
-            }
+            M3u8Helper.generateM3u8(
+                source = name,
+                streamUrl = data,
+                referer = tabiiUrl,
+                headers = mapOf("User-Agent" to "Mozilla/5.0", "Referer" to tabiiUrl)
+            ).forEach(callback)
             return true
         } else if (data.endsWith(".aac", ignoreCase = true)) {
             callback(newExtractorLink(
@@ -870,59 +501,6 @@ class Trt : MainAPI() {
                 this.quality = Qualities.Unknown.value
             })
             return true
-        }
-
-        // TRT Çocuk links
-        if (data.contains("trtcocuk.net.tr")) {
-            try {
-                val doc = app.get(data, timeout = 10).document
-
-                // YouTube embed
-                val iframe = doc.selectFirst("iframe[src*='youtube.com/embed']")
-                if (iframe != null) {
-                    val src = iframe.attr("src")
-                    val v = src.substringAfter("embed/").substringBefore("?")
-                    if (v.isNotBlank()) {
-                        loadExtractor("https://www.youtube.com/watch?v=$v", trtCocukBase, subtitleCallback, callback)
-                        return true
-                    }
-                }
-
-                // Direct video source
-                val videoSrc = doc.selectFirst("video source[src], video[src]")?.attr("src")
-                if (!videoSrc.isNullOrBlank()) {
-                    callback(newExtractorLink(
-                        source = name,
-                        name = "TRT Çocuk",
-                        url = videoSrc
-                    ) {
-                        this.referer = trtCocukBase
-                        this.quality = Qualities.Unknown.value
-                    })
-                    return true
-                }
-
-                // m3u8 in scripts
-                val scripts = doc.select("script")
-                for (s in scripts) {
-                    val html = s.html()
-                    val m = Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""").find(html)
-                    if (m != null) {
-                        val found = m.value
-                        callback(newExtractorLink(
-                            source = name,
-                            name = "TRT Çocuk",
-                            url = found
-                        ) {
-                            this.referer = trtCocukBase
-                            this.quality = Qualities.Unknown.value
-                        })
-                        return true
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("TRT", "TRT Çocuk loadLinks error: ${e.message}")
-            }
         }
 
         // TRT1 series/programs - Improved native source extraction
@@ -939,17 +517,15 @@ class Trt : MainAPI() {
                         val m3u8Url = extractM3u8FromJson(scriptContent)
                         if (m3u8Url != null) {
                             Log.d("TRT", "Extracted native m3u8: $m3u8Url")
-                            generateQualityVariants(m3u8Url).forEach { u ->
-                                M3u8Helper.generateM3u8(
-                                    source = name,
-                                    streamUrl = u,
-                                    referer = trt1Url,
-                                    headers = mapOf(
-                                        "Referer" to trt1Url,
-                                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                                    )
-                                ).forEach(callback)
-                            }
+                            M3u8Helper.generateM3u8(
+                                source = name,
+                                streamUrl = m3u8Url,
+                                referer = trt1Url,
+                                headers = mapOf(
+                                    "Referer" to trt1Url,
+                                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                )
+                            ).forEach(callback)
                             return true
                         }
                     }
@@ -962,14 +538,12 @@ class Trt : MainAPI() {
                     if (m != null) {
                         val found = m.value
                         Log.d("TRT", "Found m3u8 via regex: $found")
-                        generateQualityVariants(found).forEach { u ->
-                            M3u8Helper.generateM3u8(
-                                source = name,
-                                streamUrl = u,
-                                referer = trt1Url,
-                                headers = mapOf("Referer" to trt1Url)
-                            ).forEach(callback)
-                        }
+                        M3u8Helper.generateM3u8(
+                            source = name,
+                            streamUrl = found,
+                            referer = trt1Url,
+                            headers = mapOf("Referer" to trt1Url)
+                        ).forEach(callback)
                         return true
                     }
                 }
@@ -1015,13 +589,6 @@ class Trt : MainAPI() {
                 sr.posterUrl = ch.logoUrl
                 out += sr
             }
-
-        // TRT Çocuk search
-        try {
-            getTrtCocuk().filter { it.name.contains(query, ignoreCase = true) }.forEach { out += it }
-        } catch (e: Exception) {
-            Log.e("TRT", "TRT Çocuk search error: ${e.message}")
-        }
 
         // TRT1 series and programs search
         try {
