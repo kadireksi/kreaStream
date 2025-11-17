@@ -254,34 +254,34 @@ class Trt : MainAPI() {
         when (request.data) {
             "tv" -> {
                 val tvItem = newTvSeriesSearchResponse("TRT TV Kanalları", "trt/tv")
-                homePageLists += HomePageList(request.name, listOf(tvItem), hasNext = false)
+                homePageLists += HomePageList(request.name, listOf(tvItem), hasNextPage = false)
             }
             "radio" -> {
                 val radioItem = newTvSeriesSearchResponse("TRT Radyo Kanalları", "trt/radio")
-                homePageLists += HomePageList(request.name, listOf(radioItem), hasNext = false)
+                homePageLists += HomePageList(request.name, listOf(radioItem), hasNextPage = false)
             }
             "series" -> {
                 val items = getTrtContent("diziler", archive = false, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, true)
+                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
                 }
             }
             "archiveSeries" -> {
                 val items = getTrtContent("diziler", archive = true, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, true)
+                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
                 }
             }
             "programs" -> {
                 val items = getTrtContent("programlar", archive = false, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, true)
+                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
                 }
             }
             "archivePrograms" -> {
                 val items = getTrtContent("programlar", archive = true, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, true)
+                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
                 }
             }
         }
