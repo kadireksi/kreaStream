@@ -254,39 +254,37 @@ class Trt : MainAPI() {
         when (request.data) {
             "tv" -> {
                 val tvItem = newTvSeriesSearchResponse("TRT TV Kanalları", "trt/tv")
-                homePageLists += HomePageList(request.name, listOf(tvItem), hasNextPage = false)
+                homePageLists += HomePageList(request.name, listOf(tvItem))
             }
             "radio" -> {
                 val radioItem = newTvSeriesSearchResponse("TRT Radyo Kanalları", "trt/radio")
-                homePageLists += HomePageList(request.name, listOf(radioItem), hasNextPage = false)
+                homePageLists += HomePageList(request.name, listOf(radioItem))
             }
             "series" -> {
                 val items = getTrtContent("diziler", archive = false, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
+                    homePageLists += HomePageList(request.name, items)
                 }
             }
             "archiveSeries" -> {
                 val items = getTrtContent("diziler", archive = true, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
+                    homePageLists += HomePageList(request.name, items)
                 }
             }
             "programs" -> {
                 val items = getTrtContent("programlar", archive = false, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
+                    homePageLists += HomePageList(request.name, items)
                 }
             }
             "archivePrograms" -> {
                 val items = getTrtContent("programlar", archive = true, page = page)
                 if (items.isNotEmpty()) {
-                    homePageLists += HomePageList(request.name, items, hasNextPage = true)
+                    homePageLists += HomePageList(request.name, items)
                 }
             }
         }
-
-        val hasNext = request.data in listOf("series", "archiveSeries", "programs", "archivePrograms") && homePageLists.isNotEmpty()
 
         return newHomePageResponse(homePageLists)
     }
