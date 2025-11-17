@@ -228,8 +228,10 @@ class Trt : MainAPI() {
                 "$trt1Url/$contentType/$page?archive=$archive&order=title_asc"
             }
 
-            app.get(url, timeout = 15).document
-                .select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
+            Log.d("TRT", "Loading content from: $url")
+            
+            val document = app.get(url, timeout = 15).document
+            val items = document.select("div.grid_grid-wrapper__elAnh > div.h-full.w-full > a")
                 .mapNotNull { el ->
                     val title = el.selectFirst("div.card_card-title__IJ9af")?.text()?.trim()
                         ?: return@mapNotNull null
@@ -242,8 +244,12 @@ class Trt : MainAPI() {
                         this.posterUrl = poster
                     }
                 }
+
+            Log.d("TRT", "Found ${items.size} items on page $page")
+            items
+
         } catch (e: Exception) {
-            Log.e("TRT", "getTrtContent error for $contentType: ${e.message}")
+            Log.e("TRT", "getTrtContent error for $contentType page $page: ${e.message}")
             emptyList()
         }
     }
@@ -307,16 +313,27 @@ class Trt : MainAPI() {
                 }
             )
             "series"  -> getTrtContent("diziler", archive = false, page = page)
-            "archiveSeries" -> getTrtContent("diziler", archive = true,  page = page)
+            "archiveSeries" -> getTrtContent("diziler", archive = true, page = page)
             "programs" -> getTrtContent("programlar", archive = false, page = page)
-            "archivePrograms" -> getTrtContent("programlar", archive = true,  page = page)
+            "archivePrograms" -> getTrtContent("programlar", archive = true, page = page)
             else -> emptyList()
         }
 
-        val hasNext = request.data in listOf("series", "archiveSeries", "programs", "archivePrograms") && items.isNotEmpty()
+        // Check if there are more pages by trying to load the next page
+        val hasNext = when (request.data) {
+            "series", "archiveSeries", "programs", "archivePrograms" -> {
+                val nextPageItems = getTrtContent(
+                    if (request.data.contains("series")) "diziler" else "programlar",
+                    archive = request.data.contains("archive"),
+                    page = page + 1
+                )
+                nextPageItems.isNotEmpty()
+            }
+            else -> false
+        }
 
         return newHomePageResponse(
-            listOf(HomePageList(request.name, items, true)),
+            listOf(HomePageList(request.name, items)),
             hasNext = hasNext
         )
     }
@@ -515,9 +532,7 @@ class Trt : MainAPI() {
     ): Boolean {
 
         if (data.startsWith("https://www.youtube.com") || data.contains("youtube.com") || data.contains("youtu.be")) {
-            val youTubeExtractor = Yt()
-            youTubeExtractor.getUrl(data, mainUrl, subtitleCallback, callback)
-            return true
+            return loadExtractor(data, mainUrl, subtitleCallback, callback)
         }
 
         if (data.contains(".m3u8", ignoreCase = true)) {
