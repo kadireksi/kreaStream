@@ -109,12 +109,13 @@ class TRTCocuk : MainAPI() {
 
         newExtractorLink(
             url = mpdUrl,
+            source = name,
             name = "TRT Çocuk"
         ){
-            this.referer = mainUrl + "/",
-            this.quality = Qualities.P720.value,
-            this.type = ExtractorLinkType.DASH
-        }?.let(callback)
+            this.referer = mainUrl + "/";
+            this.quality = Qualities.P720.value;
+            this.type = ExtractorLinkType.DASH;
+        }?.let(callback);
 
         doc.select("track[kind=\"captions\"], track[label*=\"Türkçe\"]").forEach {
             val sub = fixUrl(it.attr("src"))
