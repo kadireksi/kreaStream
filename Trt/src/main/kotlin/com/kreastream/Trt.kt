@@ -1,13 +1,13 @@
-package com.trtcocuk
+package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
 class TRTCocuk : MainAPI() {
-    override val name = "TRT Çocuk"
-    override val mainUrl = "https://www.trtcocuk.net.tr"
-    override val lang = "tr"
+    override var name = "TRT Çocuk"
+    override var mainUrl = "https://www.trtcocuk.net.tr"
+    override var lang = "tr"
     override val supportedTypes = setOf(TvType.Cartoon)
     override val hasMainPage = true
     override val hasQuickSearch = true
@@ -109,11 +109,12 @@ class TRTCocuk : MainAPI() {
 
         newExtractorLink(
             url = mpdUrl,
-            name = "TRT Çocuk",
-            referer = mainUrl + "/",
-            quality = Qualities.P720.value,
-            type = ExtractorLinkType.DASH
-        )?.let(callback)
+            name = "TRT Çocuk"
+        ){
+            this.referer = mainUrl + "/",
+            this.quality = Qualities.P720.value,
+            this.type = ExtractorLinkType.DASH
+        }?.let(callback)
 
         doc.select("track[kind=\"captions\"], track[label*=\"Türkçe\"]").forEach {
             val sub = fixUrl(it.attr("src"))
