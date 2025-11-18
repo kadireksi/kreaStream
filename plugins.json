@@ -18,5 +18,24 @@
         "description": "TRT TV & Radyo & Diziler & Programlar",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Trt.cs3",
         "name": "Trt"
+    },
+    {
+        "iconUrl": "https://cms-tabii-public-image.tabii.com/int/webp/w600/q84/23857_1-0-465-262.jpeg",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
+        "fileSize": 11212,
+        "status": 1,
+        "language": "tr",
+        "authors": [
+            "kreastream"
+        ],
+        "tvTypes": [
+            "Cartoon"
+        ],
+        "version": 1,
+        "internalName": "TRTCocuk",
+        "description": "TRT \u00c7ocuk Diziler",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TRTCocuk.cs3",
+        "name": "TRTCocuk"
     }
 ]
