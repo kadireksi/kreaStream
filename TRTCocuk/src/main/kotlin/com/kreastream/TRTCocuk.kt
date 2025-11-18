@@ -37,12 +37,12 @@ class TRTCocuk : MainAPI() {
         val doc = app.get("$mainUrl/video").document
         val listOf(
             newHomePageResponse("Tüm Çizgi Filmler", doc.select(".col-xl-2 a[href^=\"/\"]").mapNotNull { el ->
-                val href = fixUrl(el.attr("href"))
+                val href = fixUrl(el.attr("href"););
                 val title = el.selectFirst("img")?.attr("alt") ?: return@mapNotNull null
                 val poster = el.selectFirst("img")?.attr("src") ?: el.selectFirst("img")?.attr("data-src")
                 newAnimeSearchResponse(title, href, TvType.Cartoon) {
                     this.posterUrl = poster
-                    addDubStatus(dubbed = false, subbed = true)
+                    //addDubStatus(dubbed = false, subbed = true)
                 }
             })
         ).also { return HomePageResponse(it) }
@@ -58,7 +58,7 @@ class TRTCocuk : MainAPI() {
             if (!href.contains("/video/")) return@mapNotNull null
             newAnimeSearchResponse(title, href, TvType.Cartoon) {
                 this.posterUrl = img
-                addDubStatus(dubbed = false, subbed = true)
+                //addDubStatus(dubbed = false, subbed = true)
             }
         }
     }
