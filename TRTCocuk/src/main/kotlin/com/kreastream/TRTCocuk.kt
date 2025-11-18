@@ -5,9 +5,9 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
 class TRTCocuk : MainAPI() {
-    override val name = "TRT Çocuk"
-    override val mainUrl = "https://www.trtcocuk.net.tr"
-    override val lang = "tr"
+    override var name = "TRT Çocuk"
+    override var mainUrl = "https://www.trtcocuk.net.tr"
+    override var lang = "tr"
     override val supportedTypes = setOf(TvType.Cartoon)
     override val hasMainPage = true
     override val hasQuickSearch = true
@@ -114,6 +114,7 @@ class TRTCocuk : MainAPI() {
         // YENİ YÖNTEM: newExtractorLink
         newExtractorLink(
             url = mpdUrl,
+            source = name,
             name = "TRT Çocuk"
         ){
             this.referer = "https://www.trtcocuk.net.tr/"
