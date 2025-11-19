@@ -2,7 +2,6 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.nodes.Element
 
 class TRTCocuk : MainAPI() {
     override var name = "TRT Çocuk"
@@ -12,6 +11,7 @@ class TRTCocuk : MainAPI() {
     override val hasMainPage = true
     override val hasQuickSearch = true
 
+    // TÜM DİZİLER – ALFABETİK SIRALI (A → Z)
     private val popularSeries = listOf(
         "akilli-tavsan-momo" to "Akıllı Tavşan Momo",
         "arkadasim-max" to "Arkadaşım Max",
@@ -62,7 +62,7 @@ class TRTCocuk : MainAPI() {
         "rafadan-tayfa-golge" to "Rafadan Tayfa: Gölge",
         "rafadan-tayfa-kapadokya" to "Rafadan Tayfa: Kapadokya",
         "rafadan-tayfa-torso" to "Rafadan Tayfa: Torso",
-        "robo-pat" to "robo-pat" to "Robo Pat",
+        "robo-pat" to "Robo Pat",
         "sibal" to "Sibal",
         "sidali" to "Sidali",
         "sihirli-annem" to "Sihirli Annem (Çocuk Versiyonu)",
@@ -76,28 +76,22 @@ class TRTCocuk : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = popularSeries.map { (slug, title) ->
-            val url = "$mainUrl/video/$slug"
-            newAnimeSearchResponse(title, url, TvType.Cartoon) {
-                this.posterUrl = "https://cdn-i.pr.trt.com.tr/trtcocuk/w513/h288/q60/$slug-cover.jpeg" // approximate, real poster loads later
+            newAnimeSearchResponse(title, "$mainUrl/video/$slug", TvType.Cartoon) {
+                posterUrl = "https://cdn-i.pr.trt.com.tr/trtcocuk/w513/h288/q60/$slug.jpeg"
             }
         }
-
-        return newHomePageResponse("Popüler Çizgi Filmler", items)
+        return newHomePageResponse("Tüm Çizgi Filmler (A→Z)", items)
     }
 
-    // Quick Search still works perfectly (uses site's HTML search)
     override suspend fun quickSearch(query: String): List<SearchResponse>? {
-        val searchUrl = "$mainUrl/ara?q=${query.replace(" ", "+")}"
-        val doc = app.get(searchUrl).document
-
-        return doc.select(".search-result a[href*=\"/video/\"], .search-result a[href^=\"/\"]").mapNotNull {
-            val href = fixUrl(it.attr("href"))
-            if (!href.contains("/video/") && !href.endsWith(oneOfSeriesSlugs())) return@mapNotNull null
-
-            val title = it.selectFirst(".title")?.text()
-                ?: it.selectFirst("img")?.attr("alt")
-                ?: return@mapNotNull null
-            val poster = it.selectFirst("img")?.attr("data-src") ?: it.selectFirst("img")?.attr("src")
+        val url = "$mainUrl/ara?q=${query.replace(" ", "+")}"
+        val doc = app.get(url).document
+        return doc.select(".search-result a[href*=\"/video/\"]").mapNotNull { el ->
+            val href = fixUrl(el.attr("href"))
+            val title = el.selectFirst(".title")?.text()
+                ?: el.selectFirst("img")?.attr("alt") ?: return@mapNotNull null
+            val poster = el.selectFirst("img")?.attr("data-src")
+                ?: el.selectFirst("img")?.attr("src")
 
             newAnimeSearchResponse(title, href, TvType.Cartoon) {
                 this.posterUrl = poster
@@ -105,14 +99,13 @@ class TRTCocuk : MainAPI() {
         }
     }
 
-    private fun oneOfSeriesSlugs() = popularSeries.map { it.first }
-
     override suspend fun search(query: String): List<SearchResponse> = quickSearch(query) ?: emptyList()
 
-    // Load series / episodes (works perfectly – episodes are in HTML)
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
-        val title = doc.selectFirst("h1")?.text() ?: "TRT Çocuk Dizisi"
+        val title = doc.selectFirst("h1")?.text()
+            ?: doc.selectFirst("meta[property=\"og:title\"]")?.attr("content")?.removeSuffix(" | TRT Çocuk")?.trim()
+            ?: "TRT Çocuk"
 
         val episodeLinks = doc.select("a[href*=\"-bolum\"], a[href*=\"-bölüm\"]")
         val isSeries = episodeLinks.isNotEmpty()
@@ -122,20 +115,24 @@ class TRTCocuk : MainAPI() {
         if (isSeries) {
             episodeLinks.forEach { a ->
                 val href = fixUrl(a.attr("href"))
-                val epText = a.selectFirst("p")?.text() ?: a.selectFirst("img")?.attr("alt") ?: ""
+                val epText = a.selectFirst("p")?.text() ?: a.selectFirst("img")?.attr("alt") ?: "Bölüm"
                 val epNum = Regex("""(\d+)""").find(epText)?.value?.toIntOrNull() ?: (episodes.size + 1)
                 val poster = a.selectFirst("img")?.attr("data-src") ?: a.selectFirst("img")?.attr("src")
 
                 episodes += newEpisode(href) {
-                    name = epText.ifBlank { "Bölüm $epNum" }
+                    name = epText.trim()
                     season = 1
                     episode = epNum
                     posterUrl = poster
                 }
             }
-            episodes.reverse() // oldest first
+            episodes.reverse() // En yeniden en eskiye → biz en eskiden başlayalım
         } else {
-            episodes += newEpisode(url) { name = title; season = 1; episode = 1 }
+            episodes += newEpisode(url) {
+                name = title
+                season = 1
+                episode = 1
+            }
         }
 
         return newTvSeriesLoadResponse(title, url, TvType.Cartoon, episodes) {
@@ -145,7 +142,6 @@ class TRTCocuk : MainAPI() {
         }
     }
 
-    // Video & subtitles (unchanged – works 100%)
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -154,15 +150,16 @@ class TRTCocuk : MainAPI() {
     ): Boolean {
         val doc = app.get(data).document
         val script = doc.select("script").firstOrNull { it.html().contains("master.mpd") } ?: return false
-        val mpd = Regex("""["']([^"']*\.mpd[^"']*)["']""").find(script.html())?.groupValues?.get(1) ?: return false
-        val mpdUrl = if (mpd.startsWith("http")) mpd else "https://cdn-i.pr.trt.com.tr$mpd"
+        val mpdMatch = Regex("""["']([^"']*master\.mpd[^"']*)["']""").find(script.html()) ?: return false
+        val mpdUrl = if (mpdMatch.groupValues[1].startsWith("http")) mpdMatch.groupValues[1]
+                     else "https://cdn-i.pr.trt.com.tr${mpdMatch.groupValues[1]}"
 
         newExtractorLink(
             url = mpdUrl,
             name = "TRT Çocuk",
             source = name
-        ){
-            this.referer = mainUrl + "/"
+        ) {
+            this.referer = "$mainUrl/"
             this.quality = Qualities.P720.value
             this.type = ExtractorLinkType.DASH
         }?.let(callback)
