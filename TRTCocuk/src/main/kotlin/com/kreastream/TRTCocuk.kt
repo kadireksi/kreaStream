@@ -1,18 +1,17 @@
-package com.trtcocuk
+package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
 class TRTCocuk : MainAPI() {
-    override val name = "TRT Çocuk"
-    override val mainUrl = "https://www.trtcocuk.net.tr"
-    override val lang = "tr"
+    override var name = "TRT Çocuk"
+    override var mainUrl = "https://www.trtcocuk.net.tr"
+    override var lang = "tr"
     override val supportedTypes = setOf(TvType.Cartoon)
     override val hasMainPage = true
     override val hasQuickSearch = true
 
-    // Hardcoded popular series (site is fully JS-loaded, so this is the most reliable way)
     private val popularSeries = listOf(
         "rafadan-tayfa" to "Rafadan Tayfa",
         "ekip-siberay" to "Ekip: SİBERAY",
@@ -33,12 +32,17 @@ class TRTCocuk : MainAPI() {
         "maymun-coco" to "Maymun Coco",
         "sibal" to "Sibal",
         "komsular" to "Komşular",
-        "kral-sakir" to "Kral Şakir",  // sometimes appears
+        "kral-sakir" to "Kral Şakir",
         "elali-ve-arkadaslari" to "Elali ve Arkadaşları",
         "sidali" to "Sidali",
         "kaptan-pengu-ve-arkadaslari" to "Kaptan Pengu ve Arkadaşları",
         "hacivat-ve-karagoz" to "Hacivat ve Karagöz",
-        "kucuk-akasya" to "Küçük Akasya"
+        "kucuk-akasya" to "Küçük Akasya",
+        "keloglan" to "Keloğlan",
+        "nasrettin-hoca" to "Nasrettin Hoca",
+        "kurt-koruyucu" to "Kurt Koruyucu",
+        "kayip-ucgen" to "Kayıp Üçgen",
+        "kalemlerle-hikayeler" to "Kalemlerle Hikayeler"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
