@@ -15,7 +15,6 @@ class Trt : MainAPI() {
     override val supportedTypes = setOf(TvType.Live, TvType.TvSeries)
     override var lang = "tr"
     override var hasMainPage = true
-    override val hasQuickSearch = true
 
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url   = "https://www.trt1.com.tr"
@@ -241,6 +240,7 @@ class Trt : MainAPI() {
                 
                 val href = el.attr("href")
                 if (href.isBlank()) {
+                    Log.d("TRT_DEBUG", "❌ No href found for: $title")
                     return@mapNotNull null
                 }
                 
@@ -407,9 +407,9 @@ class Trt : MainAPI() {
                 val title = doc.selectFirst("h1")?.text()?.trim()
                     ?: throw ErrorLoadingException("Başlık bulunamadı")
                 val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
-                var poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
-                poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")
-                    ?.replace("/q75/", "/q85/")
+                var poster = fixUrlNull(doc.selectFirst("picture.card_card-image__T64bP img")?.attr("src"))
+                poster = poster?.replace(Regex("webp/w\\d+/h\\d+"), "webp/w600/h338")?.replace("/q75/", "/q85/")
+
 
                 val basePath = if (url.contains("/diziler/")) "diziler" else "programlar"
                 val slug = url.removePrefix("$trt1Url/$basePath/").substringBefore("/")
