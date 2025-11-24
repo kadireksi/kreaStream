@@ -1,23 +1,16 @@
 [
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 24625,
+        "fileSize": 33658,
         "status": 1,
-        "language": "tr",
         "authors": [
             "kreastream"
         ],
-        "tvTypes": [
-            "Movie",
-            "TvSeries"
-        ],
         "version": 1,
-        "internalName": "HDFilmCehennemi",
-        "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
-        "name": "HDFilmCehennemi"
+        "internalName": "Hdfc",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Hdfc.cs3",
+        "name": "Hdfc"
     },
     {
         "iconUrl": "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png",
