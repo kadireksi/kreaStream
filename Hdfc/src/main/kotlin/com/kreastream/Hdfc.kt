@@ -80,6 +80,8 @@ class Hdfc : MainAPI() {
                 response.document
             }
 
+            val year = document.select("div.poster-meta span").first()?.text()?.trim()?.toIntOrNull()
+            val score = document.select("span.imdb").first()?.text()?.trim()?.toFloatOrNull()
             val posterElements = document.select("div.posters-4-col a.poster, a.poster, .posters-4-col a")
             val results = posterElements.mapNotNull { it.toSearchResult() }
             newHomePageResponse(request.name, results)
@@ -240,7 +242,6 @@ class Hdfc : MainAPI() {
         }
     }
 
-
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -354,7 +355,7 @@ class Hdfc : MainAPI() {
             }
 
         } catch (e: Exception) {
-            Log.e("HDCH", "extractFromRapidrameIframe failed: ${e.message}")
+            Log.e("HDCH", "extract From Rapidrame Iframe failed: ${e.message}")
         }
         
         return emitted
@@ -405,6 +406,9 @@ class Hdfc : MainAPI() {
         // Method 3: Try to find URLs in unpacked JavaScript
         if (!emitted) {
             val unpackedUrls = extractFromUnpackedJavaScript(html)
+            Log.d("HDCH", "Found ${unpackedUrls.size} URLs from unpacked JS")
+            Log.d("HDCH", "Unpacked URLs: ${unpackedUrls.joinToString(", ")}")
+            Log.d("HDCH", "Unpacked : ${unpackedUrls}")
             for (url in unpackedUrls) {
                 val finalUrl = normalizeMasterToM3u8(url)
                 if (foundUrls.add(finalUrl)) {
