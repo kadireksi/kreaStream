@@ -229,7 +229,7 @@ class Hdfc : MainAPI() {
                     this.plot = desc
                     this.tags = finalTags
                     if (score != null) {
-                        this.score = Score.from10(score)
+                        //this.score = Score.from10(score)
                     }
                     this.recommendations = recommendations
                     addActors(actors)
@@ -242,7 +242,7 @@ class Hdfc : MainAPI() {
                     this.plot = desc
                     this.tags = finalTags
                     if (score != null) {
-                        this.score = Score.from10(score)
+                        //this.score = Score.from10(score)
                     }
                     this.recommendations = recommendations
                     addActors(actors)
