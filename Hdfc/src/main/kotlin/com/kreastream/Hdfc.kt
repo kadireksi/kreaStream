@@ -107,12 +107,22 @@ class Hdfc : MainAPI() {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
         }
+        val langInfo = document.select("span.poster-lang span").first()?.text()?.trim()
+        var isSub = false
+        var isDub = false
+        if(langInfo?.contains("Dublaj", true) == true) {
+            isDub = true
+        }
+        if(langInfo?.contains("Altyazı", true) == true) {
+            isSub = true
+        }
         return newMovieSearchResponse(rawTitle, href, type) { 
             this.posterUrl = posterUrl 
             this.year = year
             if (score != null) {
                 this.score = Score.from10(score)
             }
+            addDubStatus(isDub, isSub)
         }
     }
 
@@ -374,7 +384,6 @@ class Hdfc : MainAPI() {
         return emitted
     }
 
-    /* Specialized extraction for rapidrame player content */
     private suspend fun extractRapidrameLinks(
         html: String,
         referer: String,
@@ -433,7 +442,6 @@ class Hdfc : MainAPI() {
         return emitted
     }
 
-    /* Improved JavaScript URL extraction */
     private fun extractUrlsFromJavaScript(html: String): List<String> {
         val urls = mutableListOf<String>()
         
@@ -472,7 +480,6 @@ class Hdfc : MainAPI() {
         return urls.distinct()
     }
 
-    /* Improved unpacker function */
     private fun unpackPacker(js: String): String {
         try {
             val evalStart = js.indexOf("eval(function(p,a,c,k,e,d)")
@@ -528,7 +535,6 @@ class Hdfc : MainAPI() {
         }
     }
 
-    /* Extract from unpacked JavaScript */
     private fun extractFromUnpackedJavaScript(html: String): List<String> {
         val urls = mutableListOf<String>()
         
