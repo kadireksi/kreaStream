@@ -80,8 +80,6 @@ class Hdfc : MainAPI() {
                 response.document
             }
 
-            val year = document.select("div.poster-meta span").first()?.text()?.trim()?.toIntOrNull()
-            val score = document.select("span.imdb").first()?.text()?.trim()?.toFloatOrNull()
             val posterElements = document.select("div.posters-4-col a.poster, a.poster, .posters-4-col a")
             val results = posterElements.mapNotNull { it.toSearchResult() }
             newHomePageResponse(request.name, results)
@@ -101,8 +99,10 @@ class Hdfc : MainAPI() {
 
         val href = fixUrlNull(this.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.select("img").first()?.attr("data-src") ?: this.select("img").first()?.attr("src"))
-        val year = fixUrlNull(this.select("div.poster-meta span").first()?.text()?.trim()?.toString())
-        val score = fixUrlNull(this.select("span.imdb").first()?.text()?.trim()?.toFloatOrNull())
+        val yearText = this.select("div.poster-meta span").first()?.text()?.trim()
+        val year = yearText?.toIntOrNull()
+        val scoreText = this.select("span.imdb").first()?.text()?.trim()
+        val score = scoreText?.toFloatOrNull()
         val type = when {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
@@ -110,7 +110,9 @@ class Hdfc : MainAPI() {
         return newMovieSearchResponse(rawTitle, href, type) { 
             this.posterUrl = posterUrl 
             this.year = year
-            this.score = Score.from10(score)
+            if (score != null) {
+                this.score = Score.from10(score)
+            }
         }
     }
 
@@ -131,12 +133,16 @@ class Hdfc : MainAPI() {
             val title = document.select("h4.title").first()?.text() ?: continue
             val href = fixUrlNull(document.select("a").first()?.attr("href")) ?: continue
             val posterUrl = fixUrlNull(document.select("img").first()?.attr("src")) ?: fixUrlNull(document.select("img").first()?.attr("data-src"))
-            val year = fixUrlNull(document.select("div.poster-meta span").first()?.text()?.trim()?.toString())
-            val score = fixUrlNull(document.select("span.imdb").first()?.text()?.trim()?.toFloatOrNull())
+            val yearText = document.select("div.poster-meta span").first()?.text()?.trim()
+            val year = yearText?.toIntOrNull()
+            val scoreText = document.select("span.imdb").first()?.text()?.trim()
+            val score = scoreText?.toFloatOrNull()
             searchResults.add(newMovieSearchResponse(title, href, TvType.Movie) { 
                 this.posterUrl = posterUrl?.replace("/thumb/", "/list/") 
                 this.year = year
-                this.score = Score.from10(score)
+                if (score != null) {
+                    this.score = Score.from10(score)
+                }
             })
         }
         return searchResults
@@ -203,8 +209,6 @@ class Hdfc : MainAPI() {
                 val recPoster = fixUrlNull(it.select("img").first()?.attr("data-src") ?: it.select("img").first()?.attr("src"))
                 newTvSeriesSearchResponse(recTitle, recHref, TvType.TvSeries) { 
                     this.posterUrl = recPoster 
-                    this.year = year
-                    this.score = Score.from10(score)
                 }
             }
 
@@ -224,7 +228,9 @@ class Hdfc : MainAPI() {
                     this.year = year
                     this.plot = desc
                     this.tags = finalTags
-                    this.score = Score.from10(score)
+                    if (score != null) {
+                        this.score = Score.from10(score)
+                    }
                     this.recommendations = recommendations
                     addActors(actors)
                     addTrailer(trailer)
@@ -235,7 +241,9 @@ class Hdfc : MainAPI() {
                     this.year = year
                     this.plot = desc
                     this.tags = finalTags
-                    this.score = Score.from10(score)
+                    if (score != null) {
+                        this.score = Score.from10(score)
+                    }
                     this.recommendations = recommendations
                     addActors(actors)
                     addTrailer(trailer)
@@ -412,8 +420,6 @@ class Hdfc : MainAPI() {
         if (!emitted) {
             val unpackedUrls = extractFromUnpackedJavaScript(html)
             Log.d("HDCH", "Found ${unpackedUrls.size} URLs from unpacked JS")
-            Log.d("HDCH", "Unpacked URLs: ${unpackedUrls.joinToString(", ")}")
-            Log.d("HDCH", "Unpacked : ${unpackedUrls}")
             for (url in unpackedUrls) {
                 val finalUrl = normalizeMasterToM3u8(url)
                 if (foundUrls.add(finalUrl)) {
