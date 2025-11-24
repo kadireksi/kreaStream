@@ -21,12 +21,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.getExtractorApiFromName
-import com.lagradost.extractors.AshdiExtractor
-import com.lagradost.extractors.csstExtractor
-import com.lagradost.models.Ajax
-import com.lagradost.models.Link
-import com.lagradost.models.PlayerJson
-import com.lagradost.models.videoConstructor
+
 
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
@@ -120,22 +115,22 @@ class Hdfc : MainAPI() {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
         }
-        val langInfo = this.select("span.poster-lang span").first()?.text()?.trim()
-        var isSub = false
-        var isDub = false
-        if(langInfo?.contains("Dublaj", true) == true) {
-            isDub = true
-        }
-        if(langInfo?.contains("Altyazı", true) == true) {
-            isSub = true
-        }
+        val langInfo = this.select("span.poster-lang span").first()?.text()?.trim()?.lowercase()
+        val isDub = langInfo?.contains("dublaj") == true
+        val isSub = langInfo?.contains("altyaz") == true || langInfo?.contains("altyazi") == true
+
         return newMovieSearchResponse(rawTitle, href, type) { 
             this.posterUrl = posterUrl 
             this.year = year
             if (score != null) {
                 this.score = Score.from10(score)
             }
-            addDubStatus(isDub, isSub)
+            val badges = mutableListOf<String>()
+            if (isDub) badges.add("Türkçe Dublaj")
+            if (isSub) badges.add("Altyazı")
+            if (badges.isNotEmpty()) {
+                this.badges = badges
+            }
         }
     }
 
