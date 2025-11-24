@@ -230,6 +230,7 @@ class Hdfc : MainAPI() {
                     this.tags = finalTags
                     if (score != null) {
                         this.score = Score.from10(score)
+                        this.score = (this.score).append(" / $dubTag")
                     }
                     this.recommendations = recommendations
                     addActors(actors)
@@ -243,6 +244,7 @@ class Hdfc : MainAPI() {
                     this.tags = finalTags
                     if (score != null) {
                         this.score = Score.from10(score)
+                        this.score = (this.score).append(" / $dubTag")
                     }
                     this.recommendations = recommendations
                     addActors(actors)
