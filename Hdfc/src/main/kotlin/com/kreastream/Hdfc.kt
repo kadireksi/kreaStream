@@ -1,4 +1,4 @@
-package com.keyiflerolsun
+package com.kreastream
 
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -15,6 +15,9 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URI
 import java.util.*
+import okhttp3.Headers
+import okhttp3.OkHttpClient
+import okhttp3.NiceResponse
 
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
@@ -552,11 +555,11 @@ class Hdfc : MainAPI() {
             newExtractorLink(
                 source = "HDFC Close",
                 name = "HDFC Close",
-                url = normalized,
-                referer = referer,
-                quality = quality,
-                isM3u8 = true
+                url = normalized
             ) {
+                this.referer = referer
+                this.quality = quality
+                //this.isM3u8 = true
                 this.headers = standardHeaders + mapOf("Origin" to mainUrl, "Referer" to referer)
             }
         )
