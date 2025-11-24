@@ -94,7 +94,7 @@ class Hdfc : MainAPI() {
             ?: this.select(".poster-title").first()?.text()
         rawTitle ?: return null
 
-        val excluded = listOf("Seri Filmler", "Japonya Filmleri", "Kore Filmleri", "Hint Filmleri", "Türk Filmleri", "1080p Film izle")
+        val excluded = listOf("Seri Filmler", "Japonya Filmleri", "Kore Filmleri", "Hint Filmleri", "1080p Film izle")
         if (excluded.any { rawTitle.contains(it, ignoreCase = true) }) return null
 
         val href = fixUrlNull(this.attr("href")) ?: return null
@@ -147,21 +147,34 @@ class Hdfc : MainAPI() {
                 response.document
             }
 
-            val title = document.select("h1.section-title, h1.entry-title").first()?.text()?.substringBefore(" izle")?.trim()
+            // Title
+            val title = document.select("strong.poster-title, h4.popover-title").first()?.text()?.substringBefore(" izle")?.trim()
                 ?: return null
 
+            // Poster
             val poster = fixUrlNull(
-                document.select("aside.post-info-poster img.lazyload").first()?.attr("data-src")
-                    ?: document.select("img.wp-post-image").first()?.attr("data-src")
-                    ?: document.select("img.attachment-full").first()?.attr("src")
+                document.select("img.poster, img.lazyload").first()?.attr("data-src")
+                    ?: document.select("img.poster, img.lazyload").first()?.attr("src")
             )
 
-            val tags = document.select("div.post-info-genres a, span.genres a").map { it.text() }
-            val year = document.select("div.post-info-year-country a, div.poster-meta span").first()?.text()?.trim()?.toIntOrNull()
-            val score = document.select("div.post-info-imdb-rating span, .imdb").first()?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
-            val desc = document.select("article.post-info-content > p, div.description p").first()?.text()?.trim()
+            // Tags / Genres
+            val tags = document.select("span.popover-meta strong:contains(Türler) + text").map { it.text().trim() }
+                .ifEmpty {
+                    document.select("div.post-info-genres a, span.genres a").map { it.text() }
+                }
 
-            val langInfo = document.select(".poster-lang").first()?.text()
+            // Year
+            val year = document.select("div.poster-meta span").first()?.text()?.trim()?.toIntOrNull()
+
+            // Score
+            val score = document.select("span.imdb, .popover-rating p").first()?.text()?.trim()?.toFloatOrNull()
+
+            // Description
+            val desc = document.select("p.popover-description").first()?.text()?.trim()
+                ?: document.select("article.post-info-content > p, div.description p").first()?.text()?.trim()
+
+            // Language
+            val langInfo = document.select("span.poster-lang").first()?.text()
             val dubTag = when {
                 langInfo?.contains("Dublaj", true) == true -> "Türkçe Dublaj"
                 langInfo?.contains("Altyaz", true) == true -> "Türkçe Altyazılı"
@@ -169,12 +182,15 @@ class Hdfc : MainAPI() {
             }
             val finalTags = if (dubTag != null) tags + dubTag else tags
 
+            // Series check
             val isSeries = document.select("div.seasons, #seasons-tab").isNotEmpty()
 
+            // Actors
             val actors = document.select("div.post-info-cast a").map {
                 Actor(it.select("strong").first()?.text() ?: it.text(), it.select("img").first()?.attr("data-src") ?: "")
             }
 
+            // Recommendations
             val recommendations = document.select("div.section-slider-container div.slider-slide a, div.recommended-posts a").mapNotNull {
                 val recHref = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
                 val recTitle = it.attr("title").ifEmpty { it.text() }
@@ -182,6 +198,7 @@ class Hdfc : MainAPI() {
                 newTvSeriesSearchResponse(recTitle, recHref, TvType.TvSeries) { this.posterUrl = recPoster }
             }
 
+            // Trailer
             val trailer = document.select("div.post-info-trailer button").first()?.attr("data-modal")?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
 
             return if (isSeries) {
@@ -219,6 +236,7 @@ class Hdfc : MainAPI() {
             return null
         }
     }
+
 
     override suspend fun loadLinks(
         data: String,
