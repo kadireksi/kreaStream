@@ -125,11 +125,12 @@ class Hdfc : MainAPI() {
             if (score != null) {
                 this.score = Score.from10(score)
             }
-            val badges = mutableListOf<String>()
-            if (isDub) badges.add("Türkçe Dublaj")
-            if (isSub) badges.add("Altyazı")
-            if (badges.isNotEmpty()) {
-                this.badges = badges
+            val posterContent = buildString {
+                if (isDub) append("🇹🇷")
+                if (isSub) append("📝")
+            }
+            if (posterContent.isNotEmpty()) {
+                this.posterContent = posterContent
             }
         }
     }
