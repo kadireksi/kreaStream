@@ -337,45 +337,163 @@ class Hdfc : MainAPI() {
         return emitted
     }
 
+        // --- add these functions / replacements to Hdfc.kt ---
+
+        /* Unpack Dean Edwards Packer eval(function(p,a,c,k,e,d){...})(...) blocks */
+    private fun unpackPacker(js: String): String {
+        try {
+            val evalStart = js.indexOf("eval(function(p,a,c,k,e,d)")
+            if (evalStart < 0) return js
+            // find function body end
+            var idx = js.indexOf("function(p,a,c,k,e,d)", evalStart)
+            if (idx < 0) return js
+            idx = js.indexOf('{', idx)
+            if (idx < 0) return js
+            var depth = 0
+            var i = idx
+            var endIndex = -1
+            while (i < js.length) {
+                when (js[i]) {
+                    '{' -> depth++
+                    '}' -> {
+                        depth--
+                        if (depth == 0) { endIndex = i; break }
+                    }
+                }
+                i++
+            }
+            if (endIndex < 0) return js
+
+            // find args parentheses after function end
+            val argsOpen = js.indexOf('(', endIndex)
+            if (argsOpen < 0) return js
+            var j = argsOpen
+            var pDepth = 0
+            var argsClose = -1
+            while (j < js.length) {
+                when (js[j]) {
+                    '(' -> pDepth++
+                    ')' -> {
+                        pDepth--
+                        if (pDepth == 0) { argsClose = j; break }
+                    }
+                }
+                j++
+            }
+            if (argsClose < 0) return js
+            val args = js.substring(argsOpen + 1, argsClose)
+
+            // extract first quoted payload (p), then a and c, then the k string before .split('|')
+            val pRegex = Regex("""(['"])(?<p>(?:\\\1|.)*?)\1""", RegexOption.DOT_MATCHES_ALL)
+            val pMatch = pRegex.find(args) ?: return js
+            val pPayload = pMatch.groups["p"]?.value ?: return js
+
+            // numbers a and c after the p payload
+            val afterP = args.substring(pMatch.range.last + 1)
+            val numMatch = Regex("""\b(\d+)\b""").findAll(afterP).toList()
+            if (numMatch.size < 2) return js
+            val a = numMatch[0].groups[1]!!.value.toIntOrNull() ?: return js
+            val c = numMatch[1].groups[1]!!.value.toIntOrNull() ?: return js
+
+            // capture k payload (string before .split('|'))
+            val kMatch = Regex("""(['"])(?<k>(?:\\\1|.)*?)\1\s*\.split\(['"]\|['"]\)""", RegexOption.DOT_MATCHES_ALL).find(afterP)
+            val kList: List<String> = if (kMatch != null) {
+                kMatch.groups["k"]!!.value.split("|")
+            } else {
+                // fallback: find the longest quoted string containing '|' and split it
+                val allQ = pRegex.findAll(args).mapNotNull { it.groups[2]?.value }.toList()
+                val cand = allQ.reversed().firstOrNull { it.contains("|") && it.length > 10 }
+                cand?.split("|") ?: emptyList()
+            }
+
+            // base conversion digits for up to base 62
+            val digits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            fun numToBase(n: Int, base: Int): String {
+                if (n == 0) return "0"
+                var nn = n
+                val sb = StringBuilder()
+                while (nn > 0) {
+                    val d = nn % base
+                    sb.insert(0, digits[d])
+                    nn /= base
+                }
+                return sb.toString()
+            }
+
+            // prepare payload string (unescape simple escapes)
+            var payload = pPayload
+                .replace("\\'", "'")
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+
+            // replacement from c-1 down to 0
+            for (ii in c - 1 downTo 0) {
+                val key = numToBase(ii, a)
+                if (ii < kList.size && kList[ii].isNotEmpty()) {
+                    // replace token occurrences with word boundaries appropriate for JS tokens
+                    payload = payload.replace(Regex("(?<![A-Za-z0-9_\\$])${Regex.escape(key)}(?![A-Za-z0-9_\\$])"), kList[ii])
+                }
+            }
+            return payload
+        } catch (e: Exception) {
+            return js
+        }
+    }
+
+    /* Enhance your existing deobfuscateJavaScript: call unpackPacker + existing decoders */
+    private fun deobfuscateJavaScriptEnhanced(html: String): String {
+        var result = html
+        // existing atob detection (your current code)
+        Regex("""atob\(['"]([^'"]+)['"]\)""").findAll(html).forEach { match ->
+            try {
+                val encoded = match.groupValues[1]
+                val decoded = String(java.util.Base64.getDecoder().decode(encoded))
+                result += " " + decoded
+            } catch (_: Exception) { }
+        }
+
+        // run Packer unpacker (this will expand eval-packed content)
+        val unpacked = unpackPacker(html)
+        if (unpacked != html) result += " " + unpacked
+
+        // also include original html to ensure coverage
+        result += " " + html
+        return result
+    }
+
+    /* Replace/augment extractCommonLinks to use enhanced deobfuscation and stronger URL detection */
     private suspend fun extractCommonLinks(
         html: String,
         referer: String,
         callback: (ExtractorLink) -> Unit,
-        found: MutableSet<String>
+        foundUrls: MutableSet<String>
     ): Boolean {
         var emitted = false
-        val text = deobfuscateJavaScript(html)
+        val deob = deobfuscateJavaScriptEnhanced(html)
 
-        // 1. NEW — detect base64 encoded iframe URLs
-        Regex("""atob\(["']([^"']+)["']\)""").findAll(text).forEach { match ->
-            val encoded = match.groupValues[1]
-            try {
-                val decoded = String(Base64.getDecoder().decode(encoded))
-                if (decoded.startsWith("http") && found.add(decoded)) {
-                    emitRapidrameLink(decoded, referer, callback)
-                    emitted = true
+        // 1) JSON-LD / contentUrl extraction
+        Regex("""["']contentUrl["']\s*[:=]\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE).findAll(deob).forEach { m ->
+            val url = m.groupValues[1]
+            val norm = normalizeMasterToM3u8(resolveUrl(url, referer))
+            if (foundUrls.add(norm)) {
+                if (norm.endsWith("m3u8", true) || norm.endsWith("master.txt", true)) {
+                    parseMasterPlaylist(norm, referer, callback, foundUrls)
+                } else {
+                    emitRapidrameLink(norm, referer, callback)
                 }
-            } catch (_: Exception) {}
-        }
-
-        // 2. NEW — detect rplayer urls in iframe src
-        Regex("""https?://[^"']*/rplayer/[^"']+""").findAll(text).forEach { m ->
-            val url = m.value
-            if (found.add(url)) {
-                if (extractFromIframeUrl(url, referer, { }, callback, found)) emitted = true
+                emitted = true
             }
         }
 
-        // 3. NEW — detect playlist/manifest urls
-        val playlistRegex = Regex(
-            """https?://[^"']+/(?:manifest|get|stream)/[^"']+(?:m3u8|txt|mp4)[^"']*"""
-        )
-
-        playlistRegex.findAll(text).forEach { m ->
-            val url = m.value.substringBefore("#").substringBefore("?")  // normalize
-            if (found.add(url)) {
-                if (url.endsWith("m3u8")) {
-                    parseMasterPlaylist(url, referer, callback, found)
+        // 2) Host-specific HLS patterns (Playmix / srv / cdnimages etc.)
+        val hlsRegex = Regex("""https?://[A-Za-z0-9\-\._]+/(?:hls|hlsv|stream|manifest|mp4)/[^"'<> \)\(]+(?:m3u8|master\.txt|index\.m3u8|txt/master\.txt|/txt/[^"'<> ]+|\.mp4/txt/master\.txt|/txt/sublist_[^"'<> ]+|/txt/sublist_aud[^"'<> ]+)?""", RegexOption.IGNORE_CASE)
+        hlsRegex.findAll(deob).forEach { m ->
+            var url = m.value
+            if (!url.startsWith("http")) url = resolveUrl(url, referer)
+            url = normalizeMasterToM3u8(url)
+            if (foundUrls.add(url)) {
+                if (url.endsWith("m3u8", true) || url.contains("master", true) || url.endsWith("master.txt", true)) {
+                    parseMasterPlaylist(url, referer, callback, foundUrls)
                 } else {
                     emitRapidrameLink(url, referer, callback)
                 }
@@ -383,8 +501,36 @@ class Hdfc : MainAPI() {
             }
         }
 
+        // 3) Loose reconstruction: look for path fragments and join them if necessary
+        // attempt to find fragments that contain movie-specific tokens and reconstruct
+        val fragmentKeywords = listOf("sisu","2022","bluray","trdual")
+        // collect quoted fragments that include any token
+        val fragRegex = Regex("""['"]([^'"]{6,300})['"]""")
+        val fragMatches = fragRegex.findAll(deob).map { it.groupValues[1] }.filter { f ->
+            fragmentKeywords.any { f.contains(it, true) }
+        }.toList()
+        if (fragMatches.isNotEmpty()) {
+            // attempt to find host prefix in deob text
+            val hostPrefixMatch = Regex("""https?://[A-Za-z0-9\-\._]+""").find(deob)
+            val hostPrefix = hostPrefixMatch?.value
+            for (frag in fragMatches) {
+                val candidate = if (frag.startsWith("http")) frag else (hostPrefix?.let { resolveUrl(frag, it) } ?: frag)
+                val norm = normalizeMasterToM3u8(candidate)
+                if (foundUrls.add(norm)) {
+                    if (norm.endsWith("m3u8", true) || norm.endsWith("master.txt", true)) {
+                        parseMasterPlaylist(norm, referer, callback, foundUrls)
+                    } else {
+                        emitRapidrameLink(norm, referer, callback)
+                    }
+                    emitted = true
+                }
+            }
+        }
+
         return emitted
     }
+
+    // --- end of snippet ---
 
 
     private suspend fun parseMasterPlaylist(
