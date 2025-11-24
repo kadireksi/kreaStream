@@ -14,6 +14,19 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URI
 import java.util.Base64
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.getExtractorApiFromName
+import com.lagradost.extractors.AshdiExtractor
+import com.lagradost.extractors.csstExtractor
+import com.lagradost.models.Ajax
+import com.lagradost.models.Link
+import com.lagradost.models.PlayerJson
+import com.lagradost.models.videoConstructor
 
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
@@ -107,7 +120,7 @@ class Hdfc : MainAPI() {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
         }
-        val langInfo = document.select("span.poster-lang span").first()?.text()?.trim()
+        val langInfo = this.select("span.poster-lang span").first()?.text()?.trim()
         var isSub = false
         var isDub = false
         if(langInfo?.contains("Dublaj", true) == true) {
