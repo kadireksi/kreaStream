@@ -119,7 +119,7 @@ class Hdfc : MainAPI() {
         val isDub = langInfo?.contains("dublaj") == true
         val isSub = langInfo?.contains("altyaz") == true || langInfo?.contains("altyazi") == true
 
-        val finalTitle = if (isDub || isSub) {
+        val finalTitle = if (isDub) {
             "🇹🇷 $rawTitle"
         } else {
             rawTitle
