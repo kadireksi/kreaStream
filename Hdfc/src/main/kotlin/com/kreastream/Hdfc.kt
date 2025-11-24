@@ -254,7 +254,7 @@ class Hdfc : MainAPI() {
             try {
                 Log.d("HDCH", "Processing alternative videoID: $videoID ($sourceLabel)")
                 
-                // CRITICAL FIX: Changed from GET to POST
+                // CRITICAL FIX: Use POST
                 val apiResp = app.post(
                     url = "$mainUrl/video/$videoID/", 
                     headers = mapOf("X-Requested-With" to "fetch"), 
@@ -337,14 +337,11 @@ class Hdfc : MainAPI() {
         return emitted
     }
 
-        // --- add these functions / replacements to Hdfc.kt ---
-
-        /* Unpack Dean Edwards Packer eval(function(p,a,c,k,e,d){...})(...) blocks */
+    /* Unpack Dean Edwards Packer eval(function(p,a,c,k,e,d){...})(...) blocks */
     private fun unpackPacker(js: String): String {
         try {
             val evalStart = js.indexOf("eval(function(p,a,c,k,e,d)")
             if (evalStart < 0) return js
-            // find function body end
             var idx = js.indexOf("function(p,a,c,k,e,d)", evalStart)
             if (idx < 0) return js
             idx = js.indexOf('{', idx)
@@ -364,7 +361,6 @@ class Hdfc : MainAPI() {
             }
             if (endIndex < 0) return js
 
-            // find args parentheses after function end
             val argsOpen = js.indexOf('(', endIndex)
             if (argsOpen < 0) return js
             var j = argsOpen
@@ -383,30 +379,25 @@ class Hdfc : MainAPI() {
             if (argsClose < 0) return js
             val args = js.substring(argsOpen + 1, argsClose)
 
-            // extract first quoted payload (p), then a and c, then the k string before .split('|')
             val pRegex = Regex("""(['"])(?<p>(?:\\\1|.)*?)\1""", RegexOption.DOT_MATCHES_ALL)
             val pMatch = pRegex.find(args) ?: return js
             val pPayload = pMatch.groups["p"]?.value ?: return js
 
-            // numbers a and c after the p payload
             val afterP = args.substring(pMatch.range.last + 1)
             val numMatch = Regex("""\b(\d+)\b""").findAll(afterP).toList()
             if (numMatch.size < 2) return js
             val a = numMatch[0].groups[1]!!.value.toIntOrNull() ?: return js
             val c = numMatch[1].groups[1]!!.value.toIntOrNull() ?: return js
 
-            // capture k payload (string before .split('|'))
             val kMatch = Regex("""(['"])(?<k>(?:\\\1|.)*?)\1\s*\.split\(['"]\|['"]\)""", RegexOption.DOT_MATCHES_ALL).find(afterP)
             val kList: List<String> = if (kMatch != null) {
                 kMatch.groups["k"]!!.value.split("|")
             } else {
-                // fallback: find the longest quoted string containing '|' and split it
                 val allQ = pRegex.findAll(args).mapNotNull { it.groups[2]?.value }.toList()
                 val cand = allQ.reversed().firstOrNull { it.contains("|") && it.length > 10 }
                 cand?.split("|") ?: emptyList()
             }
 
-            // base conversion digits for up to base 62
             val digits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
             fun numToBase(n: Int, base: Int): String {
                 if (n == 0) return "0"
@@ -420,17 +411,14 @@ class Hdfc : MainAPI() {
                 return sb.toString()
             }
 
-            // prepare payload string (unescape simple escapes)
             var payload = pPayload
                 .replace("\\'", "'")
                 .replace("\\\"", "\"")
                 .replace("\\\\", "\\")
 
-            // replacement from c-1 down to 0
             for (ii in c - 1 downTo 0) {
                 val key = numToBase(ii, a)
                 if (ii < kList.size && kList[ii].isNotEmpty()) {
-                    // replace token occurrences with word boundaries appropriate for JS tokens
                     payload = payload.replace(Regex("(?<![A-Za-z0-9_\\$])${Regex.escape(key)}(?![A-Za-z0-9_\\$])"), kList[ii])
                 }
             }
@@ -440,23 +428,24 @@ class Hdfc : MainAPI() {
         }
     }
 
-    /* Enhance your existing deobfuscateJavaScript: call unpackPacker + existing decoders */
-    private fun deobfuscateJavaScriptEnhanced(html: String): String {
+    /* Enhanced deobfuscation: base64 decoding + packer unpack */
+    private fun deobfuscateJavaScript(html: String): String {
         var result = html
-        // existing atob detection (your current code)
+
+        // base64/atob patterns
         Regex("""atob\(['"]([^'"]+)['"]\)""").findAll(html).forEach { match ->
             try {
                 val encoded = match.groupValues[1]
-                val decoded = String(java.util.Base64.getDecoder().decode(encoded))
+                val decoded = String(Base64.getDecoder().decode(encoded))
                 result += " " + decoded
             } catch (_: Exception) { }
         }
 
-        // run Packer unpacker (this will expand eval-packed content)
+        // run Packer unpacker to expose strings built by eval-packed code
         val unpacked = unpackPacker(html)
         if (unpacked != html) result += " " + unpacked
 
-        // also include original html to ensure coverage
+        // include original html for completeness
         result += " " + html
         return result
     }
@@ -469,7 +458,7 @@ class Hdfc : MainAPI() {
         foundUrls: MutableSet<String>
     ): Boolean {
         var emitted = false
-        val deob = deobfuscateJavaScriptEnhanced(html)
+        val deob = deobfuscateJavaScript(html)
 
         // 1) JSON-LD / contentUrl extraction
         Regex("""["']contentUrl["']\s*[:=]\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE).findAll(deob).forEach { m ->
@@ -502,15 +491,12 @@ class Hdfc : MainAPI() {
         }
 
         // 3) Loose reconstruction: look for path fragments and join them if necessary
-        // attempt to find fragments that contain movie-specific tokens and reconstruct
         val fragmentKeywords = listOf("sisu","2022","bluray","trdual")
-        // collect quoted fragments that include any token
         val fragRegex = Regex("""['"]([^'"]{6,300})['"]""")
         val fragMatches = fragRegex.findAll(deob).map { it.groupValues[1] }.filter { f ->
             fragmentKeywords.any { f.contains(it, true) }
         }.toList()
         if (fragMatches.isNotEmpty()) {
-            // attempt to find host prefix in deob text
             val hostPrefixMatch = Regex("""https?://[A-Za-z0-9\-\._]+""").find(deob)
             val hostPrefix = hostPrefixMatch?.value
             for (frag in fragMatches) {
@@ -529,9 +515,6 @@ class Hdfc : MainAPI() {
 
         return emitted
     }
-
-    // --- end of snippet ---
-
 
     private suspend fun parseMasterPlaylist(
         masterUrl: String,
@@ -569,45 +552,11 @@ class Hdfc : MainAPI() {
                     i++
                 }
             } else {
-                 // If it's not a master playlist, treat as single stream
                  emitRapidrameLink(masterUrl, referer, callback)
             }
         } catch (e: Exception) {
-             // Ignore errors
+             // ignore
         }
-    }
-
-    private fun deobfuscateJavaScript(html: String): String {
-        var result = html
-        
-        // Standard Packer Decoder
-        val evalPattern = Regex("""eval\(function\(p,a,c,k,e,d\)\{[^}]+\}[^)]+\)\)""", RegexOption.MULTILINE)
-        evalPattern.findAll(html).toList().forEach { match ->
-            try {
-                // Basic unpacker logic usually suffices if we just need strings
-                // Ideally use a JS evaluator, but basic split often works for URLs
-                val packed = match.value
-                val dataMatch = Regex("""\{[^}]*\}\.split\(['"]([^'"]+)['"]\)""").find(packed)
-                if (dataMatch != null) {
-                    result += " " + dataMatch.groupValues[1]
-                }
-            } catch (e: Exception) {
-                // ignore
-            }
-        }
-        
-        // Base64 Decoding
-        Regex("""atob\(['"]([^'"]+)['"]\)""").findAll(html).toList().forEach { match ->
-            try {
-                val encoded = match.groupValues[1]
-                val decoded = String(Base64.getDecoder().decode(encoded))
-                result += " $decoded"
-            } catch (e: Exception) {
-               // ignore
-            }
-        }
-        
-        return result
     }
 
     private fun extractSubtitlesFromHtml(html: String): List<SubtitleFile> {
