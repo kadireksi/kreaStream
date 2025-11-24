@@ -107,19 +107,12 @@ class Hdfc : MainAPI() {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
         }
-        val langInfo = this.select("span.poster-lang span").first()?.text()
-        val dubTag = when {
-            langInfo?.contains("Dublaj", true) == true -> "Türkçe Dublaj"
-            langInfo?.contains("Altyaz", true) == true -> "Türkçe Altyazılı"
-            else -> null
-        }
         return newMovieSearchResponse(rawTitle, href, type) { 
             this.posterUrl = posterUrl 
             this.year = year
             if (score != null) {
                 this.score = Score.from10(score)
             }
-            addDubStatus(dubTag)
         }
     }
 
@@ -144,19 +137,12 @@ class Hdfc : MainAPI() {
             val year = yearText?.toIntOrNull()
             val scoreText = document.select("span.imdb").first()?.text()?.trim()
             val score = scoreText?.toFloatOrNull()
-            val langInfo = document.select("span.poster-lang span").first()?.text()
-            val dubTag = when {
-                langInfo?.contains("Dublaj", true) == true -> "Türkçe Dublaj"
-                langInfo?.contains("Altyaz", true) == true -> "Türkçe Altyazılı"
-                else -> null
-            }
             searchResults.add(newMovieSearchResponse(title, href, TvType.Movie) { 
                 this.posterUrl = posterUrl?.replace("/thumb/", "/list/") 
                 this.year = year
                 if (score != null) {
                     this.score = Score.from10(score)
                 }
-                addDubStatus(dubTag)
             })
         }
         return searchResults
@@ -222,8 +208,7 @@ class Hdfc : MainAPI() {
                 val recTitle = it.attr("title").ifEmpty { it.text() }
                 val recPoster = fixUrlNull(it.select("img").first()?.attr("data-src") ?: it.select("img").first()?.attr("src"))
                 newTvSeriesSearchResponse(recTitle, recHref, TvType.TvSeries) { 
-                    this.posterUrl = recPoster
-                    addDubStatus(dubTag)
+                    this.posterUrl = recPoster 
                 }
             }
 
@@ -247,7 +232,6 @@ class Hdfc : MainAPI() {
                         this.score = Score.from10(score)
                     }
                     this.recommendations = recommendations
-                    addDubStatus(dubTag)
                     addActors(actors)
                     addTrailer(trailer)
                 }
@@ -261,7 +245,6 @@ class Hdfc : MainAPI() {
                         this.score = Score.from10(score)
                     }
                     this.recommendations = recommendations
-                    addDubStatus(dubTag)
                     addActors(actors)
                     addTrailer(trailer)
                 }
