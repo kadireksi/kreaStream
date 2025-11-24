@@ -103,7 +103,11 @@ class Hdfc : MainAPI() {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
         }
-        return newMovieSearchResponse(rawTitle, href, type) { this.posterUrl = posterUrl }
+        return newMovieSearchResponse(rawTitle, href, type) { 
+            this.posterUrl = posterUrl 
+            this.year = year
+            this.score = Score.from10(score)
+        }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
@@ -190,7 +194,11 @@ class Hdfc : MainAPI() {
                 val recHref = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
                 val recTitle = it.attr("title").ifEmpty { it.text() }
                 val recPoster = fixUrlNull(it.select("img").first()?.attr("data-src") ?: it.select("img").first()?.attr("src"))
-                newTvSeriesSearchResponse(recTitle, recHref, TvType.TvSeries) { this.posterUrl = recPoster }
+                newTvSeriesSearchResponse(recTitle, recHref, TvType.TvSeries) { 
+                    this.posterUrl = recPoster 
+                    this.year = year
+                    this.score = Score.from10(score)
+                }
             }
 
             // Trailer
