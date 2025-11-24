@@ -10,7 +10,6 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.nicehttp.NiceResponse
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URI
@@ -46,7 +45,6 @@ class Hdfc : MainAPI() {
         "${mainUrl}/load/page/1/mostLiked/" to "En Çok Beğenilenler"
     )
 
-    // Removing explicit return type allows inference to work even if imports vary slightly
     private suspend fun safeGet(
         url: String,
         headers: Map<String, String> = standardHeaders,
@@ -63,12 +61,10 @@ class Hdfc : MainAPI() {
             request.data.replace("/page/1/", "/page/${page}/")
         }
 
-        Log.d("HDCH", "getMainPage -> $url")
         val response = safeGet(url, standardHeaders, mainUrl)
         val text = response.text
 
         if (text.contains("Sayfa Bulunamadı", true)) {
-            Log.d("HDCH", "Sayfa bulunamadı: $url")
             return newHomePageResponse(request.name, emptyList())
         }
 
@@ -78,7 +74,6 @@ class Hdfc : MainAPI() {
                     val parsed: HDFC = objectMapper.readValue(text)
                     Jsoup.parse(parsed.html)
                 } catch (e: Exception) {
-                    Log.e("HDCH", "getMainPage JSON parse failed: ${e.message}")
                     response.document
                 }
             } else {
@@ -86,12 +81,9 @@ class Hdfc : MainAPI() {
             }
 
             val posterElements = document.select("div.posters-4-col a.poster, a.poster, .posters-4-col a")
-            Log.d("HDCH", "Found posters: ${posterElements.size}")
-
             val results = posterElements.mapNotNull { it.toSearchResult() }
             newHomePageResponse(request.name, results)
         } catch (e: Exception) {
-            Log.e("HDCH", "getMainPage failed: ${e.message}")
             newHomePageResponse(request.name, emptyList())
         }
     }
@@ -141,8 +133,6 @@ class Hdfc : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse? {
         try {
-            Log.d("HDCH", "Loading details: $url")
-
             val response = safeGet(url, standardHeaders, mainUrl)
             val text = response.text
 
@@ -151,7 +141,6 @@ class Hdfc : MainAPI() {
                     val parsed = objectMapper.readValue<HDFC>(text)
                     Jsoup.parse(parsed.html)
                 } catch (e: Exception) {
-                    Log.e("HDCH", "load JSON parse failed: ${e.message}")
                     response.document
                 }
             } else {
@@ -159,10 +148,7 @@ class Hdfc : MainAPI() {
             }
 
             val title = document.select("h1.section-title, h1.entry-title").first()?.text()?.substringBefore(" izle")?.trim()
-                ?: run {
-                    Log.e("HDCH", "No title found for $url")
-                    return null
-                }
+                ?: return null
 
             val poster = fixUrlNull(
                 document.select("aside.post-info-poster img.lazyload").first()?.attr("data-src")
@@ -247,6 +233,7 @@ class Hdfc : MainAPI() {
         val pageResp = safeGet(data, standardHeaders, mainUrl)
         val document = pageResp.document
 
+        // 1. Check for hidden close iframe
         val closeIframe = fixUrlNull(document.select(".close").first()?.attr("data-src"))?.takeIf { it.isNotBlank() }
         if (!closeIframe.isNullOrBlank()) {
             Log.d("HDCH", "Found Close iframe: $closeIframe")
@@ -259,14 +246,20 @@ class Hdfc : MainAPI() {
             }
         }
 
-        // Fixed ambiguity: converted to list
+        // 2. Check Alternative Buttons (AJAX POST REQUIRED)
         val altButtons = document.select("div.alternative-links button.alternative-link").toList()
         for (button in altButtons) {
             val sourceLabel = button.text().replace("(HDrip Xbet)", "").trim()
             val videoID = button.attr("data-video").takeIf { it.isNotBlank() } ?: continue
             try {
                 Log.d("HDCH", "Processing alternative videoID: $videoID ($sourceLabel)")
-                val apiResp = safeGet("$mainUrl/video/$videoID/", mapOf("X-Requested-With" to "fetch"), data)
+                
+                // CRITICAL FIX: Changed from GET to POST
+                val apiResp = app.post(
+                    url = "$mainUrl/video/$videoID/", 
+                    headers = mapOf("X-Requested-With" to "fetch"), 
+                    referer = data
+                )
                 
                 val parsed = try { objectMapper.readValue<VideoIframe>(apiResp.text) } catch (e: Exception) { null }
                 val iframeHtml = parsed?.data?.html ?: continue
@@ -286,7 +279,7 @@ class Hdfc : MainAPI() {
             }
         }
 
-        // Fixed ambiguity: converted to list
+        // 3. Direct Iframes
         val directIframes = document.select("iframe[data-src], iframe[src]").toList()
         for (iframe in directIframes) {
             val src = iframe.attr("data-src").ifBlank { iframe.attr("src") }
@@ -314,6 +307,8 @@ class Hdfc : MainAPI() {
         processedUrls: MutableSet<String>
     ): Boolean {
         var emitted = false
+        if (processedUrls.contains(iframeUrl)) return false
+        processedUrls.add(iframeUrl)
         
         try {
             Log.d("HDCH", "Fetching iframe: $iframeUrl")
@@ -322,31 +317,16 @@ class Hdfc : MainAPI() {
 
             extractSubtitlesFromHtml(iframeHtml).forEach { 
                 subtitleCallback(it)
-                Log.d("HDCH", "Subtitle: ${it.lang} -> ${it.url}")
             }
 
-            when {
-                iframeUrl.contains("hdfilmcehennemi.mobi", ignoreCase = true) -> {
-                    if (extractCloseLinks(iframeHtml, refererForIframe, callback, processedUrls)) emitted = true
-                }
-                iframeUrl.contains("/rplayer/", ignoreCase = true) -> {
-                    if (extractRapidrameLinks(iframeHtml, refererForIframe, callback, processedUrls)) emitted = true
-                }
-                else -> {
-                    if (extractCloseLinks(iframeHtml, refererForIframe, callback, processedUrls)) emitted = true
-                    if (extractRapidrameLinks(iframeHtml, refererForIframe, callback, processedUrls)) emitted = true
-                }
-            }
-
+            // Generalized extraction logic (less dependent on specific domains)
+            if (extractCommonLinks(iframeHtml, refererForIframe, callback, processedUrls)) emitted = true
+            
+            // Specific player recursive check
             Regex("""/rplayer/([A-Za-z0-9_\-]+)/?""").find(iframeHtml)?.groupValues?.getOrNull(1)?.let { id ->
-                try {
-                    val rplayerUrl = "$mainUrl/rplayer/$id/"
-                    Log.d("HDCH", "Found rplayer reference: $rplayerUrl")
-                    if (extractFromIframeUrl(rplayerUrl, refererForIframe, subtitleCallback, callback, processedUrls)) {
-                        emitted = true
-                    }
-                } catch (e: Exception) {
-                    Log.e("HDCH", "rplayer fetch failed: ${e.message}")
+                val rplayerUrl = "$mainUrl/rplayer/$id/"
+                if (extractFromIframeUrl(rplayerUrl, refererForIframe, subtitleCallback, callback, processedUrls)) {
+                    emitted = true
                 }
             }
 
@@ -357,83 +337,43 @@ class Hdfc : MainAPI() {
         return emitted
     }
 
-    private suspend fun extractCloseLinks(
+    private suspend fun extractCommonLinks(
         html: String,
         referer: String,
         callback: (ExtractorLink) -> Unit,
         foundUrls: MutableSet<String>
     ): Boolean {
         var emitted = false
-
-        Regex("""https?://srv\d+\.cdnimages\d*\.sbs/[^\s"'<>]+?(?:master\.txt|index\.m3u8)""", RegexOption.IGNORE_CASE)
-            .findAll(html).toList().forEach { m ->
-                val url = m.value.substringBefore("?").substringBefore("#")
-                if (foundUrls.add(url)) {
-                    val normalized = normalizeMasterToM3u8(url)
-                    emitCloseLink(normalized, referer, callback)
-                    emitted = true
-                }
-            }
-
-        Regex("""https?://[^\s"'<>]+?/txt/master\.txt""", RegexOption.IGNORE_CASE)
-            .findAll(html).toList().forEach { m ->
-                val url = m.value
-                if (foundUrls.add(url)) {
-                    val normalized = normalizeMasterToM3u8(url)
-                    emitCloseLink(normalized, referer, callback)
-                    emitted = true
-                }
-            }
-
-        Regex("""contentUrl["\s:]+["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .findAll(html).toList().forEach { m ->
-                val url = m.groupValues[1]
-                if (url.contains("cdnimages", ignoreCase = true) && foundUrls.add(url)) {
-                    val normalized = normalizeMasterToM3u8(url)
-                    emitCloseLink(normalized, referer, callback)
-                    emitted = true
-                }
-            }
-
-        return emitted
-    }
-
-    private suspend fun extractRapidrameLinks(
-        html: String,
-        referer: String,
-        callback: (ExtractorLink) -> Unit,
-        foundUrls: MutableSet<String>
-    ): Boolean {
-        var emitted = false
-
         val deobfuscated = deobfuscateJavaScript(html)
-        
-        Regex("""https?://s\d+\.rapidrame\.com/[^\s"'<>]+?master\.m3u8[^\s"'<>]*""", RegexOption.IGNORE_CASE)
-            .findAll(deobfuscated).toList().forEach { m ->
-                val url = m.value
-                if (foundUrls.add(url)) {
-                    parseMasterPlaylist(url, referer, callback, foundUrls)
-                    emitted = true
-                }
-            }
 
-        Regex("""https?://s\d+\.rapidrame\.com/[^\s"'<>]+?index-f\d+-[^\s"'<>]+?\.m3u8[^\s"'<>]*""", RegexOption.IGNORE_CASE)
-            .findAll(deobfuscated).toList().forEach { m ->
-                val url = m.value
-                if (foundUrls.add(url)) {
-                    emitRapidrameLink(url, referer, callback)
-                    emitted = true
+        // 1. Master Playlist / m3u8 (Generic Regex)
+        // Matches any http(s) URL ending in .m3u8 or master.txt inside the JS/HTML
+        val masterRegex = Regex("""https?://[^\s"']+/.*?(?:master\.txt|index\.m3u8|[a-zA-Z0-9]+\.m3u8)""")
+        masterRegex.findAll(deobfuscated).toList().forEach { m ->
+            val url = m.value.substringBefore("?").substringBefore("#")
+            if (foundUrls.add(url)) {
+                val normalized = normalizeMasterToM3u8(url)
+                
+                // Distinguish between Master (Multi-quality) and standard streams
+                if (normalized.contains("master") || normalized.contains("index")) {
+                    parseMasterPlaylist(normalized, referer, callback, foundUrls)
+                } else {
+                    emitRapidrameLink(normalized, referer, callback)
                 }
+                emitted = true
             }
+        }
 
+        // 2. Specific JSON Content URL pattern
         Regex("""contentUrl["\s:]+["']([^"']+)["']""", RegexOption.IGNORE_CASE)
             .findAll(deobfuscated).toList().forEach { m ->
                 val url = m.groupValues[1]
-                if (url.contains("rapidrame", ignoreCase = true) && foundUrls.add(url)) {
-                    if (url.contains("master.m3u8")) {
-                        parseMasterPlaylist(url, referer, callback, foundUrls)
+                if (foundUrls.add(url)) {
+                     val normalized = normalizeMasterToM3u8(url)
+                     if (url.contains("master.m3u8") || url.contains("master.txt")) {
+                        parseMasterPlaylist(normalized, referer, callback, foundUrls)
                     } else {
-                        emitRapidrameLink(url, referer, callback)
+                        emitRapidrameLink(normalized, referer, callback)
                     }
                     emitted = true
                 }
@@ -449,72 +389,70 @@ class Hdfc : MainAPI() {
         foundUrls: MutableSet<String>
     ) {
         try {
-            Log.d("HDCH", "Parsing master playlist: $masterUrl")
             val response = safeGet(masterUrl, standardHeaders, referer)
             val content = response.text
             
-            val lines = content.lines()
-            var i = 0
-            while (i < lines.size) {
-                val line = lines[i].trim()
-                if (line.startsWith("#EXT-X-STREAM-INF:")) {
-                    if (i + 1 < lines.size) {
-                        val urlLine = lines[i + 1].trim()
-                        if (urlLine.isNotEmpty() && !urlLine.startsWith("#")) {
-                            val variantUrl = if (urlLine.startsWith("http")) {
-                                urlLine
-                            } else {
-                                resolveUrl(urlLine, masterUrl)
-                            }
-                            
-                            if (foundUrls.add(variantUrl)) {
-                                val bandwidth = Regex("""BANDWIDTH=(\d+)""").find(line)?.groupValues?.get(1)?.toIntOrNull()
-                                val resolution = Regex("""RESOLUTION=(\d+)x(\d+)""").find(line)?.groupValues?.get(1)
-                                
-                                val quality = when {
-                                    resolution != null && resolution.toIntOrNull()?: 0 >= 1920 -> Qualities.P1080.value
-                                    resolution != null && resolution.toIntOrNull() ?: 0 >= 1280 -> Qualities.P720.value
-                                    resolution != null && resolution.toIntOrNull() ?: 0 >= 640 -> Qualities.P480.value
-                                    bandwidth != null && bandwidth >= 2000000 -> Qualities.P1080.value
-                                    bandwidth != null && bandwidth >= 1000000 -> Qualities.P720.value
-                                    else -> Qualities.P480.value
+            if (content.contains("#EXT-X-STREAM-INF")) {
+                val lines = content.lines()
+                var i = 0
+                while (i < lines.size) {
+                    val line = lines[i].trim()
+                    if (line.startsWith("#EXT-X-STREAM-INF:")) {
+                        if (i + 1 < lines.size) {
+                            val urlLine = lines[i + 1].trim()
+                            if (urlLine.isNotEmpty() && !urlLine.startsWith("#")) {
+                                val variantUrl = resolveUrl(urlLine, masterUrl)
+                                if (foundUrls.add(variantUrl)) {
+                                    val resolution = Regex("""RESOLUTION=(\d+)x(\d+)""").find(line)?.groupValues?.get(2)?.toIntOrNull()
+                                    val quality = when {
+                                        resolution != null && resolution >= 1080 -> Qualities.P1080.value
+                                        resolution != null && resolution >= 720 -> Qualities.P720.value
+                                        resolution != null && resolution >= 480 -> Qualities.P480.value
+                                        else -> Qualities.Unknown.value
+                                    }
+                                    emitRapidrameLink(variantUrl, referer, callback, quality)
                                 }
-                                
-                                emitRapidrameLink(variantUrl, referer, callback, quality)
                             }
                         }
                     }
+                    i++
                 }
-                i++
+            } else {
+                 // If it's not a master playlist, treat as single stream
+                 emitRapidrameLink(masterUrl, referer, callback)
             }
         } catch (e: Exception) {
-            Log.e("HDCH", "Failed to parse master playlist: ${e.message}")
+             // Ignore errors
         }
     }
 
     private fun deobfuscateJavaScript(html: String): String {
         var result = html
         
+        // Standard Packer Decoder
         val evalPattern = Regex("""eval\(function\(p,a,c,k,e,d\)\{[^}]+\}[^)]+\)\)""", RegexOption.MULTILINE)
         evalPattern.findAll(html).toList().forEach { match ->
             try {
+                // Basic unpacker logic usually suffices if we just need strings
+                // Ideally use a JS evaluator, but basic split often works for URLs
                 val packed = match.value
                 val dataMatch = Regex("""\{[^}]*\}\.split\(['"]([^'"]+)['"]\)""").find(packed)
                 if (dataMatch != null) {
                     result += " " + dataMatch.groupValues[1]
                 }
             } catch (e: Exception) {
-                Log.e("HDCH", "Deobfuscation failed: ${e.message}")
+                // ignore
             }
         }
         
+        // Base64 Decoding
         Regex("""atob\(['"]([^'"]+)['"]\)""").findAll(html).toList().forEach { match ->
             try {
                 val encoded = match.groupValues[1]
                 val decoded = String(Base64.getDecoder().decode(encoded))
                 result += " $decoded"
             } catch (e: Exception) {
-                Log.e("HDCH", "atob decode failed: ${e.message}")
+               // ignore
             }
         }
         
@@ -536,50 +474,25 @@ class Hdfc : MainAPI() {
             val final = if (src.startsWith("http")) src else resolveUrl(src, mainUrl)
             subs += SubtitleFile(lang, final)
         }
-        
-        Regex("""https?://[^\s"'<>]+\.(?:vtt|srt)""", RegexOption.IGNORE_CASE).findAll(html).toList().forEach { m ->
-            val url = m.value.substringBefore("?").substringBefore("#")
-            val lang = when {
-                url.contains("-tr", true) || url.contains("_Turkish", true) -> "Türkçe"
-                url.contains("-en", true) || url.contains("_English", true) -> "English"
-                url.contains("forced", true) -> "Forced"
-                else -> "Unknown"
-            }
-            subs += SubtitleFile(lang, url)
-        }
-        
-        return subs.distinctBy { it.url }
+        return subs
     }
 
     private suspend fun emitCloseLink(url: String, referer: String, callback: (ExtractorLink) -> Unit) {
-        val normalized = normalizeMasterToM3u8(url)
-        val quality = extractQualityFromUrl(normalized)
-        callback(
-            newExtractorLink(
-                source = "HDFC Close",
-                name = "HDFC Close",
-                url = normalized
-            ) {
-                this.referer = referer
-                this.quality = quality
-            }
-        )
-        Log.d("HDCH", "emitCloseLink -> $normalized [Q:$quality]")
+        emitRapidrameLink(url, referer, callback)
     }
 
     private suspend fun emitRapidrameLink(url: String, referer: String, callback: (ExtractorLink) -> Unit, qualityOverride: Int? = null) {
         val quality = qualityOverride ?: extractQualityFromUrl(url)
         callback(
             newExtractorLink(
-                source = "HDFC Rapidrame",
-                name = "HDFC Rapidrame",
+                source = "HDFC",
+                name = "HDFC",
                 url = url
             ) {
                 this.referer = referer
                 this.quality = quality
             }
         )
-        Log.d("HDCH", "emitRapidrameLink -> $url [Q:$quality]")
     }
 
     private fun normalizeMasterToM3u8(url: String): String {
@@ -593,9 +506,9 @@ class Hdfc : MainAPI() {
     private fun extractQualityFromUrl(url: String): Int {
         return when {
             url.contains("2160", true) || url.contains("4k", true) -> Qualities.P2160.value
-            url.contains("1080", true) || url.contains("f2-v1", true) -> Qualities.P1080.value
+            url.contains("1080", true) -> Qualities.P1080.value
             url.contains("720", true) -> Qualities.P720.value
-            url.contains("480", true) || url.contains("f1-v1", true) -> Qualities.P480.value
+            url.contains("480", true) -> Qualities.P480.value
             url.contains("360", true) -> Qualities.P360.value
             else -> Qualities.Unknown.value
         }
@@ -613,7 +526,6 @@ class Hdfc : MainAPI() {
                 baseUri.resolve(url).toString()
             }
         } catch (e: Exception) {
-            Log.e("HDCH", "resolveUrl error: ${e.message}")
             url
         }
     }
