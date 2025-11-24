@@ -119,18 +119,17 @@ class Hdfc : MainAPI() {
         val isDub = langInfo?.contains("dublaj") == true
         val isSub = langInfo?.contains("altyaz") == true || langInfo?.contains("altyazi") == true
 
-        return newMovieSearchResponse(rawTitle, href, type) { 
+        val finalTitle = if (isDub || isSub) {
+            "🇹🇷 $rawTitle"
+        } else {
+            rawTitle
+        }
+
+        return newMovieSearchResponse(finalTitle, href, type) { 
             this.posterUrl = posterUrl 
             this.year = year
             if (score != null) {
                 this.score = Score.from10(score)
-            }
-            val posterContent = buildString {
-                if (isDub) append("🇹🇷")
-                if (isSub) append("📝")
-            }
-            if (posterContent.isNotEmpty()) {
-                this.posterContent = posterContent
             }
         }
     }
