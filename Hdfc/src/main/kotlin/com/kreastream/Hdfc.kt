@@ -254,7 +254,6 @@ class Hdfc : MainAPI() {
             try {
                 Log.d("HDCH", "Processing alternative videoID: $videoID ($sourceLabel)")
                 
-                // CRITICAL FIX: Use POST
                 val apiResp = app.post(
                     url = "$mainUrl/video/$videoID/", 
                     headers = mapOf("X-Requested-With" to "fetch"), 
@@ -320,7 +319,7 @@ class Hdfc : MainAPI() {
                 subtitleCallback(it)
             }
 
-            // NEW: Enhanced extraction for rapidrame embedded content
+            // Enhanced extraction for rapidrame embedded content
             if (extractRapidrameLinks(iframeHtml, refererForIframe, callback, processedUrls)) emitted = true
 
             // Look for additional embedded iframes recursively
@@ -340,7 +339,7 @@ class Hdfc : MainAPI() {
         return emitted
     }
 
-    /* NEW: Specialized extraction for rapidrame player content */
+    /* Specialized extraction for rapidrame player content */
     private suspend fun extractRapidrameLinks(
         html: String,
         referer: String,
@@ -349,50 +348,46 @@ class Hdfc : MainAPI() {
     ): Boolean {
         var emitted = false
         
-        // Method 1: Direct HLS URL patterns from the text file example
-        val hlsPatterns = listOf(
+        // Method 1: Direct URL patterns
+        val urlPatterns = listOf(
             Regex("""https?://[A-Za-z0-9\-\.]+/hls/[^"'\s<>]+\.(?:m3u8|master\.txt)"""),
             Regex("""https?://srv\d+\.cdnimages\d+\.sbs/hls/[^"'\s<>]+\.mp4/txt/master\.txt"""),
-            Regex("""["'](https?://[^"'\s<>]+/txt/(?:master\.txt|sublist_[^"'\s<>]+))["']""")
+            Regex("""["'](https?://[^"'\s<>]+/txt/(?:master\.txt|sublist_[^"'\s<>]+\.txt))["']"""),
+            Regex("""(https?://[^"'\s<>]+\.(?:m3u8|mp4))""")
         )
         
-        for (pattern in hlsPatterns) {
+        for (pattern in urlPatterns) {
             pattern.findAll(html).forEach { match ->
                 var url = match.groupValues[1].takeIf { it.startsWith("http") } ?: match.value
                 url = normalizeMasterToM3u8(url)
                 if (foundUrls.add(url)) {
-                    Log.d("HDCH", "Found HLS URL: $url")
+                    Log.d("HDCH", "Found URL via pattern: $url")
                     parseMasterPlaylist(url, referer, callback, foundUrls)
                     emitted = true
                 }
             }
         }
 
-        // Method 2: Deobfuscate JavaScript and extract URLs
-        val deobfuscated = deobfuscateRapidrameJavaScript(html)
-        if (deobfuscated.isNotEmpty()) {
-            // Look for CDN patterns in deobfuscated code
-            val cdnPattern = Regex("""(https?://srv\d+\.cdnimages\d+\.sbs/[^"'\s<>]+)""")
-            cdnPattern.findAll(deobfuscated).forEach { match ->
-                val url = match.value
-                if (url.contains("/hls/") || url.contains("/txt/")) {
-                    val finalUrl = normalizeMasterToM3u8(url)
-                    if (foundUrls.add(finalUrl)) {
-                        Log.d("HDCH", "Found CDN URL from JS: $finalUrl")
-                        parseMasterPlaylist(finalUrl, referer, callback, foundUrls)
-                        emitted = true
-                    }
+        // Method 2: Extract from JavaScript
+        if (!emitted) {
+            val jsUrls = extractUrlsFromJavaScript(html)
+            for (url in jsUrls) {
+                val finalUrl = normalizeMasterToM3u8(url)
+                if (foundUrls.add(finalUrl)) {
+                    Log.d("HDCH", "Found URL from JS: $finalUrl")
+                    parseMasterPlaylist(finalUrl, referer, callback, foundUrls)
+                    emitted = true
                 }
             }
         }
 
-        // Method 3: Extract from packed JavaScript (specific to the example)
+        // Method 3: Try to find URLs in unpacked JavaScript
         if (!emitted) {
-            val packedUrls = extractFromPackedJavaScript(html)
-            for (url in packedUrls) {
+            val unpackedUrls = extractFromUnpackedJavaScript(html)
+            for (url in unpackedUrls) {
                 val finalUrl = normalizeMasterToM3u8(url)
                 if (foundUrls.add(finalUrl)) {
-                    Log.d("HDCH", "Found URL from packed JS: $finalUrl")
+                    Log.d("HDCH", "Found URL from unpacked JS: $finalUrl")
                     parseMasterPlaylist(finalUrl, referer, callback, foundUrls)
                     emitted = true
                 }
@@ -402,158 +397,134 @@ class Hdfc : MainAPI() {
         return emitted
     }
 
-    /* NEW: Enhanced deobfuscation for rapidrame specific JavaScript */
-    private fun deobfuscateRapidrameJavaScript(html: String): String {
-        var result = StringBuilder()
-        
-        // Extract all script content
-        val scripts = Regex("""<script[^>]*>([^<]*)</script>""", RegexOption.DOT_MATCHES_ALL).findAll(html).toList()
-        for (script in scripts) {
-            val scriptContent = script.groupValues[1]
-            if (scriptContent.contains("eval(function(p,a,c,k,e,d)") || scriptContent.contains("rapidrame")) {
-                // Try to unpack the packed JavaScript
-                val unpacked = unpackPacker(scriptContent)
-                result.append(unpacked).append("\n")
-            } else {
-                result.append(scriptContent).append("\n")
-            }
-        }
-        
-        return result.toString()
-    }
-
-    /* NEW: Extract URLs from packed JavaScript (specific to the example format) */
-    private fun extractFromPackedJavaScript(html: String): List<String> {
+    /* Improved JavaScript URL extraction */
+    private fun extractUrlsFromJavaScript(html: String): List<String> {
         val urls = mutableListOf<String>()
         
-        // Look for the specific packed pattern from the example
-        val packedMatch = Regex("""eval\(function\(p,a,c,k,e,d\)[^{]+\{([^}]+)\}\)[^)]+\)""", RegexOption.DOT_MATCHES_ALL).find(html)
-        if (packedMatch != null) {
-            try {
-                // Extract potential URLs from the packed content
-                val potentialUrls = Regex("""['"]([A-Za-z0-9+/=]+)['"]""").findAll(packedMatch.value).map { it.groupValues[1] }.toList()
-                
-                for (potential in potentialUrls) {
-                    try {
-                        // Try base64 decoding
-                        if (potential.length > 10) {
-                            val decoded = String(Base64.getDecoder().decode(potential))
-                            if (decoded.contains("http") || decoded.contains("/hls/") || decoded.contains("cdnimages")) {
-                                urls.add(decoded)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // Not base64, check if it looks like a URL fragment
-                        if (potential.contains("sisu") || potential.contains("bluray") || potential.contains("trdual")) {
-                            // Reconstruct URL from fragments
-                            val reconstructed = "https://srv12.cdnimages2068.sbs/hls/$potential.mp4/txt/master.txt"
-                            urls.add(reconstructed)
-                        }
+        // Extract all script content
+        val scripts = Regex("""<script[^>]*>([^<]+)</script>""").findAll(html).toList()
+        for (script in scripts) {
+            val scriptContent = script.groupValues[1]
+            
+            // Look for direct URL patterns in script
+            val urlPatterns = listOf(
+                Regex("""(https?://srv\d+\.cdnimages\d+\.sbs/[^"'\s]+)"""),
+                Regex("""(https?://[^"'\s]+/hls/[^"'\s]+)"""),
+                Regex("""["']([^"'\s]+\.(?:m3u8|master\.txt|mp4))["']""")
+            )
+            
+            for (pattern in urlPatterns) {
+                pattern.findAll(scriptContent).forEach { match ->
+                    var url = match.groupValues[1].takeIf { it.startsWith("http") } ?: match.value
+                    if (url.contains("cdnimages") || url.contains("/hls/")) {
+                        urls.add(url)
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("HDCH", "Error extracting from packed JS: ${e.message}")
             }
-        }
-        
-        // Also look for direct URL patterns in the packed content
-        val directUrlPattern = Regex("""(https?://[^"'\s<>]+/sisu[^"'\s<>]*\.(?:m3u8|master\.txt|mp4))""")
-        directUrlPattern.findAll(html).forEach { match ->
-            urls.add(match.value)
+            
+            // Try to unpack packed JavaScript
+            if (scriptContent.contains("eval(function(p,a,c,k,e,d)")) {
+                val unpacked = unpackPacker(scriptContent)
+                if (unpacked != scriptContent) {
+                    // Search for URLs in unpacked content
+                    val unpackedUrls = Regex("""(https?://[^"'\s]+)""").findAll(unpacked).map { it.value }.toList()
+                    urls.addAll(unpackedUrls.filter { it.contains("cdnimages") || it.contains("/hls/") })
+                }
+            }
         }
         
         return urls.distinct()
     }
 
-    /* Keep existing unpackPacker function but make it more robust */
+    /* Improved unpacker function */
     private fun unpackPacker(js: String): String {
         try {
-                        val evalStart = js.indexOf("eval(function(p,a,c,k,e,d)")
+            val evalStart = js.indexOf("eval(function(p,a,c,k,e,d)")
             if (evalStart < 0) return js
-            var idx = js.indexOf("function(p,a,c,k,e,d)", evalStart)
-            if (idx < 0) return js
-            idx = js.indexOf('{', idx)
-            if (idx < 0) return js
-            var depth = 0
-            var i = idx
-            var endIndex = -1
-            while (i < js.length) {
-                when (js[i]) {
-                    '{' -> depth++
-                    '}' -> {
-                        depth--
-                        if (depth == 0) { endIndex = i; break }
-                    }
-                }
-                i++
-            }
-            if (endIndex < 0) return js
-
-            val argsOpen = js.indexOf('(', endIndex)
-            if (argsOpen < 0) return js
-            var j = argsOpen
-            var pDepth = 0
-            var argsClose = -1
-            while (j < js.length) {
-                when (js[j]) {
-                    '(' -> pDepth++
-                    ')' -> {
-                        pDepth--
-                        if (pDepth == 0) { argsClose = j; break }
-                    }
-                }
-                j++
-            }
-            if (argsClose < 0) return js
-            val args = js.substring(argsOpen + 1, argsClose)
-
-            val pRegex = Regex("""(['"])(?<p>(?:\\\1|.)*?)\1""", RegexOption.DOT_MATCHES_ALL)
-            val pMatch = pRegex.find(args) ?: return js
-            val pPayload = pMatch.groups["p"]?.value ?: return js
-
-            val afterP = args.substring(pMatch.range.last + 1)
-            val numMatch = Regex("""\b(\d+)\b""").findAll(afterP).toList()
-            if (numMatch.size < 2) return js
-            val a = numMatch[0].groups[1]!!.value.toIntOrNull() ?: return js
-            val c = numMatch[1].groups[1]!!.value.toIntOrNull() ?: return js
-
-            val kMatch = Regex("""(['"])(?<k>(?:\\\1|.)*?)\1\s*\.split\(['"]\|['"]\)""", RegexOption.DOT_MATCHES_ALL).find(afterP)
-            val kList: List<String> = if (kMatch != null) {
-                kMatch.groups["k"]!!.value.split("|")
-            } else {
-                val allQ = pRegex.findAll(args).mapNotNull { it.groups[2]?.value }.toList()
-                val cand = allQ.reversed().firstOrNull { it.contains("|") && it.length > 10 }
-                cand?.split("|") ?: emptyList()
-            }
-
+            
+            // Extract the entire packed function
+            val packedMatch = Regex("""eval\(function\(p,a,c,k,e,d\)\{[^}]+\}\)\(([^)]+)\)""").find(js)
+            if (packedMatch == null) return js
+            
+            val argsStr = packedMatch.groupValues[1]
+            val args = argsStr.split(',').map { it.trim().removeSurrounding("'").removeSurrounding("\"") }
+            
+            if (args.size < 4) return js
+            
+            val p = args[0]  // packed code
+            val a = args[1].toIntOrNull() ?: 62
+            val c = args[2].toIntOrNull() ?: 0
+            val kStr = args[3]  // dictionary string
+            
+            val k = kStr.split('|')
+            
+            // Simple unpacking logic
             val digits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            
             fun numToBase(n: Int, base: Int): String {
                 if (n == 0) return "0"
-                var nn = n
-                val sb = StringBuilder()
-                while (nn > 0) {
-                    val d = nn % base
-                    sb.insert(0, digits[d])
-                    nn /= base
+                var num = n
+                val result = StringBuilder()
+                while (num > 0) {
+                    result.insert(0, digits[num % base])
+                    num /= base
                 }
-                return sb.toString()
+                return result.toString()
             }
-
-            var payload = pPayload
-                .replace("\\'", "'")
+            
+            var unpacked = p
+            for (i in k.indices.reversed()) {
+                val key = numToBase(i, a)
+                if (i < k.size) {
+                    unpacked = unpacked.replace(Regex("\\b$key\\b"), k[i])
+                }
+            }
+            
+            // Clean up escaped characters
+            unpacked = unpacked.replace("\\'", "'")
                 .replace("\\\"", "\"")
                 .replace("\\\\", "\\")
-
-            for (ii in c - 1 downTo 0) {
-                val key = numToBase(ii, a)
-                if (ii < kList.size && kList[ii].isNotEmpty()) {
-                    payload = payload.replace(Regex("(?<![A-Za-z0-9_\\$])${Regex.escape(key)}(?![A-Za-z0-9_\\$])"), kList[ii])
-                }
-            }
-            return js // fallback
+            
+            return unpacked
         } catch (e: Exception) {
+            Log.e("HDCH", "Unpacker failed: ${e.message}")
             return js
         }
+    }
+
+    /* Extract from unpacked JavaScript */
+    private fun extractFromUnpackedJavaScript(html: String): List<String> {
+        val urls = mutableListOf<String>()
+        
+        val scripts = Regex("""<script[^>]*>([^<]+)</script>""").findAll(html).toList()
+        for (script in scripts) {
+            val content = script.groupValues[1]
+            
+            // Try to unpack
+            val unpacked = unpackPacker(content)
+            
+            // Look for specific patterns in unpacked content
+            val patterns = listOf(
+                Regex("""(https?://srv\d+\.cdnimages\d+\.sbs/hls/[^"'\s]+)"""),
+                Regex("""["']([^"'\s]+\.mp4/txt/master\.txt)["']"""),
+                Regex("""(sisu[^"'\s]*\.mp4)""")
+            )
+            
+            for (pattern in patterns) {
+                pattern.findAll(unpacked).forEach { match ->
+                    var url = match.groupValues[1]
+                    if (!url.startsWith("http")) {
+                        // Reconstruct full URL
+                        url = "https://srv12.cdnimages2068.sbs/hls/$url"
+                    }
+                    if (url.contains("cdnimages")) {
+                        urls.add(url)
+                    }
+                }
+            }
+        }
+        
+        return urls.distinct()
     }
 
     private suspend fun parseMasterPlaylist(
@@ -594,24 +565,21 @@ class Hdfc : MainAPI() {
                     }
                     i++
                 }
-            } else if (content.contains(".m3u8") || content.endsWith(".m3u8", true)) {
-                // Direct m3u8 playlist
-                emitRapidrameLink(masterUrl, referer, callback)
-                Log.d("HDCH", "Direct m3u8: $masterUrl")
             } else {
-                // Try to use the master URL directly
+                // Direct m3u8 or other playlist
                 emitRapidrameLink(masterUrl, referer, callback)
-                Log.d("HDCH", "Using master URL directly: $masterUrl")
+                Log.d("HDCH", "Using URL directly: $masterUrl")
             }
         } catch (e: Exception) {
             Log.e("HDCH", "parseMasterPlaylist failed for $masterUrl: ${e.message}")
+            // Still try to use the URL even if parsing fails
+            emitRapidrameLink(masterUrl, referer, callback)
         }
     }
 
     private fun extractSubtitlesFromHtml(html: String): List<SubtitleFile> {
         val subs = mutableListOf<SubtitleFile>()
         
-        // Track elements
         Regex("""<track[^>]+src=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE).findAll(html).toList().forEach { m ->
             val src = m.groupValues[1]
             val tag = m.value
@@ -625,14 +593,7 @@ class Hdfc : MainAPI() {
             subs += SubtitleFile(lang, final)
         }
         
-        // Also look for subtitle URLs in JavaScript
-        val jsSubPattern = Regex("""["'](https?://[^"']+\.(?:vtt|srt))["']""")
-        jsSubPattern.findAll(html).forEach { match ->
-            val url = match.groupValues[1]
-            subs += SubtitleFile("Unknown", url)
-        }
-        
-        return subs.distinctBy { it.url }
+        return subs
     }
 
     private suspend fun emitRapidrameLink(url: String, referer: String, callback: (ExtractorLink) -> Unit, qualityOverride: Int? = null) {
@@ -640,7 +601,7 @@ class Hdfc : MainAPI() {
         callback(
             newExtractorLink(
                 source = "HDFC",
-                name = "HDFC Rapidrame",
+                name = "HDFC",
                 url = url
             ) {
                 this.referer = referer
