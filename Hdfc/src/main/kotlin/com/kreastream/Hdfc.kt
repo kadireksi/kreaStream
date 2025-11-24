@@ -101,6 +101,8 @@ class Hdfc : MainAPI() {
 
         val href = fixUrlNull(this.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.select("img").first()?.attr("data-src") ?: this.select("img").first()?.attr("src"))
+        val year = fixUrlNull(this.select("div.poster-meta span").first()?.text()?.trim()?.toIntOrNull())
+        val score = fixUrlNull(this.select("span.imdb").first()?.text()?.trim()?.toFloatOrNull())
         val type = when {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
@@ -129,9 +131,12 @@ class Hdfc : MainAPI() {
             val title = document.select("h4.title").first()?.text() ?: continue
             val href = fixUrlNull(document.select("a").first()?.attr("href")) ?: continue
             val posterUrl = fixUrlNull(document.select("img").first()?.attr("src")) ?: fixUrlNull(document.select("img").first()?.attr("data-src"))
-            
+            val year = fixUrlNull(document.select("div.poster-meta span").first()?.text()?.trim()?.toIntOrNull())
+            val score = fixUrlNull(document.select("span.imdb").first()?.text()?.trim()?.toFloatOrNull())
             searchResults.add(newMovieSearchResponse(title, href, TvType.Movie) { 
                 this.posterUrl = posterUrl?.replace("/thumb/", "/list/") 
+                this.year = year
+                this.score = Score.from10(score)
             })
         }
         return searchResults
