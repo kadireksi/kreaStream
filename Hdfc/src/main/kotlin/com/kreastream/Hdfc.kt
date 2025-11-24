@@ -163,18 +163,13 @@ class Hdfc : MainAPI() {
                     document.select("div.post-info-genres a, span.genres a").map { it.text() }
                 }
 
-            // Year
             val year = document.select("div.poster-meta span").first()?.text()?.trim()?.toIntOrNull()
+            val score = document.select("span.imdb").first()?.text()?.trim()?.toFloatOrNull()
 
-            // Score
-            val score = document.select("span.imdb, .popover-rating p").first()?.text()?.trim()?.toFloatOrNull()
-
-            // Description
             val desc = document.select("p.popover-description").first()?.text()?.trim()
                 ?: document.select("article.post-info-content > p, div.description p").first()?.text()?.trim()
 
-            // Language
-            val langInfo = document.select("span.poster-lang").first()?.text()
+            val langInfo = document.select("span.poster-lang span").first()?.text()
             val dubTag = when {
                 langInfo?.contains("Dublaj", true) == true -> "Türkçe Dublaj"
                 langInfo?.contains("Altyaz", true) == true -> "Türkçe Altyazılı"
