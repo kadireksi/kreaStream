@@ -563,10 +563,11 @@ class Hdfc : MainAPI() {
             newExtractorLink(
                 source = "HDFC Close",
                 name = "HDFC Close",
-                url = normalized,
-                referer = referer,
-                quality = quality
-            )
+                url = normalized
+            ) {
+                this.referer = referer
+                this.quality = quality
+            }
         )
         Log.d("HDCH", "emitCloseLink -> $normalized [Q:$quality]")
     }
@@ -577,10 +578,11 @@ class Hdfc : MainAPI() {
             newExtractorLink(
                 source = "HDFC Rapidrame",
                 name = "HDFC Rapidrame",
-                url = url,
-                referer = referer,
-                quality = quality
-            )
+                url = url
+            ) {
+                this.referer = referer
+                this.quality = quality
+            }
         )
         Log.d("HDCH", "emitRapidrameLink -> $url [Q:$quality]")
     }
