@@ -341,46 +341,51 @@ class Hdfc : MainAPI() {
         html: String,
         referer: String,
         callback: (ExtractorLink) -> Unit,
-        foundUrls: MutableSet<String>
+        found: MutableSet<String>
     ): Boolean {
         var emitted = false
-        val deobfuscated = deobfuscateJavaScript(html)
+        val text = deobfuscateJavaScript(html)
 
-        // 1. Master Playlist / m3u8 (Generic Regex)
-        // Matches any http(s) URL ending in .m3u8 or master.txt inside the JS/HTML
-        val masterRegex = Regex("""https?://[^\s"']+/.*?(?:master\.txt|index\.m3u8|[a-zA-Z0-9]+\.m3u8)""")
-        masterRegex.findAll(deobfuscated).toList().forEach { m ->
-            val url = m.value.substringBefore("?").substringBefore("#")
-            if (foundUrls.add(url)) {
-                val normalized = normalizeMasterToM3u8(url)
-                
-                // Distinguish between Master (Multi-quality) and standard streams
-                if (normalized.contains("master") || normalized.contains("index")) {
-                    parseMasterPlaylist(normalized, referer, callback, foundUrls)
+        // 1. NEW — detect base64 encoded iframe URLs
+        Regex("""atob\(["']([^"']+)["']\)""").findAll(text).forEach { match ->
+            val encoded = match.groupValues[1]
+            try {
+                val decoded = String(Base64.getDecoder().decode(encoded))
+                if (decoded.startsWith("http") && found.add(decoded)) {
+                    emitRapidrameLink(decoded, referer, callback)
+                    emitted = true
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 2. NEW — detect rplayer urls in iframe src
+        Regex("""https?://[^"']*/rplayer/[^"']+""").findAll(text).forEach { m ->
+            val url = m.value
+            if (found.add(url)) {
+                if (extractFromIframeUrl(url, referer, { }, callback, found)) emitted = true
+            }
+        }
+
+        // 3. NEW — detect playlist/manifest urls
+        val playlistRegex = Regex(
+            """https?://[^"']+/(?:manifest|get|stream)/[^"']+(?:m3u8|txt|mp4)[^"']*"""
+        )
+
+        playlistRegex.findAll(text).forEach { m ->
+            val url = m.value.substringBefore("#").substringBefore("?")  // normalize
+            if (found.add(url)) {
+                if (url.endsWith("m3u8")) {
+                    parseMasterPlaylist(url, referer, callback, found)
                 } else {
-                    emitRapidrameLink(normalized, referer, callback)
+                    emitRapidrameLink(url, referer, callback)
                 }
                 emitted = true
             }
         }
 
-        // 2. Specific JSON Content URL pattern
-        Regex("""contentUrl["\s:]+["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .findAll(deobfuscated).toList().forEach { m ->
-                val url = m.groupValues[1]
-                if (foundUrls.add(url)) {
-                     val normalized = normalizeMasterToM3u8(url)
-                     if (url.contains("master.m3u8") || url.contains("master.txt")) {
-                        parseMasterPlaylist(normalized, referer, callback, foundUrls)
-                    } else {
-                        emitRapidrameLink(normalized, referer, callback)
-                    }
-                    emitted = true
-                }
-            }
-
         return emitted
     }
+
 
     private suspend fun parseMasterPlaylist(
         masterUrl: String,
