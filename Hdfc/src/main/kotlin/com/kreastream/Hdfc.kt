@@ -9,15 +9,12 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URI
 import java.util.*
-import okhttp3.Headers
-import okhttp3.OkHttpClient
-import okhttp3.NiceResponse
+// Removed incorrect import: import okhttp3.NiceResponse
 
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
@@ -54,16 +51,8 @@ class Hdfc : MainAPI() {
         headers: Map<String, String> = standardHeaders,
         referer: String? = null
     ): NiceResponse {
-        var response = app.get(url, headers = headers, referer = referer)
-        val body = response.text
-        if (body.contains("Just a moment", ignoreCase = true)
-            || body.contains("Checking your browser", ignoreCase = true)
-            || response.code == 403
-        ) {
-            Log.w("HDCH", "Cloudflare detected for $url – retrying with CloudflareKiller")
-            return CloudflareKiller().bypass(url, headers)
-        }
-        return response
+        // app.get handles Cloudflare interceptors automatically if configured in the main app
+        return app.get(url, headers = headers, referer = referer)
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -98,6 +87,7 @@ class Hdfc : MainAPI() {
                 response.document
             }
 
+            // Using select(...).first() is safer than selectFirst() if imports are ambiguous
             val posterElements = document.select("div.posters-4-col a.poster, a.poster, .posters-4-col a")
             Log.d("HDCH", "Found posters: ${posterElements.size}")
 
@@ -111,15 +101,15 @@ class Hdfc : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
         val rawTitle = this.attr("title").takeIf { it.isNotEmpty() }
-            ?: this.selectFirst("strong.poster-title")?.text()
-            ?: this.selectFirst(".poster-title")?.text()
+            ?: this.select("strong.poster-title").first()?.text()
+            ?: this.select(".poster-title").first()?.text()
         rawTitle ?: return null
 
         val excluded = listOf("Seri Filmler", "Japonya Filmleri", "Kore Filmleri", "Hint Filmleri", "Türk Filmleri", "1080p Film izle")
         if (excluded.any { rawTitle.contains(it, ignoreCase = true) }) return null
 
         val href = fixUrlNull(this.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("data-src") ?: this.selectFirst("img")?.attr("src"))
+        val posterUrl = fixUrlNull(this.select("img").first()?.attr("data-src") ?: this.select("img").first()?.attr("src"))
         val type = when {
             href.contains("/diziler/") || href.contains("/tv/") -> TvType.TvSeries
             else -> TvType.Movie
@@ -131,14 +121,25 @@ class Hdfc : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val response = safeGet("$mainUrl/search?q=${query}", mapOf("X-Requested-With" to "fetch"))
-        val parsed = response.parsedSafe<Results>() ?: return emptyList()
+        
+        // Use explicit ObjectMapper
+        val parsed = try {
+            objectMapper.readValue<Results>(response.text)
+        } catch (e: Exception) {
+            return emptyList()
+        }
+
         val searchResults = mutableListOf<SearchResponse>()
-        parsed.results.forEach { resultHtml ->
+        // Use explicit loop to avoid suspend issues if logic changes, though here logic is sync
+        for (resultHtml in parsed.results) {
             val document = Jsoup.parse(resultHtml)
-            val title = document.selectFirst("h4.title")?.text() ?: return@forEach
-            val href = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
-            val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src")) ?: fixUrlNull(document.selectFirst("img")?.attr("data-src"))
-            searchResults.add(newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl?.replace("/thumb/", "/list/") })
+            val title = document.select("h4.title").first()?.text() ?: continue
+            val href = fixUrlNull(document.select("a").first()?.attr("href")) ?: continue
+            val posterUrl = fixUrlNull(document.select("img").first()?.attr("src")) ?: fixUrlNull(document.select("img").first()?.attr("data-src"))
+            
+            searchResults.add(newMovieSearchResponse(title, href, TvType.Movie) { 
+                this.posterUrl = posterUrl?.replace("/thumb/", "/list/") 
+            })
         }
         return searchResults
     }
@@ -147,8 +148,8 @@ class Hdfc : MainAPI() {
         try {
             Log.d("HDCH", "Loading details: $url")
 
-            var response = safeGet(url, standardHeaders, mainUrl)
-            var text = response.text
+            val response = safeGet(url, standardHeaders, mainUrl)
+            val text = response.text
 
             val document = if (text.trim().startsWith("{") && text.contains("\"html\"")) {
                 try {
@@ -162,48 +163,49 @@ class Hdfc : MainAPI() {
                 response.document
             }
 
-            val title = document.selectFirst("h1.section-title, h1.entry-title")?.text()?.substringBefore(" izle")?.trim()
+            val title = document.select("h1.section-title, h1.entry-title").first()?.text()?.substringBefore(" izle")?.trim()
                 ?: run {
                     Log.e("HDCH", "No title found for $url")
                     return null
                 }
 
             val poster = fixUrlNull(
-                document.selectFirst("aside.post-info-poster img.lazyload")?.attr("data-src")
-                    ?: document.selectFirst("img.wp-post-image")?.attr("data-src")
-                    ?: document.selectFirst("img.attachment-full")?.attr("src")
+                document.select("aside.post-info-poster img.lazyload").first()?.attr("data-src")
+                    ?: document.select("img.wp-post-image").first()?.attr("data-src")
+                    ?: document.select("img.attachment-full").first()?.attr("src")
             )
 
             val tags = document.select("div.post-info-genres a, span.genres a").map { it.text() }
-            val year = document.selectFirst("div.post-info-year-country a, div.poster-meta span")?.text()?.trim()?.toIntOrNull()
-            val score = document.selectFirst("div.post-info-imdb-rating span, .imdb")?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
-            val desc = document.selectFirst("article.post-info-content > p, div.description p")?.text()?.trim()
+            val year = document.select("div.post-info-year-country a, div.poster-meta span").first()?.text()?.trim()?.toIntOrNull()
+            val score = document.select("div.post-info-imdb-rating span, .imdb").first()?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
+            val desc = document.select("article.post-info-content > p, div.description p").first()?.text()?.trim()
 
-            val langInfo = document.selectFirst(".poster-lang")?.text()
+            val langInfo = document.select(".poster-lang").first()?.text()
             val dubTag = when {
                 langInfo?.contains("Dublaj", true) == true -> "Türkçe Dublaj"
                 langInfo?.contains("Altyaz", true) == true -> "Türkçe Altyazılı"
                 else -> null
             }
+            val finalTags = if (dubTag != null) tags + dubTag else tags
 
             val isSeries = document.select("div.seasons, #seasons-tab").isNotEmpty()
 
             val actors = document.select("div.post-info-cast a").map {
-                Actor(it.selectFirst("strong")?.text() ?: it.text(), it.selectFirst("img")?.attr("data-src") ?: "")
+                Actor(it.select("strong").first()?.text() ?: it.text(), it.select("img").first()?.attr("data-src") ?: "")
             }
 
             val recommendations = document.select("div.section-slider-container div.slider-slide a, div.recommended-posts a").mapNotNull {
                 val recHref = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
                 val recTitle = it.attr("title").ifEmpty { it.text() }
-                val recPoster = fixUrlNull(it.selectFirst("img")?.attr("data-src") ?: it.selectFirst("img")?.attr("src"))
+                val recPoster = fixUrlNull(it.select("img").first()?.attr("data-src") ?: it.select("img").first()?.attr("src"))
                 newTvSeriesSearchResponse(recTitle, recHref, TvType.TvSeries) { this.posterUrl = recPoster }
             }
 
-            val trailer = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
+            val trailer = document.select("div.post-info-trailer button").first()?.attr("data-modal")?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
 
             return if (isSeries) {
                 val episodes = document.select("div.seasons-tab-content a").mapNotNull {
-                    val epName = it.selectFirst("h4")?.text()?.trim() ?: return@mapNotNull null
+                    val epName = it.select("h4").first()?.text()?.trim() ?: return@mapNotNull null
                     val epHref = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
                     val epEpisode = Regex("""(\d+)\. ?Bölüm""").find(epName)?.groupValues?.getOrNull(1)?.toIntOrNull()
                     val epSeason = Regex("""(\d+)\. ?Sezon""").find(epName)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 1
@@ -213,7 +215,7 @@ class Hdfc : MainAPI() {
                     this.posterUrl = poster
                     this.year = year
                     this.plot = desc
-                    this.tags = tags + listOfNotNull(dubTag)
+                    this.tags = finalTags
                     this.score = Score.from10(score)
                     this.recommendations = recommendations
                     addActors(actors)
@@ -224,7 +226,7 @@ class Hdfc : MainAPI() {
                     this.posterUrl = poster
                     this.year = year
                     this.plot = desc
-                    this.tags = tags + listOfNotNull(dubTag)
+                    this.tags = finalTags
                     this.score = Score.from10(score)
                     this.recommendations = recommendations
                     addActors(actors)
@@ -250,7 +252,7 @@ class Hdfc : MainAPI() {
         val pageResp = safeGet(data, standardHeaders, mainUrl)
         val document = pageResp.document
 
-        val closeIframe = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))?.takeIf { it.isNotBlank() }
+        val closeIframe = fixUrlNull(document.select(".close").first()?.attr("data-src"))?.takeIf { it.isNotBlank() }
         if (!closeIframe.isNullOrBlank()) {
             Log.d("HDCH", "Found Close iframe: $closeIframe")
             try {
@@ -262,18 +264,22 @@ class Hdfc : MainAPI() {
             }
         }
 
-        document.select("div.alternative-links button.alternative-link").forEach { button ->
+        // Changed to standard for loop to allow suspend calls
+        val altButtons = document.select("div.alternative-links button.alternative-link")
+        for (button in altButtons) {
             val sourceLabel = button.text().replace("(HDrip Xbet)", "").trim()
-            val videoID = button.attr("data-video").takeIf { it.isNotBlank() } ?: return@forEach
+            val videoID = button.attr("data-video").takeIf { it.isNotBlank() } ?: continue
             try {
                 Log.d("HDCH", "Processing alternative videoID: $videoID ($sourceLabel)")
                 val apiResp = safeGet("$mainUrl/video/$videoID/", mapOf("X-Requested-With" to "fetch"), data)
-                val parsed = apiResp.parsedSafe<VideoIframe>()
-                val iframeHtml = parsed?.data?.html ?: return@forEach
-                val iframeSrc = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("data-src")?.ifBlank { 
-                    Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src") 
+                
+                val parsed = try { objectMapper.readValue<VideoIframe>(apiResp.text) } catch (e: Exception) { null }
+                val iframeHtml = parsed?.data?.html ?: continue
+                val iframeDoc = Jsoup.parse(iframeHtml)
+                val iframeSrc = iframeDoc.select("iframe").first()?.attr("data-src")?.ifBlank { 
+                    iframeDoc.select("iframe").first()?.attr("src") 
                 }
-                if (iframeSrc.isNullOrBlank()) return@forEach
+                if (iframeSrc.isNullOrBlank()) continue
                 val iframeUrl = resolveUrl(iframeSrc, mainUrl)
                 
                 Log.d("HDCH", "Processing iframe: $iframeUrl")
@@ -285,9 +291,11 @@ class Hdfc : MainAPI() {
             }
         }
 
-        document.select("iframe[data-src], iframe[src]").forEach { iframe ->
+        // Changed to standard for loop
+        val directIframes = document.select("iframe[data-src], iframe[src]")
+        for (iframe in directIframes) {
             val src = iframe.attr("data-src").ifBlank { iframe.attr("src") }
-            if (src.isNullOrBlank()) return@forEach
+            if (src.isNullOrBlank()) continue
             val final = resolveUrl(src, data)
             
             try {
@@ -555,13 +563,10 @@ class Hdfc : MainAPI() {
             newExtractorLink(
                 source = "HDFC Close",
                 name = "HDFC Close",
-                url = normalized
-            ) {
-                this.referer = referer
-                this.quality = quality
-                //this.isM3u8 = true
-                this.headers = standardHeaders + mapOf("Origin" to mainUrl, "Referer" to referer)
-            }
+                url = normalized,
+                referer = referer,
+                quality = quality
+            )
         )
         Log.d("HDCH", "emitCloseLink -> $normalized [Q:$quality]")
     }
@@ -574,11 +579,8 @@ class Hdfc : MainAPI() {
                 name = "HDFC Rapidrame",
                 url = url,
                 referer = referer,
-                quality = quality,
-                isM3u8 = true
-            ) {
-                this.headers = standardHeaders + mapOf("Origin" to mainUrl, "Referer" to referer)
-            }
+                quality = quality
+            )
         )
         Log.d("HDCH", "emitRapidrameLink -> $url [Q:$quality]")
     }
