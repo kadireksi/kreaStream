@@ -10,11 +10,11 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.nicehttp.NiceResponse
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URI
-import java.util.*
-// Removed incorrect import: import okhttp3.NiceResponse
+import java.util.Base64
 
 class Hdfc : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.la"
@@ -46,14 +46,12 @@ class Hdfc : MainAPI() {
         "${mainUrl}/load/page/1/mostLiked/" to "En Çok Beğenilenler"
     )
 
+    // Removing explicit return type allows inference to work even if imports vary slightly
     private suspend fun safeGet(
         url: String,
         headers: Map<String, String> = standardHeaders,
         referer: String? = null
-    ): NiceResponse {
-        // app.get handles Cloudflare interceptors automatically if configured in the main app
-        return app.get(url, headers = headers, referer = referer)
-    }
+    ) = app.get(url, headers = headers, referer = referer)
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) {
@@ -87,7 +85,6 @@ class Hdfc : MainAPI() {
                 response.document
             }
 
-            // Using select(...).first() is safer than selectFirst() if imports are ambiguous
             val posterElements = document.select("div.posters-4-col a.poster, a.poster, .posters-4-col a")
             Log.d("HDCH", "Found posters: ${posterElements.size}")
 
@@ -122,7 +119,6 @@ class Hdfc : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val response = safeGet("$mainUrl/search?q=${query}", mapOf("X-Requested-With" to "fetch"))
         
-        // Use explicit ObjectMapper
         val parsed = try {
             objectMapper.readValue<Results>(response.text)
         } catch (e: Exception) {
@@ -130,7 +126,6 @@ class Hdfc : MainAPI() {
         }
 
         val searchResults = mutableListOf<SearchResponse>()
-        // Use explicit loop to avoid suspend issues if logic changes, though here logic is sync
         for (resultHtml in parsed.results) {
             val document = Jsoup.parse(resultHtml)
             val title = document.select("h4.title").first()?.text() ?: continue
@@ -256,7 +251,7 @@ class Hdfc : MainAPI() {
         if (!closeIframe.isNullOrBlank()) {
             Log.d("HDCH", "Found Close iframe: $closeIframe")
             try {
-                if (extractFromIframeUrl(closeIframe, data, subtitleCallback, callback, processedUrls)) {
+                if (extractFromIframeUrl(closeIframe!!, data, subtitleCallback, callback, processedUrls)) {
                     linksFound = true
                 }
             } catch (e: Exception) {
@@ -264,8 +259,8 @@ class Hdfc : MainAPI() {
             }
         }
 
-        // Changed to standard for loop to allow suspend calls
-        val altButtons = document.select("div.alternative-links button.alternative-link")
+        // Fixed ambiguity: converted to list
+        val altButtons = document.select("div.alternative-links button.alternative-link").toList()
         for (button in altButtons) {
             val sourceLabel = button.text().replace("(HDrip Xbet)", "").trim()
             val videoID = button.attr("data-video").takeIf { it.isNotBlank() } ?: continue
@@ -280,7 +275,7 @@ class Hdfc : MainAPI() {
                     iframeDoc.select("iframe").first()?.attr("src") 
                 }
                 if (iframeSrc.isNullOrBlank()) continue
-                val iframeUrl = resolveUrl(iframeSrc, mainUrl)
+                val iframeUrl = resolveUrl(iframeSrc!!, mainUrl)
                 
                 Log.d("HDCH", "Processing iframe: $iframeUrl")
                 if (extractFromIframeUrl(iframeUrl, data, subtitleCallback, callback, processedUrls)) {
@@ -291,8 +286,8 @@ class Hdfc : MainAPI() {
             }
         }
 
-        // Changed to standard for loop
-        val directIframes = document.select("iframe[data-src], iframe[src]")
+        // Fixed ambiguity: converted to list
+        val directIframes = document.select("iframe[data-src], iframe[src]").toList()
         for (iframe in directIframes) {
             val src = iframe.attr("data-src").ifBlank { iframe.attr("src") }
             if (src.isNullOrBlank()) continue
@@ -371,7 +366,7 @@ class Hdfc : MainAPI() {
         var emitted = false
 
         Regex("""https?://srv\d+\.cdnimages\d*\.sbs/[^\s"'<>]+?(?:master\.txt|index\.m3u8)""", RegexOption.IGNORE_CASE)
-            .findAll(html).forEach { m ->
+            .findAll(html).toList().forEach { m ->
                 val url = m.value.substringBefore("?").substringBefore("#")
                 if (foundUrls.add(url)) {
                     val normalized = normalizeMasterToM3u8(url)
@@ -381,7 +376,7 @@ class Hdfc : MainAPI() {
             }
 
         Regex("""https?://[^\s"'<>]+?/txt/master\.txt""", RegexOption.IGNORE_CASE)
-            .findAll(html).forEach { m ->
+            .findAll(html).toList().forEach { m ->
                 val url = m.value
                 if (foundUrls.add(url)) {
                     val normalized = normalizeMasterToM3u8(url)
@@ -391,7 +386,7 @@ class Hdfc : MainAPI() {
             }
 
         Regex("""contentUrl["\s:]+["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .findAll(html).forEach { m ->
+            .findAll(html).toList().forEach { m ->
                 val url = m.groupValues[1]
                 if (url.contains("cdnimages", ignoreCase = true) && foundUrls.add(url)) {
                     val normalized = normalizeMasterToM3u8(url)
@@ -414,7 +409,7 @@ class Hdfc : MainAPI() {
         val deobfuscated = deobfuscateJavaScript(html)
         
         Regex("""https?://s\d+\.rapidrame\.com/[^\s"'<>]+?master\.m3u8[^\s"'<>]*""", RegexOption.IGNORE_CASE)
-            .findAll(deobfuscated).forEach { m ->
+            .findAll(deobfuscated).toList().forEach { m ->
                 val url = m.value
                 if (foundUrls.add(url)) {
                     parseMasterPlaylist(url, referer, callback, foundUrls)
@@ -423,7 +418,7 @@ class Hdfc : MainAPI() {
             }
 
         Regex("""https?://s\d+\.rapidrame\.com/[^\s"'<>]+?index-f\d+-[^\s"'<>]+?\.m3u8[^\s"'<>]*""", RegexOption.IGNORE_CASE)
-            .findAll(deobfuscated).forEach { m ->
+            .findAll(deobfuscated).toList().forEach { m ->
                 val url = m.value
                 if (foundUrls.add(url)) {
                     emitRapidrameLink(url, referer, callback)
@@ -432,7 +427,7 @@ class Hdfc : MainAPI() {
             }
 
         Regex("""contentUrl["\s:]+["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .findAll(deobfuscated).forEach { m ->
+            .findAll(deobfuscated).toList().forEach { m ->
                 val url = m.groupValues[1]
                 if (url.contains("rapidrame", ignoreCase = true) && foundUrls.add(url)) {
                     if (url.contains("master.m3u8")) {
@@ -501,7 +496,7 @@ class Hdfc : MainAPI() {
         var result = html
         
         val evalPattern = Regex("""eval\(function\(p,a,c,k,e,d\)\{[^}]+\}[^)]+\)\)""", RegexOption.MULTILINE)
-        evalPattern.findAll(html).forEach { match ->
+        evalPattern.findAll(html).toList().forEach { match ->
             try {
                 val packed = match.value
                 val dataMatch = Regex("""\{[^}]*\}\.split\(['"]([^'"]+)['"]\)""").find(packed)
@@ -513,7 +508,7 @@ class Hdfc : MainAPI() {
             }
         }
         
-        Regex("""atob\(['"]([^'"]+)['"]\)""").findAll(html).forEach { match ->
+        Regex("""atob\(['"]([^'"]+)['"]\)""").findAll(html).toList().forEach { match ->
             try {
                 val encoded = match.groupValues[1]
                 val decoded = String(Base64.getDecoder().decode(encoded))
@@ -529,7 +524,7 @@ class Hdfc : MainAPI() {
     private fun extractSubtitlesFromHtml(html: String): List<SubtitleFile> {
         val subs = mutableListOf<SubtitleFile>()
         
-        Regex("""<track[^>]+src=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE).findAll(html).forEach { m ->
+        Regex("""<track[^>]+src=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE).findAll(html).toList().forEach { m ->
             val src = m.groupValues[1]
             val tag = m.value
             val lang = when {
@@ -542,7 +537,7 @@ class Hdfc : MainAPI() {
             subs += SubtitleFile(lang, final)
         }
         
-        Regex("""https?://[^\s"'<>]+\.(?:vtt|srt)""", RegexOption.IGNORE_CASE).findAll(html).forEach { m ->
+        Regex("""https?://[^\s"'<>]+\.(?:vtt|srt)""", RegexOption.IGNORE_CASE).findAll(html).toList().forEach { m ->
             val url = m.value.substringBefore("?").substringBefore("#")
             val lang = when {
                 url.contains("-tr", true) || url.contains("_Turkish", true) -> "Türkçe"
