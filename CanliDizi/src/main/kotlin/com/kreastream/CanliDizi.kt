@@ -214,7 +214,12 @@ class CanliDizi : MainAPI() {
         val type = if (url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
 
         callback.invoke(
-            newExtractorLink("$name - $source", name, url, referer, quality, type)
+            newExtractorLink("$name - $source", name, url)
+            {
+                this.referer = referer;
+                this.quality = quality;
+                this.type = type
+            }
         )
         println("Link added: $source → $url")
     }
