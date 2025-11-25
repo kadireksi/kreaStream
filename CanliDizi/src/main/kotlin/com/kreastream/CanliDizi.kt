@@ -17,7 +17,8 @@ class CanliDizi : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = listOf(
-            Triple("$mainUrl/diziler", "Yerli Diziler", true),
+            Triple("$mainUrl/yerli-bolumler", "Yerli Yeni Bölümler", true),
+            Triple("$mainUrl/digi-bolumler", "Dijital Yeni Bölümler", true),
             Triple("$mainUrl/dijital-diziler-izle", "Dijital Diziler", true),
             Triple("$mainUrl/film-izle", "Filmler", false)
         ).mapNotNull { (url, title, isSeries) ->
@@ -61,8 +62,6 @@ class CanliDizi : MainAPI() {
                 extractYouTube(html, data, callback) ||
                 extractFromIframes(app.get(data).document, data, callback)
     }
-
-    // ====================== EXTRACTORS ======================
 
     private suspend fun extractBetaPlayer(
         html: String,
