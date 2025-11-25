@@ -214,8 +214,8 @@ class CanliDizi : MainAPI() {
 
         callback(
             newExtractorLink(
-                sourceName = "$name - $source",
-                displayName = name,
+                source = "$name - $source",
+                name = name,
                 url = url
             ) {
                 this.referer = referer
