@@ -1,14 +1,21 @@
 [
     {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 34409,
+        "fileSize": 34410,
         "status": 1,
+        "language": "tr",
         "authors": [
             "kreastream"
         ],
-        "version": 1,
+        "tvTypes": [
+            "TvSeries",
+            "Movies"
+        ],
+        "version": 2,
         "internalName": "Hdfc",
+        "description": "HDfilmCehennemi",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Hdfc.cs3",
         "name": "Hdfc"
     },
