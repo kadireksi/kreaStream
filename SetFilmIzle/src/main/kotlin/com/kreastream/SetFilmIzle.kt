@@ -87,16 +87,16 @@ class SetFilmIzle : MainAPI() {
         val year = this.selectFirst("span.year")?.text()?.trim()?.toIntOrNull()
         val dubSub = this.selectFirst(".anadil")?.text()?.trim()
         val hasDub = dubSub?.contains("Dublaj", ignoreCase = true) == true
-        var title = hasDub?.let { "$title (Dublaj)" } ?: title
+        var newTitle = hasDub?.let { "$title (Dublaj)" } ?: title
 
         return if (href.contains("/dizi/")) {
-            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+            newTvSeriesSearchResponse(newTitle, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
                 this.score = Score.from10(score)
                 this.year = year
             }
         } else {
-            newMovieSearchResponse(title, href, TvType.Movie) {
+            newMovieSearchResponse(newTitle, href, TvType.Movie) {
                 this.posterUrl = posterUrl
                 this.score = Score.from10(score)
                 this.year = year
@@ -127,15 +127,18 @@ class SetFilmIzle : MainAPI() {
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("data-src"))
         val score = this.selectFirst("span.rating")?.text()?.trim()
         val year = this.selectFirst("span.year")?.text()?.trim()?.toIntOrNull()
+        val dubSub = this.selectFirst(".anadil")?.text()?.trim()
+        val hasDub = dubSub?.contains("Dublaj", ignoreCase = true) == true
+        var newTitle = hasDub?.let { "$title (Dublaj)" } ?: title
 
         return if (href.contains("/dizi/")) {
-            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+            newTvSeriesSearchResponse(newTitle, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
                 this.score = Score.from10(score)
                 this.year = year
             }
         } else {
-            newMovieSearchResponse(title, href, TvType.Movie) {
+            newMovieSearchResponse(newTitle, href, TvType.Movie) {
                 this.posterUrl = posterUrl
                 this.score = Score.from10(score)
                 this.year = year
