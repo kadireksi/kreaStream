@@ -36,7 +36,7 @@ class CanliDizi : MainAPI() {
                     parseMoviesWithPagination(url, categoryName)
                 }
                 if (items.isNotEmpty()) {
-                    all.add(HomePageList(categoryName, items))
+                    all.add(HomePageList(categoryName, items, true))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -757,6 +757,7 @@ class CanliDizi : MainAPI() {
             this.posterUrl = poster
             this.plot = description
             this.year = year
+            this.score = Score.from10(score)
         }
     }
 
@@ -810,6 +811,7 @@ class CanliDizi : MainAPI() {
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             this.posterUrl = poster
             this.plot = description
+            this.score = Score.from10(score)
         }
     }
 
