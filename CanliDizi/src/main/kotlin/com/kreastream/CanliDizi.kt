@@ -15,15 +15,27 @@ class CanliDizi : MainAPI() {
     override val hasDownloadSupport = true
     override val hasQuickSearch = true
 
+    override var sequentialMainPage = true
+    override var sequentialMainPageDelay       = 50L
+    override var sequentialMainPageScrollDelay = 50L
+
+    private val standardHeaders = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0",
+        "Accept" to "*/*",
+        "X-Requested-With" to "fetch"
+    )
+
+    override val mainPage = mainPageOf(
+        "${mainUrl}/yerli-bolumler"         to "Yerli Yeni Bölümler",
+        "${mainUrl}/digi-bolumler"          to "Dijital Yeni Bölümler",
+        "${mainUrl}/dijital-diziler-izle"   to "Dijital Diziler",
+        "${mainUrl}/film-izle"              to "Filmler"
+    )
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val items = listOf(
-            Triple("$mainUrl/yerli-bolumler", "Yerli Yeni Bölümler", true),
-            Triple("$mainUrl/digi-bolumler", "Dijital Yeni Bölümler", true),
-            Triple("$mainUrl/dijital-diziler-izle", "Dijital Diziler", true),
-            Triple("$mainUrl/film-izle", "Filmler", false)
-        ).mapNotNull { (url, title, isSeries) ->
+        val items = mainPage.mapNotNull { (url, title) ->
             try {
-                val list = if (isSeries) parseSeriesCategory(url) else parseMovieCategory(url)
+                val list = parseSeriesCategory(url)
                 if (list.isNotEmpty()) HomePageList(title, list, true) else null
             } catch (e: Exception) {
                 null
@@ -224,8 +236,6 @@ class CanliDizi : MainAPI() {
         )
         println("Link added: $source → $url")
     }
-
-    // ====================== PARSERS ======================
 
     private fun parseSearchItem(e: Element): SearchResponse? {
         val a = e.selectFirst("div.cat-img a") ?: return null
