@@ -367,16 +367,14 @@ class Hdfc : MainAPI() {
             val iframeResp = safeGet(iframeUrl, standardHeaders, refererForIframe)
             val iframeHtml = iframeResp.text
 
-            // Extract subtitles first
             extractSubtitlesFromHtml(iframeHtml).forEach { 
                 subtitleCallback(it)
             }
 
-            // Enhanced extraction for rapidrame embedded content
             if (extractRapidrameLinks(iframeHtml, refererForIframe, callback, processedUrls)) emitted = true
 
-            // Look for additional embedded iframes recursively
             val nestedIframes = Regex("""<iframe[^>]+(?:data-src|src)=["']([^"']+)["']""").findAll(iframeHtml).toList()
+            Log.d("HDCH", "iframe: ${nestedIframes}")
             for (nested in nestedIframes) {
                 val nestedUrl = nested.groupValues[1]
                 val finalNestedUrl = resolveUrl(nestedUrl, iframeUrl)
@@ -400,6 +398,7 @@ class Hdfc : MainAPI() {
     ): Boolean {
         var emitted = false
         
+        Log.d("HDCH", " ${html}")
         // Method 1: Direct URL patterns
         val urlPatterns = listOf(
             Regex("""https?://[A-Za-z0-9\-\.]+/hls/[^"'\s<>]+\.(?:m3u8|master\.txt)"""),
