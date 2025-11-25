@@ -61,7 +61,7 @@ class CanliDizi : MainAPI() {
         }
         
         return newHomePageResponse(
-            listOf(HomePageList(request.name, items)),
+            listOf(HomePageList(request.name, items, true)),
             hasNext = items.isNotEmpty() && document.select("a.next.page-numbers, link[rel=next]").isNotEmpty()
         )
     }
