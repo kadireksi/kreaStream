@@ -75,8 +75,8 @@ class CanliDizi : MainAPI() {
         println("BetaPlayer → $playerUrl")
         return app.get(playerUrl, referer = referer).text.let { content ->
             extractBetaListBase64(content, playerUrl, callback) ||
-            extractBetaM3U8(content, playerUrl, callback) ||
-            extractDirectVideo(content, playerUrl, callback)
+                    extractBetaM3U8(content, playerUrl, callback) ||
+                    extractDirectVideo(content, playerUrl, callback)
         }
     }
 
@@ -90,7 +90,6 @@ class CanliDizi : MainAPI() {
 
         println("CanliPlayer → $playerUrl")
         return app.get(playerUrl, referer = referer).text.let { content ->
-            // Packed JS base64
             Regex("""["']12["']\s*:\s*["']([A-Za-z0-9+/=]+)""").find(content)
                 ?.groupValues?.get(1)
                 ?.let { decodeBase64Video(it, playerUrl, callback, "CanliPlayer") }
@@ -171,7 +170,7 @@ class CanliDizi : MainAPI() {
 
     // ====================== DECODING & LINK CREATION ======================
 
-    private fun decodeBase64Video(
+    private suspend fun decodeBase64Video(
         base64: String,
         referer: String,
         callback: (ExtractorLink) -> Unit,
@@ -199,25 +198,28 @@ class CanliDizi : MainAPI() {
         return false
     }
 
-    private fun addLink(
+    private suspend fun addLink(
         url: String,
         referer: String,
         callback: (ExtractorLink) -> Unit,
         source: String
     ) {
         val quality = when {
-            url.contains("1080") -> Qualities.P1080.value
-            url.contains("720") -> Qualities.P720.value
-            url.contains("480") -> Qualities.P480.value
+            url.contains("1080", true) -> Qualities.P1080.value
+            url.contains("720", true) -> Qualities.P720.value
+            url.contains("480", true) -> Qualities.P480.value
             else -> Qualities.Unknown.value
         }
         val type = if (url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
 
-        callback.invoke(
-            newExtractorLink("$name - $source", name, url)
-            {
-                this.referer = referer;
-                this.quality = quality;
+        callback(
+            newExtractorLink(
+                sourceName = "$name - $source",
+                displayName = name,
+                url = url
+            ) {
+                this.referer = referer
+                this.quality = quality
                 this.type = type
             }
         )
@@ -230,11 +232,14 @@ class CanliDizi : MainAPI() {
         val a = e.selectFirst("div.cat-img a") ?: return null
         val href = fixUrl(a.attr("href"))
         val title = e.selectFirst("div.categorytitle a")?.text()
-            ?: e.selectFirst("img")?.attr("alt")?.replace(Regex("(izle|son bölüm).*", RegexOption.IGNORE_CASE), "")?.trim()
+            ?: e.selectFirst("img")?.attr("alt")
+                ?.replace(Regex("(izle|son bölüm).*", RegexOption.IGNORE_CASE), "")
+                ?.trim()
             ?: return null
-        val poster = e.selectFirst("img")?.attr("data-wpfc-original-src")?.takeIf { it.isNotBlank() }
-            ?: e.selectFirst("img")?.attr("src")
-            ?.let { fixUrl(it) }
+        val poster = e.selectFirst("img")
+            ?.attr("data-wpfc-original-src")
+            ?.takeIf { it.isNotBlank() }
+            ?: e.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
 
         val isMovie = href.contains("/film") || title.contains("film", true)
         return if (isMovie) {
@@ -278,7 +283,7 @@ class CanliDizi : MainAPI() {
         return list
     }
 
-    private fun loadSeriesNew(doc: Element, url: String): LoadResponse {
+    private suspend fun loadSeriesNew(doc: Element, url: String): LoadResponse {
         val title = doc.selectFirst("h1.title-border")?.text()?.trim()
             ?.replace(Regex("son bölüm izle.*", RegexOption.IGNORE_CASE), "")?.trim()
             ?: throw ErrorLoadingException("Title not found")
@@ -299,7 +304,7 @@ class CanliDizi : MainAPI() {
         }
     }
 
-    private fun loadSeriesOld(doc: Element, url: String): LoadResponse {
+    private suspend fun loadSeriesOld(doc: Element, url: String): LoadResponse {
         val title = doc.selectFirst("h1")?.text()?.trim() ?: "Unknown"
         val poster = doc.selectFirst("img.poster, img.wp-post-image")?.attr("src")?.let { fixUrl(it) }
         val episodes = doc.select("div.bolumust a, div.episode-box a").mapNotNull {
@@ -313,7 +318,7 @@ class CanliDizi : MainAPI() {
         }
     }
 
-    private fun loadMovie(doc: Element, url: String): LoadResponse {
+    private suspend fun loadMovie(doc: Element, url: String): LoadResponse {
         val title = doc.selectFirst("h1")?.text()?.trim()
             ?.replace(Regex("(izle|film).*", RegexOption.IGNORE_CASE), "")?.trim()
             ?: "Movie"
