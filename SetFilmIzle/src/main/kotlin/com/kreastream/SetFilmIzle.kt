@@ -83,7 +83,7 @@ class SetFilmIzle : MainAPI() {
         val title = this.selectFirst("h2")?.text() ?: return "" to null
         val dubSub = this.selectFirst(".anadil")?.text()?.trim()
         val hasDub = dubSub?.contains("Dublaj", ignoreCase = true) == true
-        val newTitle = if (hasDub) "$title (Dublaj)" else title
+        val newTitle = if (hasDub) "🇹🇷 $title" else title
         return newTitle to dubSub
     }
 
