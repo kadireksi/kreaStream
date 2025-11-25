@@ -33,15 +33,20 @@ class CanliDizi : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val items = mainPage.mapNotNull { (url, title) ->
+        val document = app.get(request.data + if (page > 1) "page/$page/" else "").document
+        
+        val items = document.select("div.single-item, div.film-item").mapNotNull { element ->
             try {
-                val list = parseSeriesCategory(url)
-                if (list.isNotEmpty()) HomePageList(title, list, true) else null
+                parseSearchItem(element)
             } catch (e: Exception) {
                 null
             }
         }
-        return newHomePageResponse(items)
+        
+        return newHomePageResponse(
+            listOf(HomePageList(request.name, items)),
+            hasNext = items.isNotEmpty()
+        )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
@@ -178,8 +183,6 @@ class CanliDizi : MainAPI() {
         }
         return false
     }
-
-    // ====================== DECODING & LINK CREATION ======================
 
     private suspend fun decodeBase64Video(
         base64: String,
