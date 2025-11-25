@@ -1,40 +1,24 @@
 package com.kreastream
 
 import android.util.Log
-import com.lagradost.cloudstream3.Actor
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.fasterxml.jackson.module.kotlin.readValue
+import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.Score
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.nicehttp.NiceResponse
+import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.utils.*
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
-class Hdfc : MainAPI() {
+class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
-    override var name                 = "HDFC"
+    override var name                 = "HDFilm Cehennemi"
     override val hasMainPage          = true
     override var lang                 = "tr"
     override val hasQuickSearch       = true
@@ -135,53 +119,23 @@ class Hdfc : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.attr("title")
             .takeIf { it.isNotEmpty() }
-            ?.trim()
-            ?: this.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: return null
+            .takeUnless {
+                it?.contains("Seri Filmler", ignoreCase = true) == true
+                || it?.contains("Japonya Filmleri", ignoreCase = true) == true
+                || it?.contains("Kore Filmleri", ignoreCase = true) == true
+                || it?.contains("Hint Filmleri", ignoreCase = true) == true
+                || it?.contains("Türk Filmleri", ignoreCase = true) == true
+                || it?.contains("DC Yapımları", ignoreCase = true) == true
+                || it?.contains("Marvel Yapımları", ignoreCase = true) == true
+                || it?.contains("Amazon Yapımları", ignoreCase = true) == true
+                || it?.contains("1080p Film izle", ignoreCase = true) == true
+            } ?: return null
 
-        val href = fixUrlNull(this.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
-            ?: this.selectFirst("img")?.attr("src"))
+        val href      = fixUrlNull(this.attr("href")) ?: return null
+        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("data-src"))
 
-        // --- Year ---
-        val yearText = this.selectFirst(".poster-meta span")?.text()?.trim()
-        val year = yearText?.toIntOrNull()
-
-        // --- IMDb Score ---
-        val scoreText = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
-        val score = scoreText?.toFloatOrNull()
-
-        // --- Dub/Sub info ---
-        val dubSubText = this.selectFirst(".poster-lang span")?.text()?.trim()
-
-        // Determine which labels to show
-        val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
-        val hasSub = dubSubText?.contains("Altyaz", ignoreCase = true) == true
-
-        val label = when {
-            hasDub && hasSub -> "Dublaj + Sub"
-            hasDub -> "Dublaj"
-            hasSub -> "Altyazılı"
-            else -> null
-        }
-
-        val tvType = if (this.attr("href").contains("/dizi/", ignoreCase = true)
-            || this.attr("href").contains("/series", ignoreCase = true)
-            || this.attr("href").contains("home-series", ignoreCase = true)
-        ) TvType.TvSeries else TvType.Movie
-
-        return newMovieSearchResponse(title, href, tvType) {
-            this.posterUrl = posterUrl
-            this.quality = getQualityFromString("HD") // or leave null if unknown
-            this.plot = buildString {
-                if (!label.isNullOrBlank()) append("$label • ")
-                if (score != null) append("⭐ ${"%.1f".format(score)} • ")
-                if (!yearText.isNullOrBlank()) append(yearText)
-                if (!description.isNullOrBlank()) append("\n$description")
-            }.trim()
-        }
+        return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
-
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
@@ -204,7 +158,6 @@ class Hdfc : MainAPI() {
             searchResults.add(
                 newMovieSearchResponse(title, href, TvType.Movie) {
                     this.posterUrl = posterUrl?.replace("/thumb/", "/list/")
-                    this.score =
                 }
             )
         }
@@ -215,84 +168,39 @@ class Hdfc : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        val title = document.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle")
-            ?: return null
 
-        val poster = fixUrlNull(
-            document.selectFirst("img.lazyload, img[data-src]")?.attr("data-src")
-                ?: document.selectFirst("img[src]")?.attr("src")
-        )
 
-        // --- Year ---
-        val yearText = document.selectFirst(".poster-meta span")?.text()?.trim()
-        val year = yearText?.toIntOrNull()
-
-        // --- IMDb Score ---
-        val scoreText = document.selectFirst(".imdb, .popover-rating p")?.text()
-            ?.substringBefore("(")?.trim()
-        val score = scoreText?.toFloatOrNull()
-
-        // --- Dub/Sub info ---
-        val dubSubText = document.selectFirst(".poster-lang span")?.text()?.trim()
-            ?: document.selectFirst(".popover-meta span:matchesOwn(Kategori)")?.parent()?.ownText()?.trim()
-
-        val hasDub = dubSubText?.contains("Dublaj", ignoreCase = true) == true
-        val hasSub = dubSubText?.contains("Altyazı", ignoreCase = true) == true
-        val label = when {
-            hasDub && hasSub -> "Dublaj + Sub"
-            hasDub -> "Dublaj"
-            hasSub -> "Altyazılı"
-            else -> null
+        val title       = document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
+        val poster      = fixUrlNull(document.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
+        val tags        = document.select("div.post-info-genres a").map { it.text() }
+        val year        = document.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
+        val tvType      = if (document.select("div.seasons").isEmpty()) TvType.Movie else TvType.TvSeries
+        val description = document.selectFirst("article.post-info-content > p")?.text()?.trim()
+        val scoreText   = document.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
+        val score       = scoreText?.toFloatOrNull()
+        val actors      = document.select("div.post-info-cast a").map {
+            Actor(it.selectFirst("strong")!!.text(), it.select("img").attr("data-src"))
         }
 
-        // --- Description ---
-        val description = document.selectFirst(".popover-description, article.post-info-content > p")
-            ?.text()?.replace("Özet", "")?.trim()
-
-        // --- Genres ---
-        val genresText = document.selectFirst(".popover-meta span:matchesOwn(Türler)")
-            ?.parent()?.ownText()?.trim()
-        val tags = genresText?.split(",")?.map { it.trim() } ?: emptyList()
-
-        // --- Determine type (Movie or Series) ---
-        val typeText = document.selectFirst(".popover-meta span:matchesOwn(Kategori)")
-            ?.parent()?.ownText()?.lowercase()
-        val tvType = when {
-            typeText?.contains("dizi") == true -> TvType.TvSeries
-            else -> TvType.Movie
-        }
-
-        // --- Actors ---
-        val actors = document.select("div.post-info-cast a").map {
-            val name = it.selectFirst("strong")?.text() ?: it.text()
-            val image = fixUrlNull(it.selectFirst("img")?.attr("data-src"))
-            Actor(name, image)
-        }
-
-        // --- Recommendations ---
         val recommendations = document.select("div.section-slider-container div.slider-slide").mapNotNull {
-            val recName = it.selectFirst("a")?.attr("title") ?: return@mapNotNull null
-            val recHref = fixUrlNull(it.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
-            val recPosterUrl = fixUrlNull(it.selectFirst("img")?.attr("data-src"))
-                ?: fixUrlNull(it.selectFirst("img")?.attr("src"))
+            val recName      = it.selectFirst("a")?.attr("title") ?: return@mapNotNull null
+            val recHref      = fixUrlNull(it.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
+            val recPosterUrl = fixUrlNull(it.selectFirst("img")?.attr("data-src")) ?:
+            fixUrlNull(it.selectFirst("img")?.attr("src"))
 
             newTvSeriesSearchResponse(recName, recHref, TvType.TvSeries) {
                 this.posterUrl = recPosterUrl
             }
         }
 
-        // --- Trailer ---
-        val trailer = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")
-            ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
-
-        // --- Construct final response ---
         return if (tvType == TvType.TvSeries) {
+            val trailer  = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")
+                ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
             val episodes = document.select("div.seasons-tab-content a").mapNotNull {
-                val epName = it.selectFirst("h4")?.text()?.trim() ?: return@mapNotNull null
-                val epHref = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
+                val epName    = it.selectFirst("h4")?.text()?.trim() ?: return@mapNotNull null
+                val epHref    = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
                 val epEpisode = Regex("""(\d+)\. ?Bölüm""").find(epName)?.groupValues?.get(1)?.toIntOrNull()
-                val epSeason = Regex("""(\d+)\. ?Sezon""").find(epName)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                val epSeason  = Regex("""(\d+)\. ?Sezon""").find(epName)?.groupValues?.get(1)?.toIntOrNull() ?: 1
 
                 newEpisode(epHref) {
                     this.name = epName
@@ -302,35 +210,31 @@ class Hdfc : MainAPI() {
             }
 
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
-                this.year = year
-                this.quality = yearText
-                this.posterLabel = label
-                this.posterText = score?.let { "⭐ ${"%.1f".format(it)}" }
-                this.plot = description
-                this.tags = tags
-                this.score = Score.from10(score)
+                this.posterUrl       = poster
+                this.year            = year
+                this.plot            = description
+                this.tags            = tags
+                this.score          = Score.from10(score)
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
             }
         } else {
+            val trailer = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")
+                ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
+
             newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = poster
-                this.year = year
-                this.quality = yearText
-                this.posterLabel = label
-                this.posterText = score?.let { "⭐ ${"%.1f".format(it)}" }
-                this.plot = description
-                this.tags = tags
-                this.score = Score.from10(score)
+                this.posterUrl       = poster
+                this.year            = year
+                this.plot            = description
+                this.tags            = tags
+                this.score          = Score.from10(score)
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
             }
         }
     }
-
 
     private suspend fun invokeLocalSource(
         source: String,
