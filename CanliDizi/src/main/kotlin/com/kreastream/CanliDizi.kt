@@ -27,7 +27,8 @@ class CanliDizi : MainAPI() {
 
     override val mainPage = mainPageOf(
         "${mainUrl}/yerli-bolumler" to "Yerli Yeni Bölümler",
-        "${mainUrl}/digi-bolumler" to "Dijital Yeni Bölümler",
+        "${mainUrl}/digi-bolumler" to "Dijital Yeni Bölümler", 
+        "${mainUrl}/diziler" to "Yerli Diziler",
         "${mainUrl}/dijital-diziler-izle" to "Dijital Diziler",
         "${mainUrl}/film-izle" to "Filmler"
     )
@@ -36,18 +37,108 @@ class CanliDizi : MainAPI() {
         val url = request.data + if (page > 1) "page/$page/" else ""
         val document = app.get(url).document
         
-        val items = document.select("div.single-item, div.film-item").mapNotNull { element ->
-            try {
-                parseSearchItem(element)
-            } catch (e: Exception) {
-                null
+        val items = when {
+            request.name.contains("Yerli Yeni Bölümler") || url.contains("yerli-bolumler") -> {
+                document.select("div.list-episodes").mapNotNull { element ->
+                    parseEpisodeItem(element)
+                }
+            }
+            request.name.contains("Dijital Yeni Bölümler") || url.contains("digi-bolumler") -> {
+                document.select("div.list-episodes").mapNotNull { element ->
+                    parseEpisodeItem(element)
+                }
+            }
+            request.name.contains("Filmler") || url.contains("film-izle") -> {
+                document.select("div.list-episodes, div.single-item, div.film-item").mapNotNull { element ->
+                    parseMovieItem(element)
+                }
+            }
+            else -> {
+                document.select("div.single-item, div.list-series").mapNotNull { element ->
+                    parseSeriesItem(element)
+                }
             }
         }
         
         return newHomePageResponse(
             listOf(HomePageList(request.name, items)),
-            hasNext = items.isNotEmpty()
+            hasNext = items.isNotEmpty() && document.select("a.next.page-numbers, link[rel=next]").isNotEmpty()
         )
+    }
+
+    private fun parseEpisodeItem(element: Element): SearchResponse? {
+        try {
+            val link = element.selectFirst("a") ?: return null
+            val href = fixUrl(link.attr("href"))
+            val titleElement = element.selectFirst("div.serie-name") ?: return null
+            val episodeElement = element.selectFirst("div.episode-name") ?: return null
+            
+            val seriesTitle = titleElement.text().trim()
+            val episodeInfo = episodeElement.text().trim()
+            
+            // Extract episode number from episode info
+            val episodeNum = Regex("""(\d+)\.?Bölüm""").find(episodeInfo)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            
+            val fullTitle = "$seriesTitle - $episodeInfo"
+            
+            val poster = element.selectFirst("img")?.let { img ->
+                img.attr("data-wpfc-original-src").takeIf { it.isNotBlank() } 
+                    ?: img.attr("src")
+            }?.let { fixUrl(it) }
+            
+            return newTvSeriesSearchResponse(fullTitle, href, TvType.TvSeries) {
+                this.posterUrl = poster
+            }
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
+    private fun parseSeriesItem(element: Element): SearchResponse? {
+        try {
+            val link = element.selectFirst("a") ?: return null
+            val href = fixUrl(link.attr("href"))
+            
+            val title = element.selectFirst("div.serie-name, div.categorytitle a")?.text()?.trim()
+                ?: element.selectFirst("img")?.attr("alt")?.trim()
+                ?: link.attr("title")?.trim()
+                ?: return null
+                
+            val poster = element.selectFirst("img")?.let { img ->
+                img.attr("data-wpfc-original-src").takeIf { it.isNotBlank() } 
+                    ?: img.attr("src")
+            }?.let { fixUrl(it) }
+            
+            val isMovie = href.contains("/film") || title.contains("film", true)
+            return if (isMovie) {
+                newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = poster }
+            } else {
+                newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = poster }
+            }
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
+    private fun parseMovieItem(element: Element): SearchResponse? {
+        try {
+            val link = element.selectFirst("a") ?: return null
+            val href = fixUrl(link.attr("href"))
+            
+            val title = element.selectFirst("div.serie-name")?.text()?.trim()
+                ?: element.selectFirst("img")?.attr("alt")?.trim()
+                ?: link.attr("title")?.trim()
+                ?: return null
+                
+            val poster = element.selectFirst("img")?.let { img ->
+                img.attr("data-wpfc-original-src").takeIf { it.isNotBlank() } 
+                    ?: img.attr("src")
+            }?.let { fixUrl(it) }
+            
+            return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = poster }
+        } catch (e: Exception) {
+            return null
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
