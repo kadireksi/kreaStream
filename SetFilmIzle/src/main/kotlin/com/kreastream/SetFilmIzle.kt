@@ -79,15 +79,20 @@ class SetFilmIzle : MainAPI() {
         return newHomePageResponse(request.name, home)
     }
 
+    private fun Element.extractTitleWithDubInfo(): Pair<String, String?> {
+        val title = this.selectFirst("h2")?.text() ?: return "" to null
+        val dubSub = this.selectFirst(".anadil")?.text()?.trim()
+        val hasDub = dubSub?.contains("Dublaj", ignoreCase = true) == true
+        val newTitle = if (hasDub) "$title (Dublaj)" else title
+        return newTitle to dubSub
+    }
+
     private fun Element.toMainPageResult(): SearchResponse? {
-        val title = this.selectFirst("h2")?.text() ?: return null
+        val (newTitle, _) = this.extractTitleWithDubInfo()
         val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("data-src"))
         val score = this.selectFirst("span.rating")?.text()?.trim()
         val year = this.selectFirst("span.year")?.text()?.trim()?.toIntOrNull()
-        val dubSub = this.selectFirst(".anadil")?.text()?.trim()
-        val hasDub = dubSub?.contains("Dublaj", ignoreCase = true) == true
-        var newTitle = hasDub?.let { "$title (Dublaj)" } ?: title
 
         return if (href.contains("/dizi/")) {
             newTvSeriesSearchResponse(newTitle, href, TvType.TvSeries) {
@@ -122,14 +127,11 @@ class SetFilmIzle : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.selectFirst("h2")?.text() ?: return null
+        val (newTitle, _) = this.extractTitleWithDubInfo()
         val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("data-src"))
         val score = this.selectFirst("span.rating")?.text()?.trim()
         val year = this.selectFirst("span.year")?.text()?.trim()?.toIntOrNull()
-        val dubSub = this.selectFirst(".anadil")?.text()?.trim()
-        val hasDub = dubSub?.contains("Dublaj", ignoreCase = true) == true
-        var newTitle = hasDub?.let { "$title (Dublaj)" } ?: title
 
         return if (href.contains("/dizi/")) {
             newTvSeriesSearchResponse(newTitle, href, TvType.TvSeries) {
