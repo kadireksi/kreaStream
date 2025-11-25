@@ -16,7 +16,7 @@ class CanliDizi : MainAPI() {
     override val hasQuickSearch = true
 
     override var sequentialMainPage = true
-    override var sequentialMainPageDelay       = 50L
+    override var sequentialMainPageDelay = 50L
     override var sequentialMainPageScrollDelay = 50L
 
     private val standardHeaders = mapOf(
@@ -26,14 +26,15 @@ class CanliDizi : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/yerli-bolumler"         to "Yerli Yeni Bölümler",
-        "${mainUrl}/digi-bolumler"          to "Dijital Yeni Bölümler",
-        "${mainUrl}/dijital-diziler-izle"   to "Dijital Diziler",
-        "${mainUrl}/film-izle"              to "Filmler"
+        "${mainUrl}/yerli-bolumler" to "Yerli Yeni Bölümler",
+        "${mainUrl}/digi-bolumler" to "Dijital Yeni Bölümler",
+        "${mainUrl}/dijital-diziler-izle" to "Dijital Diziler",
+        "${mainUrl}/film-izle" to "Filmler"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get(request.data + if (page > 1) "page/$page/" else "").document
+        val url = request.data + if (page > 1) "page/$page/" else ""
+        val document = app.get(url).document
         
         val items = document.select("div.single-item, div.film-item").mapNotNull { element ->
             try {
@@ -241,13 +242,15 @@ class CanliDizi : MainAPI() {
     }
 
     private fun parseSearchItem(e: Element): SearchResponse? {
-        val a = e.selectFirst("div.cat-img a") ?: return null
+        val a = e.selectFirst("div.cat-img a, a.cat-img") ?: e.selectFirst("a") ?: return null
         val href = fixUrl(a.attr("href"))
         val title = e.selectFirst("div.categorytitle a")?.text()
             ?: e.selectFirst("img")?.attr("alt")
                 ?.replace(Regex("(izle|son bölüm).*", RegexOption.IGNORE_CASE), "")
                 ?.trim()
+            ?: a.attr("title") ?: a.text().trim()
             ?: return null
+            
         val poster = e.selectFirst("img")
             ?.attr("data-wpfc-original-src")
             ?.takeIf { it.isNotBlank() }
@@ -259,40 +262,6 @@ class CanliDizi : MainAPI() {
         } else {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = poster }
         }
-    }
-
-    private suspend fun parseSeriesCategory(base: String): List<SearchResponse> {
-        val list = mutableListOf<SearchResponse>()
-        for (p in 1..8) {
-            val url = if (p == 1) base else "$base/page/$p/"
-            try {
-                val doc = app.get(url).document
-                val items = doc.select("div.single-item").mapNotNull { parseSearchItem(it) }
-                if (items.isEmpty()) break
-                list.addAll(items)
-            } catch (e: Exception) { break }
-        }
-        return list
-    }
-
-    private suspend fun parseMovieCategory(base: String): List<SearchResponse> {
-        val list = mutableListOf<MovieSearchResponse>()
-        for (p in 1..8) {
-            val url = if (p == 1) base else "$base/page/$p/"
-            try {
-                val doc = app.get(url).document
-                val items = doc.select("div.single-item, div.film-item").mapNotNull {
-                    val a = it.selectFirst("a") ?: return@mapNotNull null
-                    val href = fixUrl(a.attr("href"))
-                    val title = a.selectFirst("img")?.attr("alt") ?: a.text()
-                    val poster = a.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
-                    newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = poster }
-                }
-                if (items.isEmpty()) break
-                list.addAll(items)
-            } catch (e: Exception) { break }
-        }
-        return list
     }
 
     private suspend fun loadSeriesNew(doc: Element, url: String): LoadResponse {
