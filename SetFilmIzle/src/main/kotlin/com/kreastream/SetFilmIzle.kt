@@ -87,7 +87,7 @@ class SetFilmIzle : MainAPI() {
         val year = this.selectFirst("span.year")?.text()?.trim()?.toIntOrNull()
         val dubSub = this.selectFirst(".anadil")?.text()?.trim()
         val hasDub = dubSub?.contains("Dublaj", ignoreCase = true) == true
-        val title = hasDub?.let { "$title (Dublaj)" } ?: title
+        var title = hasDub?.let { "$title (Dublaj)" } ?: title
 
         return if (href.contains("/dizi/")) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
