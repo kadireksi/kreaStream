@@ -63,7 +63,7 @@
         "iconUrl": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://dizipal932.com&size=128",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 44170,
+        "fileSize": 44166,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -73,7 +73,7 @@
         "tvTypes": [
             "TvSeries"
         ],
-        "version": 28,
+        "version": 29,
         "internalName": "DiziPalOrijinal",
         "description": "DiziPal Orijinal.",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/DiziPalOrijinal.cs3",
