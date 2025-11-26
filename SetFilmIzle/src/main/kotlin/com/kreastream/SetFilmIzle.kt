@@ -56,7 +56,7 @@ class SetFilmIzle : MainAPI() {
         val score = this.selectFirst("span.rating")?.text()?.trim()
         val year = this.selectFirst("span.year")?.text()?.trim()?.toIntOrNull()
 
-        return if (href.contains("/dizi/")) {
+        return if (href.contains("/dizi/") || href.contains("/bolum/")) {
             newTvSeriesSearchResponse(newTitle, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
                 this.score = Score.from10(score)
@@ -95,7 +95,7 @@ class SetFilmIzle : MainAPI() {
         val score = this.selectFirst("span.rating")?.text()?.trim()
         val year = this.selectFirst("span.year")?.text()?.trim()?.toIntOrNull()
 
-        return if (href.contains("/dizi/")) {
+        return if (href.contains("/dizi/") || href.contains("/bolum/")) {
             newTvSeriesSearchResponse(newTitle, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
                 this.score = Score.from10(score)
