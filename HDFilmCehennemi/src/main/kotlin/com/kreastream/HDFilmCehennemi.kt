@@ -250,11 +250,12 @@ class Hdfc : MainAPI() {
                 newExtractorLink(
                     source  = source,
                     name    = source,
-                    url     = videoUrl,
-                    referer = "$mainUrl/",
-                    quality = Qualities.Unknown.value,
-                    type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                )
+                    url     = videoUrl
+                ){
+                    this.referer = "$mainUrl/"
+                    this.quality = Qualities.Unknown.value
+                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                }
             )
         } catch (e: Exception) {
             Log.e("HDFC", "Error extracting local source", e)
