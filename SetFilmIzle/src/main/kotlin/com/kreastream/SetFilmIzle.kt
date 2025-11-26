@@ -2,6 +2,8 @@ package com.kreastream
 
 import android.util.Log
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.*
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
