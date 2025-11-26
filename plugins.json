@@ -80,26 +80,6 @@
         "name": "DiziPalOrijinal"
     },
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 24642,
-        "status": 1,
-        "language": "tr",
-        "authors": [
-            "kreastream"
-        ],
-        "tvTypes": [
-            "Movie",
-            "TvSeries"
-        ],
-        "version": 1,
-        "internalName": "HDFilmCehennemi",
-        "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
-        "name": "HDFilmCehennemi"
-    },
-    {
         "iconUrl": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh3vCp6N1K4bECoYRQD-cisJF2_6V_Hk01ZhDmoPR2JuM8O5qr4MqrPO1munM9cRlleBBSK6odYhLtDBWv4E3vhPhynlmS5hVVtJZShHoGA5REQ8_3v8SIlccTEqzVQu2UJyNYQdJNrKIfWy66RQeT0D-CcmFCbHPz5023H6p2v5fv4NVloZ5Rqo_yGrIY/s320/iNat-Box-App.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
@@ -178,21 +158,5 @@
         "description": "TRT TV & Radyo & Diziler & Programlar",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Trt.cs3",
         "name": "Trt"
-    },
-    {
-        "iconUrl": "https://raw.githubusercontent.com/kadireksi/kreaStream/refs/heads/logos/tr_flag.png",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 32477,
-        "status": 1,
-        "language": "tr",
-        "authors": [
-            "kreastream"
-        ],
-        "version": 1,
-        "internalName": "TurkTV",
-        "description": "T\u00fcrk TV Dizi ve Canl\u0131 Yay\u0131nlar\u0131",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
-        "name": "TurkTV"
     }
 ]
