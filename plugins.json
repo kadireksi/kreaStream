@@ -140,7 +140,7 @@
         "name": "NeonSpor"
     },
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=www.setfilmizle.de&sz=%size%",
+        "iconUrl": "https://www.setfilmizle.uk/wp-content/uploads/2017/05/set-touch.webp",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
         "fileSize": 22868,
@@ -153,7 +153,7 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 14,
+        "version": 15,
         "internalName": "SetFilmIzle",
         "description": "Setfilmizle sitemizde, donma ya\u015famadan T\u00fcrk\u00e7e dublaj ve altyaz\u0131l\u0131 filmleri ile dizileri muhte\u015fem 1080p full HD kalitesinde izleyebilirsiniz.",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/SetFilmIzle.cs3",
