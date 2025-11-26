@@ -1,33 +1,8 @@
-// ! Bu araç @keyiflerolsun tarafından | @KekikAkademi için yazılmıştır.
-
 package com.kreastream
 
 import android.util.Log
-import com.lagradost.cloudstream3.Actor
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.Score
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -67,7 +42,7 @@ class SetFilmIzle : MainAPI() {
     private fun Element.extractTitleWithDubInfo(): Pair<String, String?> {
         val title = this.selectFirst("h2")?.text() ?: return "" to null
         val dubSub = this.selectFirst(".anadil")?.text()?.trim()
-        val hasDub = dubSub?.contains("Dublaj" || "Yerli", ignoreCase = true) == true
+        val hasDub = dubSub?.startsWith("Dublaj", ignoreCase = true) == true || dubSub?.startsWith("Yerli", ignoreCase = true) == true
         val newTitle = if (hasDub) "🇹🇷 $title" else title
         return newTitle to dubSub
     }
