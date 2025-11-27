@@ -139,9 +139,15 @@ class HDFilmCehennemi : MainAPI() {
         ) TvType.TvSeries else TvType.Movie
 
         // 2. Add the language text to the posterHeaders list (FIXED: using Map<String, String>)
-        return newMovieSearchResponse(title, href, tvType) {
+        return newMovieSearchResponse(newTitle, href, tvType) {
             this.posterUrl = posterUrl
             this.score = Score.from10(score)
+
+            // Add year if found
+            if (!yearText.isNullOrBlank()) {
+                this.year = yearText.toIntOrNull()
+            }
+            
             // Add language tag if found
             if (!lang.isNullOrBlank()) {
                 // FIXED: posterHeaders requires a Map<String, String>. Key is text, value can be empty.
