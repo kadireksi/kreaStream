@@ -184,12 +184,25 @@ class HDFilmCehennemi : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
         val data = this.extractPosterData() ?: return null
-        val headers = if (!data.lang.isNullOrBlank()) mapOf(data.lang to "") else null
+        
+        val headers = mutableMapOf<String, String>()
+        
+        // Add the "TR DUB" flag if it's dubbed
+        if (data.hasDub) {
+            headers["TR DUB"] = "" // The platform uses the presence of the key for the flag
+        }
+        
+        // Add the language/subtitle status if available and not a duplicate of the dub status
+        if (!data.lang.isNullOrBlank()) {
+            headers[data.lang] = ""
+        }
+        
+        val finalHeaders = if (headers.isEmpty()) null else headers
 
         return newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
             this.score = Score.from10(data.score)
-            this.posterHeaders = headers
+            this.posterHeaders = finalHeaders
         }
     }
 
@@ -209,13 +222,25 @@ class HDFilmCehennemi : MainAPI() {
 
             val data = document.selectFirst("a")?.extractPosterData() ?: return@forEach
             
-            val headers = if (!data.lang.isNullOrBlank()) mapOf(data.lang to "") else null
+            val headers = mutableMapOf<String, String>()
+            
+            // Add the "TR DUB" flag if it's dubbed
+            if (data.hasDub) {
+                headers["TR DUB"] = ""
+            }
+            
+            // Add the language/subtitle status if available
+            if (!data.lang.isNullOrBlank()) {
+                headers[data.lang] = ""
+            }
+            
+            val finalHeaders = if (headers.isEmpty()) null else headers
 
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
                     this.posterUrl = data.posterUrl?.replace("/thumb/", "/list/")
                     this.score = Score.from10(data.score)
-                    this.posterHeaders = headers
+                    this.posterHeaders = finalHeaders
                 }
             )
         }
