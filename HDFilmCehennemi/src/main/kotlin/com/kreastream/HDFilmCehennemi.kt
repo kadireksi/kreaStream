@@ -114,6 +114,7 @@ class HDFilmCehennemi : MainAPI() {
     // New data class to hold common extracted fields
     private data class PosterData(
         val title: String,
+        val newTitle: String,
         val href: String,
         val posterUrl: String?,
         val lang: String?,
@@ -139,21 +140,19 @@ class HDFilmCehennemi : MainAPI() {
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
         val lang = this.selectFirst(".poster-lang")?.text()?.trim()
         val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || lang?.startsWith("Yerli", ignoreCase = true) == true
+        val newTitle = if (hasDub) "🇹🇷 ${title}" else title
 
         val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true) || this.attr("href").contains("/series", ignoreCase = true)
         val tvType = if (typeCheck) TvType.TvSeries else TvType.Movie
 
-        return PosterData(title, href, posterUrl, lang, year, score, tvType, hasDub)
+        return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub)
     }
 
-    // Refactored to use the new helper function
     private fun Element.toSearchResult(): SearchResponse? {
         val data = this.extractPosterData() ?: return null
-        val newTitle = if (data.hasDub) "🇹🇷 ${data.title}" else data.title
-        // FIXED: Use Map<String, String> for posterHeaders. Key is text, value can be empty.
         val headers = if (!data.lang.isNullOrBlank()) mapOf(data.lang to "") else null
 
-        return newMovieSearchResponse(newTitle, data.href, data.tvType) {
+        return newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
             this.score = Score.from10(data.score)
             this.posterHeaders = headers
@@ -163,7 +162,6 @@ class HDFilmCehennemi : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    // Refactored to use the new helper function and fix errors
     override suspend fun search(query: String): List<SearchResponse> {
         val response = app.get(
             "${mainUrl}/search?q=${query}",
@@ -174,18 +172,16 @@ class HDFilmCehennemi : MainAPI() {
 
         response.results.forEach { resultHtml ->
             val document = Jsoup.parse(resultHtml)
-            // Search results are wrapped, so we find the link element to extract data
+
             val data = document.selectFirst("a")?.extractPosterData() ?: return@forEach
             
-            // FIXED: Use Map<String, String> for posterHeaders
             val headers = if (!data.lang.isNullOrBlank()) mapOf(data.lang to "") else null
 
             searchResults.add(
-                newMovieSearchResponse(data.title, data.href, data.tvType) {
-                    // Note: The search results often require '/list/' for the poster size
+                newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
                     this.posterUrl = data.posterUrl?.replace("/thumb/", "/list/")
-                    this.score = Score.from10(data.score) // Fixed score
-                    this.posterHeaders = headers // Fixed header type
+                    this.score = Score.from10(data.score)
+                    this.posterHeaders = headers
                 }
             )
         }
@@ -195,7 +191,6 @@ class HDFilmCehennemi : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        // Use a more specific selector for the title if the first one fails
         val title       = document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
         val poster      = fixUrlNull(document.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
         val tags        = document.select("div.post-info-genres a").map { it.text() }
