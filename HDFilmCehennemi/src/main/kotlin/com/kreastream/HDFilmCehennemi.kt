@@ -217,36 +217,31 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // Helper function to decode the obfuscated HDFC URL
+    // FIXED: Decrypts URL using ByteArray to prevent UTF-8 corruption
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. Base64 Decode
-            val decodedBytes = Base64.decode(encryptedData, Base64.DEFAULT)
-            val afterBase64 = String(decodedBytes)
+            // 1. Base64 Decode -> ByteArray (Crucial: Keep as bytes!)
+            val bytes = Base64.decode(encryptedData, Base64.DEFAULT)
 
-            // 2. ROT13
-            val afterRot13 = afterBase64.map { char ->
-                when (char) {
-                    in 'a'..'z' -> {
-                        val c = char.code + 13
-                        if (c > 'z'.code) (c - 26).toChar() else c.toChar()
-                    }
-                    in 'A'..'Z' -> {
-                        val c = char.code + 13
-                        if (c > 'Z'.code) (c - 26).toChar() else c.toChar()
-                    }
-                    else -> char
+            // 2. Apply ROT13 to ASCII letters only (in-place modification of bytes)
+            for (i in bytes.indices) {
+                val b = bytes[i].toInt()
+                if ((b in 65..90) || (b in 97..122)) { // A-Z or a-z
+                    val isUpper = b <= 90
+                    val base = if (isUpper) 65 else 97
+                    // ROT13 logic
+                    val shifted = ((b - base + 13) % 26) + base
+                    bytes[i] = shifted.toByte()
                 }
-            }.joinToString("")
+            }
 
-            // 3. Reverse
-            val reversed = afterRot13.reversed()
+            // 3. Reverse the byte array
+            bytes.reverse()
 
             // 4. Custom Byte Shift Loop
             val sb = StringBuilder()
-            for (i in reversed.indices) {
-                val charCode = reversed[i].code
-                // JS Logic: (charCode - (399756995 % (i + 5)) + 256) % 256
+            for (i in bytes.indices) {
+                val charCode = bytes[i].toInt() and 0xFF // Convert to unsigned int 0-255
                 val shift = seed % (i + 5)
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
@@ -259,7 +254,6 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // UPDATED: invokeLocalSource now unpacks the JS to find and decrypt the HLS link
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
@@ -275,16 +269,11 @@ class HDFilmCehennemi : MainAPI() {
             val unpacked = JsUnpacker(script).unpack() ?: return
             
             // 2. Extract the encrypted array string
-            // Matches: var X = func(["part1", "part2"...]);
-            // Finds the list of strings sent to the decrypt function
             val arrayRegex = Regex("""\w+\(\[(.*?)\]\)""")
             val arrayMatch = arrayRegex.find(unpacked)?.groupValues?.get(1) ?: return
-            
-            // Clean up the array string to get the combined value (equivalent to JS .join(''))
             val encryptedString = arrayMatch.replace("\"", "").replace(",", "")
 
             // 3. Extract the math seed
-            // Matches: charCode-(399756995%(i+5))
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
             val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
 
@@ -351,7 +340,6 @@ class HDFilmCehennemi : MainAPI() {
                 val sourceName = button.text().replace("(HDrip Xbet)", "").trim() + " $langCode"
                 val videoID = button.attr("data-video")
                 
-                // Fetch the API to get the real iframe URL
                 val apiGet = app.get(
                     "${mainUrl}/video/$videoID/",
                     headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
