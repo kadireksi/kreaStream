@@ -1,58 +1,81 @@
 package com.kreastream
 
-import com.lagradost.api.Log
-import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
-import okhttp3.Interceptor
-import okhttp3.ResponseBody
-import org.json.JSONArray
-import java.net.URI
-import javax.crypto.Cipher
-import javax.crypto.spec.SecretKeySpec
-import javax.crypto.spec.IvParameterSpec
 import android.util.Base64
+import com.lagradost.api.Log
+import com.lagradost.cloudstream3.DubStatus
+import com.lagradost.cloudstream3.Episode
+import com.lagradost.cloudstream3.HomePageResponse
+import com.lagradost.cloudstream3.LiveStreamLoadResponse
+import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.MainPageRequest
+import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.SeasonData
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.mainPageOf
+import com.lagradost.cloudstream3.newAnimeLoadResponse
+import com.lagradost.cloudstream3.newEpisode
+import com.lagradost.cloudstream3.newHomePageResponse
+import com.lagradost.cloudstream3.newLiveSearchResponse
+import com.lagradost.cloudstream3.newLiveStreamLoadResponse
+import com.lagradost.cloudstream3.newMovieLoadResponse
+import com.lagradost.cloudstream3.newMovieSearchResponse
+import com.lagradost.cloudstream3.newTvSeriesSearchResponse
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.newExtractorLink
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import okio.BufferedSource
+import java.net.URI
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 class InatBox : MainAPI() {
-    private val contentUrl  = "https://dizibooooox.cfd/CDN/001/dizibox"
+    private val contentUrl = "https://diziboxxx.cfd/CDN/001/dizibox"
 //    private val categoryUrl = "https://diziboxs.cfd"
 
-    override var name                 = "InatBox"
-    override val hasMainPage          = true
-    override var lang                 = "tr"
-    override val hasQuickSearch       = true
-    override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries, TvType.Live)
-    override var sequentialMainPage   = false
+    override var name = "InatBox"
+    override val hasMainPage = true
+    override var lang = "tr"
+    override val hasQuickSearch = true
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Live)
+    override var sequentialMainPage = false
 
     private val urlToSearchResponse = mutableMapOf<String, SearchResponse>()
-    private val aesKey = "ywevqtjrurkwtqgz" //Master secret and iv key (This is used for both secret key and iv. This is the embedded master key for loading categories like sport channels.)
+    private val aesKey =
+        "ywevqtjrurkwtqgz" //Master secret and iv key (This is used for both secret key and iv. This is the embedded master key for loading categories like sport channels.)
 
     override val mainPage = mainPageOf(
-        "https://boxbc.icu/CDN/001_STR/boxbc.icu/spor_v2.php"  to "Spor Kanalları",
-        
-        "${contentUrl}/ex/index.php"                            to "EXXEN",
-        "${contentUrl}/ga/index.php"                            to "Gain",
-        "${contentUrl}/dsny/index.php"                          to "Disney+",
-        "${contentUrl}/amz/index.php"                           to "Amazon Prime",
-        "${contentUrl}/hb/index.php"                            to "HBO Max",
-        "${contentUrl}/tbi/index.php"                           to "Tabii",
-        "${contentUrl}/film/mubi.php"                           to "Mubi",
+        "https://boxbc.icu/CDN/001_STR/boxbc.icu/spor_v2.php" to "Spor Kanalları",
+
+        "${contentUrl}/ex/index.php" to "EXXEN",
+        "${contentUrl}/ga/index.php" to "Gain",
+        "${contentUrl}/dsny/index.php" to "Disney+",
+        "${contentUrl}/amz/index.php" to "Amazon Prime",
+        "${contentUrl}/hb/index.php" to "HBO Max",
+        "${contentUrl}/tbi/index.php" to "Tabii",
+        "${contentUrl}/film/mubi.php" to "Mubi",
         "https://boxbc.icu/CDN/001_STR/boxbc.icu/ccc/index.php" to "TOD",
 
-        "${contentUrl}/tv/list1.php"                            to "Kanallar Liste 1 ",
-        "${contentUrl}/tv/list2.php"                            to "Kanallar Liste 2",
-        "${contentUrl}/tv/list3.php"                            to "Kanallar Liste 3 ",
-        "${contentUrl}/tv/sinema.php"                           to "Sinema Kanalları",
-        "${contentUrl}/tv/belgesel.php"                         to "Belgesel Kanalları",
-        "${contentUrl}/tv/ulusal.php"                           to "Ulusal Kanallar",
-        "${contentUrl}/tv/haber.php"                            to "Haber Kanalları",
-        "${contentUrl}/tv/eba.php"                              to "Eba Kanalları",
-        "${contentUrl}/tv/cocuk.php"                            to "Çocuk Kanalları",
-        "${contentUrl}/tv/dini.php"                             to "Dini Kanallar",
+        "${contentUrl}/tv/list1.php" to "Kanallar Liste 1 ",
+        "${contentUrl}/tv/list2.php" to "Kanallar Liste 2",
+        "${contentUrl}/tv/list3.php" to "Kanallar Liste 3 ",
+        "${contentUrl}/tv/sinema.php" to "Sinema Kanalları",
+        "${contentUrl}/tv/belgesel.php" to "Belgesel Kanalları",
+        "${contentUrl}/tv/ulusal.php" to "Ulusal Kanallar",
+        "${contentUrl}/tv/haber.php" to "Haber Kanalları",
+        "${contentUrl}/tv/eba.php" to "Eba Kanalları",
+        "${contentUrl}/tv/cocuk.php" to "Çocuk Kanalları",
+        "${contentUrl}/tv/dini.php" to "Dini Kanallar",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -142,7 +165,12 @@ class InatBox : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
         Log.d("InatBox", "data: $data")
         return try {
             if (data.startsWith("[")) {
@@ -164,7 +192,10 @@ class InatBox : MainAPI() {
         }
     }
 
-    private suspend fun parseTvSeriesResponse(item: JSONObject, tvType: TvType = TvType.TvSeries): LoadResponse? {
+    private suspend fun parseTvSeriesResponse(
+        item: JSONObject,
+        tvType: TvType = TvType.TvSeries
+    ): LoadResponse? {
         val episodes = mutableMapOf<DubStatus, MutableList<Episode>>()
         val seasonDataList = mutableListOf<SeasonData>()
 
@@ -249,7 +280,12 @@ class InatBox : MainAPI() {
                 val jsonResponse = makeInatRequest(url) ?: return null
                 val jsonArray = JSONArray(jsonResponse)
 
-                return newMovieLoadResponse(name = name,url = item.toString(), type = TvType.Movie, dataUrl = jsonArray.toString()){
+                return newMovieLoadResponse(
+                    name = name,
+                    url = item.toString(),
+                    type = TvType.Movie,
+                    dataUrl = jsonArray.toString()
+                ) {
                     this.posterUrl = posterUrl
                     this.plot = plot
                 }
@@ -327,11 +363,15 @@ class InatBox : MainAPI() {
         )
     }
 
-    private suspend fun loadChContentLinks(chContent: ChContent, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit){
+    private suspend fun loadChContentLinks(
+        chContent: ChContent,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
         val chType = chContent.chType
-        val contentToProcess : ChContent
+        val contentToProcess: ChContent
 
-        if(chType == "tekli_regex_lb_sh_3"){
+        if (chType == "tekli_regex_lb_sh_3") {
             val name = chContent.chName
             val url = chContent.chUrl
             val posterUrl = chContent.chImg
@@ -339,15 +379,16 @@ class InatBox : MainAPI() {
             val reg = chContent.chReg
             val type = chContent.chType
 
-            val jsonResponse = runCatching { makeInatRequest(url) }.getOrNull() ?: getJsonFromEncryptedInatResponse(app.get(url).text) ?: return
+            val jsonResponse = runCatching { makeInatRequest(url) }.getOrNull()
+                ?: getJsonFromEncryptedInatResponse(app.get(url).text) ?: return
             val firstItem = JSONObject(jsonResponse)
             firstItem.put("chHeaders", headers)
             firstItem.put("chReg", reg)
-            firstItem.put("chName",name)
-            firstItem.put("chImg",posterUrl)
-            firstItem.put("chType",type)
+            firstItem.put("chName", name)
+            firstItem.put("chImg", posterUrl)
+            firstItem.put("chType", type)
             contentToProcess = parseToChContent(firstItem)
-        } else{
+        } else {
             contentToProcess = chContent
         }
 
@@ -373,9 +414,18 @@ class InatBox : MainAPI() {
         }
 
         val extractorFound =
-            loadExtractor(sourceUrl, headers["Referer"], subtitleCallback){
+            loadExtractor(sourceUrl, headers["Referer"], subtitleCallback) {
                 callback.invoke(
-                    ExtractorLink(source = it.source,name = contentToProcess.chName, url = it.url, referer = it.referer, quality = it.quality, headers = it.headers, type = it.type)
+                    newExtractorLink(
+                        source = it.source,
+                        name = contentToProcess.chName,
+                        url = it.url
+                    ){
+                        this.referer = it.referer
+                        this.quality = it.quality
+                        this.headers = it.headers
+                        this.type = it.type
+                    }
                 )
             }
 
@@ -386,11 +436,15 @@ class InatBox : MainAPI() {
                     source = this.name,
                     name = contentToProcess.chName,
                     url = sourceUrl
-                ){
+                ) {
                     this.referer = ""
                     this.quality = Qualities.Unknown.value
                     this.headers = headers
-                    this.type = if(sourceUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else if(sourceUrl.contains(".mpd")) ExtractorLinkType.DASH else ExtractorLinkType.VIDEO
+                    this.type =
+                        if (sourceUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else if (sourceUrl.contains(
+                                ".mpd"
+                            )
+                        ) ExtractorLinkType.DASH else ExtractorLinkType.VIDEO
                 }
             )
         }
@@ -514,7 +568,11 @@ class InatBox : MainAPI() {
                     val chType = item.getString("chType")
 
                     val searchResponse = when (chType) {
-                        "live_url", "tekli_regex_lb_sh_3" -> newLiveSearchResponse(name, item.toString(), TvType.Live) {
+                        "live_url", "tekli_regex_lb_sh_3" -> newLiveSearchResponse(
+                            name,
+                            item.toString(),
+                            TvType.Live
+                        ) {
                             this.posterUrl = posterUrl
                         }
 

@@ -34,6 +34,7 @@ import com.lagradost.cloudstream3.utils.newExtractorLink
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
 class HDFilmCehennemi : MainAPI() {
@@ -111,7 +112,6 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // New data class to hold common extracted fields
     private data class PosterData(
         val title: String,
         val newTitle: String,
@@ -124,12 +124,42 @@ class HDFilmCehennemi : MainAPI() {
         val hasDub: Boolean
     )
 
-    // New helper extension function to extract common data from an Element
+    private data class LoadData(
+        val title: String,
+        val poster: String?,
+        val tags: List<String>,
+        val year: Int?,
+        val tvType: TvType,
+        val description: String?,
+        val score: Float?,
+        val actors: List<Actor>,
+        val trailer: String?
+    )
+
+    private fun Document.extractLoadData(): LoadData? {
+        val title = this.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
+        val poster = fixUrlNull(this.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
+        val tags = this.select("div.post-info-genres a").map { it.text() }
+        val year = this.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
+        val tvType = if (this.select("div.seasons").isEmpty()) TvType.Movie else TvType.TvSeries
+        val description = this.selectFirst("article.post-info-content > p")?.text()?.trim()
+        val score = this.selectFirst("div.post-info-imdb-rating span")?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
+        
+        val actors = this.select("div.post-info-cast a").map {
+            Actor(it.selectFirst("strong")?.text() ?: it.text(), fixUrlNull(it.selectFirst("img")?.attr("data-src")))
+        }
+
+        val trailer = this.selectFirst("div.post-info-trailer button")?.attr("data-modal")
+            ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
+
+        return LoadData(title, poster, tags, year, tvType, description, score, actors, trailer)
+    }
+
     private fun Element.extractPosterData(): PosterData? {
         val title = this.attr("title")
             .takeIf { it.isNotEmpty() }?.trim()
             ?: this.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: this.selectFirst("h4.title")?.text()?.trim() // For search results
+            ?: this.selectFirst("h4.title")?.text()?.trim()
             ?: return null
 
         val href = fixUrlNull(this.attr("href")) ?: return null
@@ -188,19 +218,10 @@ class HDFilmCehennemi : MainAPI() {
         return searchResults
     }
 
+    // Refactored Load function using the new LoadData helper
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
-
-        val title       = document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
-        val poster      = fixUrlNull(document.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
-        val tags        = document.select("div.post-info-genres a").map { it.text() }
-        val year        = document.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
-        val tvType      = if (document.select("div.seasons").isEmpty()) TvType.Movie else TvType.TvSeries
-        val description = document.selectFirst("article.post-info-content > p")?.text()?.trim()
-        val score      = document.selectFirst("div.post-info-imdb-rating span")?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
-        val actors      = document.select("div.post-info-cast a").map {
-            Actor(it.selectFirst("strong")!!.text(), it.select("img").attr("data-src"))
-        }
+        val data = document.extractLoadData() ?: return null
 
         val recommendations = document.select("div.section-slider-container div.slider-slide").mapNotNull {
             val recName      = it.selectFirst("a")?.attr("title") ?: return@mapNotNull null
@@ -208,14 +229,12 @@ class HDFilmCehennemi : MainAPI() {
             val recPosterUrl = fixUrlNull(it.selectFirst("img")?.attr("data-src")) ?:
             fixUrlNull(it.selectFirst("img")?.attr("src"))
 
-            newTvSeriesSearchResponse(recName, recHref, TvType.TvSeries) {
+            newTvSeriesSearchResponse(recName, recHref, data.tvType) { // Use data.tvType here for consistency
                 this.posterUrl = recPosterUrl
             }
         }
 
-        return if (tvType == TvType.TvSeries) {
-            val trailer  = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")
-                ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
+        return if (data.tvType == TvType.TvSeries) {
             val episodes = document.select("div.seasons-tab-content a").mapNotNull {
                 val epName    = it.selectFirst("h4")?.text()?.trim() ?: return@mapNotNull null
                 val epHref    = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
@@ -229,31 +248,26 @@ class HDFilmCehennemi : MainAPI() {
                 }
             }
 
-            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl       = poster
-                this.year            = year
-                this.plot            = description
-                this.tags            = tags
-                this.score           = Score.from10(score)
-                //this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
+            newTvSeriesLoadResponse(data.title, url, data.tvType, episodes) {
+                this.posterUrl       = data.poster
+                this.year            = data.year
+                this.plot            = data.description
+                this.tags            = data.tags
+                this.score           = Score.from10(data.score)
                 this.recommendations = recommendations
-                addActors(actors)
-                addTrailer(trailer)
+                addActors(data.actors)
+                addTrailer(data.trailer)
             }
         } else {
-            val trailer = document.selectFirst("div.post-info-trailer button")?.attr("data-modal")
-                ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
-
-            newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl       = poster
-                this.year            = year
-                this.plot            = description
-                this.tags            = tags
-                this.score           = Score.from10(score)
-                //this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
+            newMovieLoadResponse(data.title, url, data.tvType, url) {
+                this.posterUrl       = data.poster
+                this.year            = data.year
+                this.plot            = data.description
+                this.tags            = data.tags
+                this.score           = Score.from10(data.score)
                 this.recommendations = recommendations
-                addActors(actors)
-                addTrailer(trailer)
+                addActors(data.actors)
+                addTrailer(data.trailer)
             }
         }
     }
