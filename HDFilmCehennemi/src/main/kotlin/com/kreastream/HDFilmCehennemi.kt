@@ -74,6 +74,76 @@ class HDFilmCehennemi : MainAPI() {
         "X-Requested-With" to "fetch"
     )
 
+    private data class PosterData(
+        val title: String,
+        val newTitle: String,
+        val href: String,
+        val posterUrl: String?,
+        val lang: String?,
+        val year: Int?,
+        val score: Float?,
+        val tvType: TvType,
+        val hasDub: Boolean
+    )
+
+    private data class LoadData(
+        val title: String,
+        val newTitle: String,
+        val poster: String?,
+        val tags: List<String>,
+        val year: Int?,
+        val tvType: TvType,
+        val description: String?,
+        val score: Float?,
+        val actors: List<Actor>,
+        val trailer: String?
+    )
+
+    private fun Document.extractLoadData(): LoadData? {
+        val title = this.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
+        val poster = fixUrlNull(this.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
+        val tags = this.select("div.post-info-genres a").map { it.text() }
+        val year = this.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
+        val tvType = if (this.select("div.seasons").isEmpty()) TvType.Movie else TvType.TvSeries
+        val description = this.selectFirst("article.post-info-content > p")?.text()?.trim()
+        val score = this.selectFirst("div.post-info-imdb-rating span")?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
+        val lang = this.selectFirst(".language-link")?.text()?.trim()
+        val hasDub = lang?.contains("Dublaj", ignoreCase = true) == true
+        val newTitle = if (hasDub) "🇹🇷 ${title}" else title
+
+        val actors = this.select("div.post-info-cast a").map {
+            Actor(it.selectFirst("strong")?.text() ?: it.text(), fixUrlNull(it.selectFirst("img")?.attr("data-src")))
+        }
+
+        val trailer = this.selectFirst("div.post-info-trailer button")?.attr("data-modal")
+            ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
+
+        return LoadData(title, newTitle, poster, tags, year, tvType, description, score, actors, trailer)
+    }
+
+    private fun Element.extractPosterData(): PosterData? {
+        val title = this.attr("title")
+            .takeIf { it.isNotEmpty() }?.trim()
+            ?: this.selectFirst("strong.poster-title")?.text()?.trim()
+            ?: this.selectFirst("h4.title")?.text()?.trim()
+            ?: return null
+
+        val href = fixUrlNull(this.attr("href")) ?: return null
+        val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
+            ?: this.selectFirst("img")?.attr("src"))
+
+        val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
+        val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
+        val lang = this.selectFirst(".poster-lang span")?.text()?.trim()
+        val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || lang?.startsWith("Yerli", ignoreCase = true) == true
+        val newTitle = if (hasDub) "🇹🇷 ${title}" else title
+
+        val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true) || this.attr("href").contains("/series", ignoreCase = true)
+        val tvType = if (typeCheck) TvType.TvSeries else TvType.Movie
+
+        return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub)
+    }
+
     override val mainPage = mainPageOf(
         "${mainUrl}/load/page/1/home/"                                    to "Yeni Eklenen Filmler",
         "${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
@@ -110,72 +180,6 @@ class HDFilmCehennemi : MainAPI() {
         } catch (e: Exception) {
             return newHomePageResponse(request.name, emptyList())
         }
-    }
-
-    private data class PosterData(
-        val title: String,
-        val newTitle: String,
-        val href: String,
-        val posterUrl: String?,
-        val lang: String?,
-        val year: Int?,
-        val score: Float?,
-        val tvType: TvType,
-        val hasDub: Boolean
-    )
-
-    private data class LoadData(
-        val title: String,
-        val poster: String?,
-        val tags: List<String>,
-        val year: Int?,
-        val tvType: TvType,
-        val description: String?,
-        val score: Float?,
-        val actors: List<Actor>,
-        val trailer: String?
-    )
-
-    private fun Document.extractLoadData(): LoadData? {
-        val title = this.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
-        val poster = fixUrlNull(this.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
-        val tags = this.select("div.post-info-genres a").map { it.text() }
-        val year = this.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
-        val tvType = if (this.select("div.seasons").isEmpty()) TvType.Movie else TvType.TvSeries
-        val description = this.selectFirst("article.post-info-content > p")?.text()?.trim()
-        val score = this.selectFirst("div.post-info-imdb-rating span")?.text()?.substringBefore("(")?.trim()?.toFloatOrNull()
-        
-        val actors = this.select("div.post-info-cast a").map {
-            Actor(it.selectFirst("strong")?.text() ?: it.text(), fixUrlNull(it.selectFirst("img")?.attr("data-src")))
-        }
-
-        val trailer = this.selectFirst("div.post-info-trailer button")?.attr("data-modal")
-            ?.substringAfter("trailer/")?.let { "https://www.youtube.com/embed/$it" }
-
-        return LoadData(title, poster, tags, year, tvType, description, score, actors, trailer)
-    }
-
-    private fun Element.extractPosterData(): PosterData? {
-        val title = this.attr("title")
-            .takeIf { it.isNotEmpty() }?.trim()
-            ?: this.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: this.selectFirst("h4.title")?.text()?.trim()
-            ?: return null
-
-        val href = fixUrlNull(this.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
-            ?: this.selectFirst("img")?.attr("src"))
-
-        val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
-        val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
-        val lang = this.selectFirst(".poster-lang")?.text()?.trim()
-        val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || lang?.startsWith("Yerli", ignoreCase = true) == true
-        val newTitle = if (hasDub) "🇹🇷 ${title}" else title
-
-        val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true) || this.attr("href").contains("/series", ignoreCase = true)
-        val tvType = if (typeCheck) TvType.TvSeries else TvType.Movie
-
-        return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
@@ -248,7 +252,7 @@ class HDFilmCehennemi : MainAPI() {
                 }
             }
 
-            newTvSeriesLoadResponse(data.title, url, data.tvType, episodes) {
+            newTvSeriesLoadResponse(data.newTitle, url, data.tvType, episodes) {
                 this.posterUrl       = data.poster
                 this.year            = data.year
                 this.plot            = data.description
@@ -259,7 +263,7 @@ class HDFilmCehennemi : MainAPI() {
                 addTrailer(data.trailer)
             }
         } else {
-            newMovieLoadResponse(data.title, url, data.tvType, url) {
+            newMovieLoadResponse(data.newTitle, url, data.tvType, url) {
                 this.posterUrl       = data.poster
                 this.year            = data.year
                 this.plot            = data.description
