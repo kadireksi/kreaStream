@@ -111,18 +111,23 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.attr("title")
-            .takeIf { it.isNotEmpty() }?.trim()
-            ?: this.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: return null
+    private fun Element.extractTitleWithDubInfo(): Pair<String, String?> {
+        val title = this.selectFirst("strong.poster-title")?.text() ?: return "" to null
+        val dubSub = this.selectFirst(".poster-lang span")?.text()?.trim()
+        val hasDub = dubSub?.startsWith("Dublaj", ignoreCase = true) == true || dubSub?.startsWith("Yerli", ignoreCase = true) == true
+        val newTitle = if (hasDub) "🇹🇷 $title" else title
+        return newTitle to dubSub
+    }
 
+    private fun Element.toSearchResult(): SearchResponse? {
+        val (newTitle, _) = this.extractTitleWithDubInfo()
         val href = fixUrlNull(this.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
             ?: this.selectFirst("img")?.attr("src"))
 
         // 1. Extract the language text
-        val lang = this.selectFirst(".poster-lang")?.text()?.trim()
+        val lang = this.selectFirst(".poster-lang span")?.text()?.trim()
+        if (lang.isNullOrBlank()) return null
 
         val yearText = this.selectFirst(".poster-meta span")?.text()?.trim()
         val scoreText = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
@@ -136,6 +141,7 @@ class HDFilmCehennemi : MainAPI() {
         // 2. Add the language text to the posterHeaders list (FIXED: using Map<String, String>)
         return newMovieSearchResponse(title, href, tvType) {
             this.posterUrl = posterUrl
+            this.score = Score.from10(score)
             // Add language tag if found
             if (!lang.isNullOrBlank()) {
                 // FIXED: posterHeaders requires a Map<String, String>. Key is text, value can be empty.
@@ -145,7 +151,6 @@ class HDFilmCehennemi : MainAPI() {
             }
         }
     }
-
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
