@@ -120,7 +120,7 @@ class HDFilmCehennemi : MainAPI() {
         val year: Int?,
         val score: Float?,
         val tvType: TvType,
-        val hasDub: Boolean?
+        val hasDub: Boolean
     )
 
     // New helper extension function to extract common data from an Element
