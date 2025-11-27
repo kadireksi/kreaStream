@@ -84,7 +84,7 @@ class HDFilmCehennemi : MainAPI() {
         val score: Float?,
         val tvType: TvType,
         val hasDub: Boolean,
-        val hasSub: Boolean // Added for subtitle status
+        val hasSub: Boolean 
     )
 
     private data class LoadData(
@@ -194,23 +194,19 @@ class HDFilmCehennemi : MainAPI() {
         
         val headers = mutableMapOf<String, String>()
         
-        // Add flags: Order matters for display priority!
-        // 1. TR DUB flag
+        // Use generic keys "Dub" and "Sub" for flags to work with the frontend
         if (data.hasDub) {
-            headers["TR DUB"] = "" 
+            headers["Dub"] = "" 
         }
-        // 2. TR SUB flag
         if (data.hasSub) {
-            headers["TR SUB"] = "" 
+            headers["Sub"] = "" 
         }
-        
-        // The language status is kept implicitly by the TR DUB/SUB flags.
         
         val finalHeaders = if (headers.isEmpty()) null else headers
 
         return newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
-            this.score = Score.from10(data.score) // Score is added here
+            this.score = Score.from10(data.score) 
             this.posterHeaders = finalHeaders // Flags are added here
         }
     }
@@ -233,13 +229,12 @@ class HDFilmCehennemi : MainAPI() {
             
             val headers = mutableMapOf<String, String>()
             
-            // 1. TR DUB flag
+            // Use generic keys "Dub" and "Sub" for flags
             if (data.hasDub) {
-                headers["TR DUB"] = ""
+                headers["Dub"] = ""
             }
-            // 2. TR SUB flag
             if (data.hasSub) {
-                headers["TR SUB"] = ""
+                headers["Sub"] = ""
             }
             
             val finalHeaders = if (headers.isEmpty()) null else headers
