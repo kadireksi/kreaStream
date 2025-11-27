@@ -3,11 +3,11 @@
         "iconUrl": "https://www.canlidizi14.com/favicon.ico",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 22747,
+        "fileSize": 22744,
         "status": 1,
         "language": "tr",
         "authors": [
-            "kreaStream"
+            "kreastream"
         ],
         "tvTypes": [
             "TvSeries",
@@ -27,33 +27,32 @@
         "status": 1,
         "language": "tr",
         "authors": [
-            "keyiflerolsun"
+            "kreastream"
         ],
         "tvTypes": [
             "TvSeries"
         ],
-        "version": 29,
+        "version": 2,
         "internalName": "DiziMom",
         "description": "Binlerce yerli yabanc\u0131 dizi ar\u015fivi, t\u00fcm sezonlar, kesintisiz b\u00f6l\u00fcmler. Sadece dizi izle, Dizimom heryerde seninle!",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/DiziMom.cs3",
         "name": "DiziMom"
     },
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=https://dizipal1205.com&sz=%size%",
+        "iconUrl": "https://www.google.com/s2/favicons?domain=https://dizipal1220.com&sz=%size%",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
         "fileSize": 20094,
         "status": 1,
         "language": "tr",
         "authors": [
-            "keyiflerolsun",
-            "muratcesmecioglu"
+            "kreastream"
         ],
         "tvTypes": [
             "TvSeries",
             "Movie"
         ],
-        "version": 26,
+        "version": 24,
         "internalName": "DiziPal",
         "description": "en yeni dizileri g\u00fcvenli ve h\u0131zl\u0131 \u015fekilde sunar.",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/DiziPal.cs3",
@@ -63,17 +62,16 @@
         "iconUrl": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://dizipal932.com&size=128",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 44166,
+        "fileSize": 44165,
         "status": 1,
         "language": "tr",
         "authors": [
-            "kerimmkirac",
-            "kraptor"
+            "kreastream"
         ],
         "tvTypes": [
             "TvSeries"
         ],
-        "version": 29,
+        "version": 2,
         "internalName": "DiziPalOrijinal",
         "description": "DiziPal Orijinal.",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/DiziPalOrijinal.cs3",
@@ -83,7 +81,7 @@
         "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 24743,
+        "fileSize": 25829,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -93,32 +91,11 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 2,
+        "version": 3,
         "internalName": "HDFilmCehennemi",
         "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
         "name": "HDFilmCehennemi"
-    },
-    {
-        "iconUrl": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh3vCp6N1K4bECoYRQD-cisJF2_6V_Hk01ZhDmoPR2JuM8O5qr4MqrPO1munM9cRlleBBSK6odYhLtDBWv4E3vhPhynlmS5hVVtJZShHoGA5REQ8_3v8SIlccTEqzVQu2UJyNYQdJNrKIfWy66RQeT0D-CcmFCbHPz5023H6p2v5fv4NVloZ5Rqo_yGrIY/s320/iNat-Box-App.png",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 31117,
-        "status": 3,
-        "language": "tr",
-        "authors": [
-            "kreastream"
-        ],
-        "tvTypes": [
-            "Movie",
-            "TvSeries",
-            "Live"
-        ],
-        "version": 10,
-        "internalName": "InatBox",
-        "description": "\u0130natBox cloudstream eklentisidir. Sevdi\u011finiz yay\u0131n platformlar\u0131n\u0131 ve canl\u0131 ma\u00e7lar\u0131 burada bulabilirsiniz.",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/InatBox.cs3",
-        "name": "InatBox"
     },
     {
         "iconUrl": "https://www.google.com/s2/favicons?domain=colorhunt.co&sz=%size%",
@@ -163,7 +140,7 @@
         "iconUrl": "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 31187,
+        "fileSize": 31173,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -173,7 +150,7 @@
             "TvSeries",
             "Live"
         ],
-        "version": 3,
+        "version": 2,
         "internalName": "Trt",
         "description": "TRT TV & Radyo & Diziler & Programlar",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Trt.cs3",
