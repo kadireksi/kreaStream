@@ -140,14 +140,8 @@ class HDFilmCehennemi : MainAPI() {
         val lang = this.selectFirst(".poster-lang")?.text()?.trim()
         val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || lang?.startsWith("Yerli", ignoreCase = true) == true
 
-        val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true)
-            || this.attr("href").contains("/series", ignoreCase = true)
-
+        val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true) || this.attr("href").contains("/series", ignoreCase = true)
         val tvType = if (typeCheck) TvType.TvSeries else TvType.Movie
-        
-        // Check if it's a dub/sub version
-        val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || 
-                    lang?.startsWith("Yerli", ignoreCase = true) == true
 
         return PosterData(title, href, posterUrl, lang, year, score, tvType, hasDub)
     }
@@ -161,7 +155,7 @@ class HDFilmCehennemi : MainAPI() {
 
         return newMovieSearchResponse(data.title, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
-            this.score =  if (hasDub) "🇹🇷 ${Score.from10(data.score)}" else Score.from10(data.score)?.toString()
+            this.score =  if (hasDub) "🇹🇷 ${Score.from10(data.score)}" else Score.from10(data.score)?
             this.posterHeaders = headers
         }
     }
