@@ -237,6 +237,7 @@ class HDFilmCehennemi : MainAPI() {
             // 1. Unpack the javascript
             val unpacked = JsUnpacker(script).unpack() ?: return
             
+            Log.d("HDFC", "Unpacked JS: $unpacked")
             // 2. Find the URL in the unpacked code. 
             // Based on hdfc1.txt, the real source ends in .txt (master.txt) but acts as m3u8.
             val videoUrl = Regex("""(https:[^"']+\.txt)""").find(unpacked)?.groupValues?.get(1) 
