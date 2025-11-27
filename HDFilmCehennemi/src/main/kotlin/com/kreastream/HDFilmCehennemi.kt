@@ -149,13 +149,13 @@ class HDFilmCehennemi : MainAPI() {
     // Refactored to use the new helper function
     private fun Element.toSearchResult(): SearchResponse? {
         val data = this.extractPosterData() ?: return null
-
+        val newTitle = if (data.hasDub) "🇹🇷 ${data.title}" else data.title
         // FIXED: Use Map<String, String> for posterHeaders. Key is text, value can be empty.
         val headers = if (!data.lang.isNullOrBlank()) mapOf(data.lang to "") else null
 
-        return newMovieSearchResponse(data.title, data.href, data.tvType) {
+        return newMovieSearchResponse(newTitle, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
-            this.score =  if (hasDub) "🇹🇷 ${Score.from10(data.score)}" else Score.from10(data.score)?
+            this.score = Score.from10(data.score)
             this.posterHeaders = headers
         }
     }
