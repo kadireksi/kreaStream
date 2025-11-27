@@ -83,7 +83,8 @@ class HDFilmCehennemi : MainAPI() {
         val year: Int?,
         val score: Float?,
         val tvType: TvType,
-        val hasDub: Boolean
+        val hasDub: Boolean,
+        val hasSub: Boolean // Added for subtitle status
     )
 
     private data class LoadData(
@@ -135,13 +136,19 @@ class HDFilmCehennemi : MainAPI() {
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
         val lang = this.selectFirst(".poster-lang span")?.text()?.trim()
-        val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || lang?.startsWith("Yerli", ignoreCase = true) == true
+        
+        // Dubbed status: checks for "Dublaj" or "Yerli"
+        val hasDub = lang?.contains("Dublaj", ignoreCase = true) == true || lang?.contains("Yerli", ignoreCase = true) == true
+        
+        // Subtitle status: checks for "Altyazılı"
+        val hasSub = lang?.contains("Altyazılı", ignoreCase = true) == true
+        
         val newTitle = if (hasDub) "🇹🇷 ${title}" else title
 
         val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true) || this.attr("href").contains("/series", ignoreCase = true)
         val tvType = if (typeCheck) TvType.TvSeries else TvType.Movie
 
-        return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub)
+        return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub, hasSub)
     }
 
     override val mainPage = mainPageOf(
@@ -187,22 +194,24 @@ class HDFilmCehennemi : MainAPI() {
         
         val headers = mutableMapOf<String, String>()
         
-        // Add the "TR DUB" flag if it's dubbed
+        // Add flags: Order matters for display priority!
+        // 1. TR DUB flag
         if (data.hasDub) {
-            headers["TR DUB"] = "" // The platform uses the presence of the key for the flag
+            headers["TR DUB"] = "" 
+        }
+        // 2. TR SUB flag
+        if (data.hasSub) {
+            headers["TR SUB"] = "" 
         }
         
-        // Add the language/subtitle status if available and not a duplicate of the dub status
-        if (!data.lang.isNullOrBlank()) {
-            headers[data.lang] = ""
-        }
+        // The language status is kept implicitly by the TR DUB/SUB flags.
         
         val finalHeaders = if (headers.isEmpty()) null else headers
 
         return newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
-            this.score = Score.from10(data.score)
-            this.posterHeaders = finalHeaders
+            this.score = Score.from10(data.score) // Score is added here
+            this.posterHeaders = finalHeaders // Flags are added here
         }
     }
 
@@ -224,14 +233,13 @@ class HDFilmCehennemi : MainAPI() {
             
             val headers = mutableMapOf<String, String>()
             
-            // Add the "TR DUB" flag if it's dubbed
+            // 1. TR DUB flag
             if (data.hasDub) {
                 headers["TR DUB"] = ""
             }
-            
-            // Add the language/subtitle status if available
-            if (!data.lang.isNullOrBlank()) {
-                headers[data.lang] = ""
+            // 2. TR SUB flag
+            if (data.hasSub) {
+                headers["TR SUB"] = ""
             }
             
             val finalHeaders = if (headers.isEmpty()) null else headers
