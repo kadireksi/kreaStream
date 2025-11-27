@@ -111,55 +111,59 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    private fun Element.extractTitleWithDubInfo(): Pair<String, String?> {
-        val title = this.selectFirst("strong.poster-title")?.text() ?: return "" to null
-        val dubSub = this.selectFirst(".poster-lang span")?.text()?.trim()
-        val hasDub = dubSub?.startsWith("Dublaj", ignoreCase = true) == true || dubSub?.startsWith("Yerli", ignoreCase = true) == true
-        val newTitle = if (hasDub) "🇹🇷 $title" else title
-        return newTitle to dubSub
-    }
+    // New data class to hold common extracted fields
+    private data class PosterData(
+        val title: String,
+        val href: String,
+        val posterUrl: String?,
+        val lang: String?,
+        val year: Int?,
+        val score: Float?,
+        val tvType: TvType
+    )
 
-    private fun Element.toSearchResult(): SearchResponse? {
-        val (newTitle, _) = this.extractTitleWithDubInfo()
+    // New helper extension function to extract common data from an Element
+    private fun Element.extractPosterData(): PosterData? {
+        val title = this.attr("title")
+            .takeIf { it.isNotEmpty() }?.trim()
+            ?: this.selectFirst("strong.poster-title")?.text()?.trim()
+            ?: this.selectFirst("h4.title")?.text()?.trim() // For search results
+            ?: return null
+
         val href = fixUrlNull(this.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
             ?: this.selectFirst("img")?.attr("src"))
 
-        // 1. Extract the language text
-        val lang = this.selectFirst(".poster-lang span")?.text()?.trim()
-        if (lang.isNullOrBlank()) return null
+        val lang = this.selectFirst(".poster-lang")?.text()?.trim()
+        val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
+        val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
 
-        val yearText = this.selectFirst(".poster-meta span")?.text()?.trim()
-        val scoreText = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
-        val score = scoreText?.toFloatOrNull()
-        
-        val tvType = if (this.attr("href").contains("/dizi/", ignoreCase = true)
+        val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true)
             || this.attr("href").contains("/series", ignoreCase = true)
-            || this.attr("href").contains("home-series", ignoreCase = true)
-        ) TvType.TvSeries else TvType.Movie
 
-        // 2. Add the language text to the posterHeaders list (FIXED: using Map<String, String>)
-        return newMovieSearchResponse(newTitle, href, tvType) {
-            this.posterUrl = posterUrl
-            this.score = Score.from10(score)
+        val tvType = if (typeCheck) TvType.TvSeries else TvType.Movie
 
-            // Add year if found
-            if (!yearText.isNullOrBlank()) {
-                this.year = yearText.toIntOrNull()
-            }
-            
-            // Add language tag if found
-            if (!lang.isNullOrBlank()) {
-                // FIXED: posterHeaders requires a Map<String, String>. Key is text, value can be empty.
-                this.posterHeaders = mapOf(
-                    lang to ""
-                )
-            }
+        return PosterData(title, href, posterUrl, lang, year, score, tvType)
+    }
+
+    // Refactored to use the new helper function
+    private fun Element.toSearchResult(): SearchResponse? {
+        val data = this.extractPosterData() ?: return null
+
+        // FIXED: Use Map<String, String> for posterHeaders. Key is text, value can be empty.
+        val headers = if (!data.lang.isNullOrBlank()) mapOf(data.lang to "") else null
+
+        return newMovieSearchResponse(data.title, data.href, data.tvType) {
+            this.posterUrl = data.posterUrl
+            this.score = Score.from10(data.score) 
+            this.posterHeaders = headers
         }
     }
 
+
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
+    // Refactored to use the new helper function and fix errors
     override suspend fun search(query: String): List<SearchResponse> {
         val response = app.get(
             "${mainUrl}/search?q=${query}",
@@ -170,28 +174,18 @@ class HDFilmCehennemi : MainAPI() {
 
         response.results.forEach { resultHtml ->
             val document = Jsoup.parse(resultHtml)
-            val title     = document.selectFirst("h4.title")?.text() ?: return@forEach
-            val href      = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
-            val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src")) ?:
-            fixUrlNull(document.selectFirst("img")?.attr("data-src"))
+            // Search results are wrapped, so we find the link element to extract data
+            val data = document.selectFirst("a")?.extractPosterData() ?: return@forEach
             
-            // Extract language in search results
-            val lang = document.selectFirst(".poster-lang")?.text()?.trim()
-            // Extract score in search results
-            val scoreText = document.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
-            val score = scoreText?.toFloatOrNull()
+            // FIXED: Use Map<String, String> for posterHeaders
+            val headers = if (!data.lang.isNullOrBlank()) mapOf(data.lang to "") else null
 
             searchResults.add(
-                newMovieSearchResponse(title, href, TvType.Movie) {
-                    this.posterUrl = posterUrl?.replace("/thumb/", "/list/")
-                    // FIXED: Using extracted score
-                    this.score = Score.from10(score) 
-                    // FIXED: Using Map<String, String> for posterHeaders and extracted lang
-                    if (!lang.isNullOrBlank()) {
-                        this.posterHeaders = mapOf(
-                            lang to ""
-                        )
-                    }
+                newMovieSearchResponse(data.title, data.href, data.tvType) {
+                    // Note: The search results often require '/list/' for the poster size
+                    this.posterUrl = data.posterUrl?.replace("/thumb/", "/list/")
+                    this.score = Score.from10(data.score) // Fixed score
+                    this.posterHeaders = headers // Fixed header type
                 }
             )
         }
@@ -202,9 +196,7 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(url).document
 
         // Use a more specific selector for the title if the first one fails
-        val title       = document.selectFirst("strong.poster-title")?.text()?.trim()
-            ?: document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
-
+        val title       = document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
         val poster      = fixUrlNull(document.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
         val tags        = document.select("div.post-info-genres a").map { it.text() }
         val year        = document.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
@@ -248,6 +240,7 @@ class HDFilmCehennemi : MainAPI() {
                 this.plot            = description
                 this.tags            = tags
                 this.score           = Score.from10(score)
+                this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
@@ -262,6 +255,7 @@ class HDFilmCehennemi : MainAPI() {
                 this.plot            = description
                 this.tags            = tags
                 this.score           = Score.from10(score)
+                this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
