@@ -119,7 +119,8 @@ class HDFilmCehennemi : MainAPI() {
         val lang: String?,
         val year: Int?,
         val score: Float?,
-        val tvType: TvType
+        val tvType: TvType,
+        val hasDub: Boolean?
     )
 
     // New helper extension function to extract common data from an Element
@@ -134,16 +135,21 @@ class HDFilmCehennemi : MainAPI() {
         val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
             ?: this.selectFirst("img")?.attr("src"))
 
-        val lang = this.selectFirst(".poster-lang")?.text()?.trim()
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
+        val lang = this.selectFirst(".poster-lang")?.text()?.trim()
+        val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || lang?.startsWith("Yerli", ignoreCase = true) == true
 
         val typeCheck = this.attr("href").contains("/dizi/", ignoreCase = true)
             || this.attr("href").contains("/series", ignoreCase = true)
 
         val tvType = if (typeCheck) TvType.TvSeries else TvType.Movie
+        
+        // Check if it's a dub/sub version
+        val hasDub = lang?.startsWith("Dublaj", ignoreCase = true) == true || 
+                    lang?.startsWith("Yerli", ignoreCase = true) == true
 
-        return PosterData(title, href, posterUrl, lang, year, score, tvType)
+        return PosterData(title, href, posterUrl, lang, year, score, tvType, hasDub)
     }
 
     // Refactored to use the new helper function
@@ -155,7 +161,7 @@ class HDFilmCehennemi : MainAPI() {
 
         return newMovieSearchResponse(data.title, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
-            this.score = Score.from10(data.score) 
+            this.score =  if (hasDub) "🇹🇷 ${Score.from10(data.score)}" else Score.from10(data.score)?.toString()
             this.posterHeaders = headers
         }
     }
