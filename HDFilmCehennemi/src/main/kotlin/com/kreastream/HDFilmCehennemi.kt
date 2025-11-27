@@ -1,5 +1,6 @@
 package com.kreastream
 
+import android.util.Base64
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -49,7 +50,6 @@ class HDFilmCehennemi : MainAPI() {
 
     private val cloudflareKiller by lazy { CloudflareKiller() }
     
-    // CloudflareInterceptor implementation (Simplified for brevity based on your file)
     class CloudflareKiller { 
         fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request()) 
     }
@@ -58,7 +58,6 @@ class HDFilmCehennemi : MainAPI() {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request  = chain.request()
             val response = chain.proceed(request)
-            // Basic CF check logic
             return response
         }
     }
@@ -130,10 +129,6 @@ class HDFilmCehennemi : MainAPI() {
 
         return newMovieSearchResponse(title, href, tvType) {
             this.posterUrl = posterUrl
-            // this.plot = buildString {
-            //     if (score != null) append("⭐ ${"%.1f".format(score)} • ")
-            //     if (!yearText.isNullOrBlank()) append(yearText)
-            // }.trim()
         }
     }
 
@@ -222,7 +217,49 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // UPDATED: invokeLocalSource now unpacks the JS to find the HLS (.txt/.m3u8) link
+    // Helper function to decode the obfuscated HDFC URL
+    private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
+        try {
+            // 1. Base64 Decode
+            val decodedBytes = Base64.decode(encryptedData, Base64.DEFAULT)
+            val afterBase64 = String(decodedBytes)
+
+            // 2. ROT13
+            val afterRot13 = afterBase64.map { char ->
+                when (char) {
+                    in 'a'..'z' -> {
+                        val c = char.code + 13
+                        if (c > 'z'.code) (c - 26).toChar() else c.toChar()
+                    }
+                    in 'A'..'Z' -> {
+                        val c = char.code + 13
+                        if (c > 'Z'.code) (c - 26).toChar() else c.toChar()
+                    }
+                    else -> char
+                }
+            }.joinToString("")
+
+            // 3. Reverse
+            val reversed = afterRot13.reversed()
+
+            // 4. Custom Byte Shift Loop
+            val sb = StringBuilder()
+            for (i in reversed.indices) {
+                val charCode = reversed[i].code
+                // JS Logic: (charCode - (399756995 % (i + 5)) + 256) % 256
+                val shift = seed % (i + 5)
+                val newChar = (charCode - shift + 256) % 256
+                sb.append(newChar.toChar())
+            }
+
+            return sb.toString()
+        } catch (e: Exception) {
+            Log.e("HDFC", "Decryption failed", e)
+            return ""
+        }
+    }
+
+    // UPDATED: invokeLocalSource now unpacks the JS to find and decrypt the HLS link
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
@@ -237,21 +274,34 @@ class HDFilmCehennemi : MainAPI() {
             // 1. Unpack the javascript
             val unpacked = JsUnpacker(script).unpack() ?: return
             
-            Log.d("HDFC", "Unpacked JS: $unpacked")
-            // 2. Find the URL in the unpacked code. 
-            // Based on hdfc1.txt, the real source ends in .txt (master.txt) but acts as m3u8.
-            val videoUrl = Regex("""(https:[^"']+\.txt)""").find(unpacked)?.groupValues?.get(1) 
-                ?: Regex("""(https:[^"']+\.m3u8)""").find(unpacked)?.groupValues?.get(1)
-                ?: return
+            // 2. Extract the encrypted array string
+            // Matches: var X = func(["part1", "part2"...]);
+            // Finds the list of strings sent to the decrypt function
+            val arrayRegex = Regex("""\w+\(\[(.*?)\]\)""")
+            val arrayMatch = arrayRegex.find(unpacked)?.groupValues?.get(1) ?: return
+            
+            // Clean up the array string to get the combined value (equivalent to JS .join(''))
+            val encryptedString = arrayMatch.replace("\"", "").replace(",", "")
 
-            // 3. Determine if it's HLS
-            val isHls = videoUrl.contains(".m3u8") || videoUrl.endsWith(".txt")
+            // 3. Extract the math seed
+            // Matches: charCode-(399756995%(i+5))
+            val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
+            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
+
+            // 4. Decrypt
+            val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
+            
+            if (decryptedUrl.isEmpty()) return
+            Log.d("HDFC", "Decrypted URL: $decryptedUrl")
+
+            // 5. Determine if it's HLS
+            val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
             
             callback.invoke(
                 newExtractorLink(
                     source  = source,
                     name    = source,
-                    url     = videoUrl
+                    url     = decryptedUrl
                 ){
                     this.referer = "$mainUrl/"
                     this.quality = Qualities.Unknown.value
