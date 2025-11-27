@@ -135,7 +135,10 @@ class HDFilmCehennemi : MainAPI() {
 
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
-        val lang = this.selectFirst(".poster-lang span")?.text()?.trim()
+        
+        // **FIXED: Use .poster-lang or .poster-meta for language info**
+        // In search results, language might be in .poster-lang. On main page, it's often in a general span.
+        val lang = this.selectFirst(".poster-lang span, .poster-meta-genre span")?.text()?.trim()
         
         // Dubbed status: checks for "Dublaj" or "Yerli"
         val hasDub = lang?.contains("Dublaj", ignoreCase = true) == true || lang?.contains("Yerli", ignoreCase = true) == true
@@ -189,6 +192,9 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
+    /**
+     * FIX: Adds 'Dub'/'Sub' flags (posterHeaders) on posters for main pages.
+     */
     private fun Element.toSearchResult(): SearchResponse? {
         val data = this.extractPosterData() ?: return null
         
@@ -214,6 +220,10 @@ class HDFilmCehennemi : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
+    /**
+     * FIX: Ensures posters are loaded by replacing '/thumb/' with '/list/'
+     * and adds 'Dub'/'Sub' flags (posterHeaders).
+     */
     override suspend fun search(query: String): List<SearchResponse> {
         val response = app.get(
             "${mainUrl}/search?q=${query}",
@@ -241,6 +251,7 @@ class HDFilmCehennemi : MainAPI() {
 
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
+                    // FIX: Replaces /thumb/ with /list/ for better poster resolution/loading
                     this.posterUrl = data.posterUrl?.replace("/thumb/", "/list/")
                     this.score = Score.from10(data.score)
                     this.posterHeaders = finalHeaders
@@ -250,7 +261,6 @@ class HDFilmCehennemi : MainAPI() {
         return searchResults
     }
 
-    // Refactored Load function using the new LoadData helper
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val data = document.extractLoadData() ?: return null
@@ -261,7 +271,7 @@ class HDFilmCehennemi : MainAPI() {
             val recPosterUrl = fixUrlNull(it.selectFirst("img")?.attr("data-src")) ?:
             fixUrlNull(it.selectFirst("img")?.attr("src"))
 
-            newTvSeriesSearchResponse(recName, recHref, data.tvType) { // Use data.tvType here for consistency
+            newTvSeriesSearchResponse(recName, recHref, data.tvType) { 
                 this.posterUrl = recPosterUrl
             }
         }
@@ -341,6 +351,9 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
+    /**
+     * FIX: Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
+     */
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
@@ -355,12 +368,14 @@ class HDFilmCehennemi : MainAPI() {
             // 1. Unpack the javascript
             val unpacked = JsUnpacker(script).unpack() ?: return
             
-            // 2. Extract the encrypted array string
-            val arrayRegex = Regex("""\w+\(\[(.*?)\]\)""")
-            val arrayMatch = arrayRegex.find(unpacked)?.groupValues?.get(1) ?: return
-            val encryptedString = arrayMatch.replace("\"", "").replace(",", "")
+            // 2. Extract the encrypted array string: matches func(["45","4l",...])
+            val callRegex = Regex("""\w+\(\[(.*?)\]\)""")
+            val arrayContent = callRegex.find(unpacked)?.groupValues?.get(1) ?: return
+            
+            // Clean it up to get the single Base64 string "454l..."
+            val encryptedString = arrayContent.replace("\"", "").replace("'", "").replace(",", "").replace("\\s".toRegex(), "")
 
-            // 3. Extract the math seed
+            // 3. Extract the math seed: matches charCode-(SEED%(i+5))
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
             val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
 
@@ -370,7 +385,7 @@ class HDFilmCehennemi : MainAPI() {
             if (decryptedUrl.isEmpty()) return
             Log.d("HDFC", "Decrypted URL: $decryptedUrl")
 
-            // 5. Determine if it's HLS
+            // 5. Determine if it's HLS (fixes the .txt link from hdfc1.txt)
             val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
             
             callback.invoke(
