@@ -133,14 +133,14 @@ class HDFilmCehennemi : MainAPI() {
             || this.attr("href").contains("home-series", ignoreCase = true)
         ) TvType.TvSeries else TvType.Movie
 
-        // 2. Add the language text to the posterHeaders list
+        // 2. Add the language text to the posterHeaders list (FIXED: using Map<String, String>)
         return newMovieSearchResponse(title, href, tvType) {
             this.posterUrl = posterUrl
             // Add language tag if found
             if (!lang.isNullOrBlank()) {
-                this.posterHeaders = listOf(
-                    // Pair(text, opacity). 0.4f is a good standard value for opacity.
-                    Pair(lang, 0.4f)
+                // FIXED: posterHeaders requires a Map<String, String>. Key is text, value can be empty.
+                this.posterHeaders = mapOf(
+                    lang to ""
                 )
             }
         }
@@ -163,15 +163,22 @@ class HDFilmCehennemi : MainAPI() {
             val href      = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
             val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src")) ?:
             fixUrlNull(document.selectFirst("img")?.attr("data-src"))
+            
+            // Extract language in search results
+            val lang = document.selectFirst(".poster-lang")?.text()?.trim()
+            // Extract score in search results
+            val scoreText = document.selectFirst(".poster-meta .imdb")?.ownText()?.trim()
+            val score = scoreText?.toFloatOrNull()
 
             searchResults.add(
                 newMovieSearchResponse(title, href, TvType.Movie) {
                     this.posterUrl = posterUrl?.replace("/thumb/", "/list/")
-                    this.score = Score.from10(score)
-                    // Add language tag if found
+                    // FIXED: Using extracted score
+                    this.score = Score.from10(score) 
+                    // FIXED: Using Map<String, String> for posterHeaders and extracted lang
                     if (!lang.isNullOrBlank()) {
-                        this.posterHeaders = listOf(
-                            Pair(lang, 0.4f)
+                        this.posterHeaders = mapOf(
+                            lang to ""
                         )
                     }
                 }
@@ -183,9 +190,10 @@ class HDFilmCehennemi : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
+        // Use a more specific selector for the title if the first one fails
+        val title       = document.selectFirst("strong.poster-title")?.text()?.trim()
+            ?: document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
 
-
-        val title       = document.selectFirst("h1.section-title")?.text()?.substringBefore(" izle") ?: return null
         val poster      = fixUrlNull(document.select("aside.post-info-poster img.lazyload").lastOrNull()?.attr("data-src"))
         val tags        = document.select("div.post-info-genres a").map { it.text() }
         val year        = document.selectFirst("div.post-info-year-country a")?.text()?.trim()?.toIntOrNull()
@@ -229,7 +237,7 @@ class HDFilmCehennemi : MainAPI() {
                 this.plot            = description
                 this.tags            = tags
                 this.score           = Score.from10(score)
-                this.language        = lang
+                this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
@@ -244,7 +252,7 @@ class HDFilmCehennemi : MainAPI() {
                 this.plot            = description
                 this.tags            = tags
                 this.score           = Score.from10(score)
-                this.language        = lang
+                this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
