@@ -240,7 +240,7 @@ class HDFilmCehennemi : MainAPI() {
                 this.plot            = description
                 this.tags            = tags
                 this.score           = Score.from10(score)
-                this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
+                //this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
@@ -255,7 +255,7 @@ class HDFilmCehennemi : MainAPI() {
                 this.plot            = description
                 this.tags            = tags
                 this.score           = Score.from10(score)
-                this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
+                //this.lang            = this@HDFilmCehennemi.lang // FIXED: Changed 'language' to 'lang'
                 this.recommendations = recommendations
                 addActors(actors)
                 addTrailer(trailer)
