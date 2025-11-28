@@ -23,7 +23,7 @@
         "iconUrl": "https://www.google.com/s2/favicons?domain=www.dizimom.plus&sz=%size%",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 31506,
+        "fileSize": 31502,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -32,7 +32,7 @@
         "tvTypes": [
             "TvSeries"
         ],
-        "version": 2,
+        "version": 3,
         "internalName": "DiziMom",
         "description": "Binlerce yerli yabanc\u0131 dizi ar\u015fivi, t\u00fcm sezonlar, kesintisiz b\u00f6l\u00fcmler. Sadece dizi izle, Dizimom heryerde seninle!",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/DiziMom.cs3",
@@ -52,7 +52,7 @@
             "TvSeries",
             "Movie"
         ],
-        "version": 24,
+        "version": 25,
         "internalName": "DiziPal",
         "description": "en yeni dizileri g\u00fcvenli ve h\u0131zl\u0131 \u015fekilde sunar.",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/DiziPal.cs3",
@@ -140,7 +140,7 @@
         "iconUrl": "https://kariyer.trt.net.tr/wp-content/uploads/2022/01/trt-kariyer-logo.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 31173,
+        "fileSize": 31187,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -150,7 +150,7 @@
             "TvSeries",
             "Live"
         ],
-        "version": 2,
+        "version": 3,
         "internalName": "Trt",
         "description": "TRT TV & Radyo & Diziler & Programlar",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Trt.cs3",
