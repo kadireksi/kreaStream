@@ -54,21 +54,29 @@ jobs:
         uses: android-actions/setup-android@v3.2.2
 
       # ------------------------------
-      # 3) Detect Changed Plugins (Stable)
+      # 3) Detect Changed Plugins (Event-Based, Stable)
       # ------------------------------
       - name: Detect Changed Plugins
         id: detect_plugins
         run: |
           cd $GITHUB_WORKSPACE/src
 
-          # Fetch main branch for reliable comparison
-          git fetch origin main
+          # Push event: değişen dosyaları al
+          if [ -f "$GITHUB_EVENT_PATH" ]; then
+            CHANGED_FILES=$(jq -r '.commits[].added[], .commits[].modified[]' $GITHUB_EVENT_PATH || true)
+          else
+            CHANGED_FILES=""
+          fi
+
+          # workflow_dispatch veya manuel override için tüm klasörleri al
+          if [ -z "$CHANGED_FILES" ]; then
+            CHANGED_FILES=$(find . -mindepth 1 -maxdepth 1 -type d | sed 's|^\./||')
+          fi
 
           # Build-relevant files only
           FILE_FILTER="(\.kt$|\.kts$|\.gradle$|\.json$|\.xml$|\.pro$|\.properties$)"
 
-          # Compare with origin/main
-          changed=$(git diff --name-only origin/main \
+          changed=$(echo "$CHANGED_FILES" \
             | grep -E "$FILE_FILTER" || true \
             | cut -d'/' -f1 \
             | uniq)
