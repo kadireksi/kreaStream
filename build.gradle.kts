@@ -45,7 +45,7 @@ subprojects {
         namespace = "com.kreastream"
 
         defaultConfig {
-            minSdk = 21
+            minSdk = 26
             compileSdkVersion(35)
             targetSdk = 35
         }
