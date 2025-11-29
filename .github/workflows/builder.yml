@@ -21,137 +21,46 @@ on:
       - "**/*.py"
 
 jobs:
-  build_plugins:
+  kreaStreamDerleyici:
     runs-on: ubuntu-latest
-
     steps:
-      # ------------------------------
-      # 1) Checkout Repositories
-      # ------------------------------
-      - name: Checkout source repo
+      - name: "'src' Depo Kontrolü"
         uses: actions/checkout@v4.2.2
         with:
-          path: src
-          fetch-depth: 0
+          path: "src"
 
-      - name: Checkout builds repo
+      - name: "'build' Depo Kontrolü"
         uses: actions/checkout@v4.2.2
         with:
-          ref: builds
-          path: builds
-          fetch-depth: 0
+          ref: "builds"
+          path: "builds"
 
-      # ------------------------------
-      # 2) Setup Java & Android SDK
-      # ------------------------------
-      - name: Setup JDK 17
+      #- name: Eski Derlemeleri Temizle
+        #run: rm $GITHUB_WORKSPACE/builds/*.cs3 || true
+        #run: find $GITHUB_WORKSPACE/builds -name '*.cs3' -delete
+
+      - name: JDK 17 Ayarla
         uses: actions/setup-java@v4.6.0
         with:
           distribution: adopt
           java-version: 17
 
-      - name: Setup Android SDK
+      - name: Android SDK Ayarla
         uses: android-actions/setup-android@v3.2.2
 
-      # ------------------------------
-      # 3) Detect Changed Plugins (Only Capital Start)
-      # ------------------------------
-      - name: Detect Changed Plugins
-        id: detect_plugins
-        run: |
-          cd $GITHUB_WORKSPACE/src
-
-          FILE_FILTER="(\.kt$|\.kts$|\.gradle$|\.json$|\.xml$|\.pro$|\.properties$)"
-          changed=""
-
-          # 1) Push event: commits varsa
-          if [ -f "$GITHUB_EVENT_PATH" ]; then
-            if jq -e '.commits != null' $GITHUB_EVENT_PATH >/dev/null; then
-              CHANGED_FILES=$(jq -r '.commits[].added[], .commits[].modified[]' $GITHUB_EVENT_PATH)
-              changed=$(echo "$CHANGED_FILES" \
-                | grep -E "$FILE_FILTER" || true \
-                | cut -d'/' -f1 \
-                | grep '^[A-Z]' \
-                | uniq)
-            fi
-          fi
-
-          # 2) Fallback: workflow_dispatch veya null commits → tüm klasörler (büyük harf ile başlayan)
-          if [ -z "$changed" ]; then
-            changed=$(find . -mindepth 1 -maxdepth 1 -type d | sed 's|^\./||' | grep '^[A-Z]')
-          fi
-
-          echo "Detected changed plugin folders:"
-          echo "$changed"
-
-          # Github Actions output: lines to comma
-          changed_csv=$(echo "$changed" | paste -sd "," -)
-          echo "plugins=$changed_csv" >> $GITHUB_OUTPUT
-
-      # ------------------------------
-      # 4) Version Bump BEFORE Build
-      # ------------------------------
-      - name: Version Bump Before Build
-        if: steps.detect_plugins.outputs.plugins != ''
-        run: |
-          cd $GITHUB_WORKSPACE/src
-          plugins="${{ steps.detect_plugins.outputs.plugins }}"
-
-          # Convert comma-separated to space-separated
-          plugins=$(echo "$plugins" | tr ',' ' ')
-
-          for project in $plugins; do
-            gradleFile="$GITHUB_WORKSPACE/src/$project/build.gradle.kts"
-
-            if [ -f "$gradleFile" ]; then
-              echo "Updating version for: $project"
-
-              # oldVersion'u güvenli şekilde al
-              oldVersion=$(grep -oP 'version\s*=\s*\K\d+' "$gradleFile" | head -n1)
-
-              if [ -z "$oldVersion" ]; then
-                echo "WARNING: Could not find version in $gradleFile. Skipping..."
-                continue
-              fi
-
-              newVersion=$((oldVersion + 1))
-
-              # sed ile değiştir
-              sed -i "s/version\s*=.*/version = $newVersion/" "$gradleFile"
-
-              echo "$project version: $oldVersion → $newVersion"
-            fi
-          done
-
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-
-          git add .
-          git commit -m "Auto version bump before build" || true
-          git push
-
-      # ------------------------------
-      # 5) Build Plugins
-      # ------------------------------
-      - name: Build Plugins
+      - name: Eklentileri Derle
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
           ./gradlew make makePluginsJson
-
-          # Copy output to builds repo
-          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds || true
+          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
           cp build/plugins.json $GITHUB_WORKSPACE/builds
 
-      # ------------------------------
-      # 6) Push Build Files
-      # ------------------------------
-      - name: Push Build Files
+      - name: Derlemeleri Yükle
         run: |
           cd $GITHUB_WORKSPACE/builds
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
-
           git add .
-          git commit -m "Build updated for $GITHUB_SHA" || true
+          git commit -m "$GITHUB_SHA 'nın Derlenmesi" || exit 0   # eğer commit edilecek bir şey yoksa hata verme
           git push --force
