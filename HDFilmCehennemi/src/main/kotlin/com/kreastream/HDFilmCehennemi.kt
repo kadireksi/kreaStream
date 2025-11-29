@@ -37,6 +37,7 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import kotlin.text.Charsets // ADDED: Required for Base64 decoding charset handling
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -316,31 +317,30 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // FIXED: Decrypts URL using ByteArray to prevent UTF-8 corruption
+    /**
+     * FIX: Updated logic to match the new packed JS script's decryption sequence:
+     * Reverse String -> Double Base64 Decode -> Custom Byte Shift.
+     */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. Base64 Decode -> ByteArray (Crucial: Keep as bytes!)
-            val bytes = Base64.decode(encryptedData, Base64.DEFAULT)
+            // 1. Reverse the string (JS: .reverse().join().split(''))
+            val reversedString = encryptedData.reversed()
 
-            // 2. Apply ROT13 to ASCII letters only (in-place modification of bytes)
-            for (i in bytes.indices) {
-                val b = bytes[i].toInt()
-                if ((b in 65..90) || (b in 97..122)) { // A-Z or a-z
-                    val isUpper = b <= 90
-                    val base = if (isUpper) 65 else 97
-                    // ROT13 logic
-                    val shifted = ((b - base + 13) % 26) + base
-                    bytes[i] = shifted.toByte()
-                }
-            }
+            // 2. Double Base64 Decode (JS: .atob().atob())
+            // First decode: String -> Bytes
+            val bytes1 = Base64.decode(reversedString, Base64.DEFAULT)
 
-            // 3. Reverse the byte array
-            bytes.reverse()
+            // Convert to string using ISO_8859_1 (Latin-1) for the second base64 decode, 
+            // as this mimics the browser's atob handling for non-UTF8 bytes.
+            val intermediateString = String(bytes1, Charsets.ISO_8859_1)
 
-            // 4. Custom Byte Shift Loop
+            // Second decode: String -> Final Bytes
+            val finalBytes = Base64.decode(intermediateString, Base64.DEFAULT)
+            
+            // 3. Custom Byte Shift Loop (The shifting logic is unchanged)
             val sb = StringBuilder()
-            for (i in bytes.indices) {
-                val charCode = bytes[i].toInt() and 0xFF // Convert to unsigned int 0-255
+            for (i in finalBytes.indices) {
+                val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
                 val shift = seed % (i + 5)
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
@@ -354,7 +354,7 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     /**
-     * FIX: Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
+     * Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
      */
     private suspend fun invokeLocalSource(
         source: String,
