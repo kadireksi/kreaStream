@@ -366,10 +366,12 @@ class HDFilmCehennemi : MainAPI() {
 
     /**
      * Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
+     * FIX: Added a referer parameter for correct playback.
      */
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
+        referer: String,
         callback: (ExtractorLink) -> Unit
     ) {
         try {
@@ -388,8 +390,9 @@ class HDFilmCehennemi : MainAPI() {
             // Clean it up to get the single Base64 string "454l..."
             val encryptedString = arrayContent.replace("\"", "").replace("'", "").replace(",", "").replace("\\s".toRegex(), "")
 
-            // 3. Use the known constant seed from the packed script's dictionary (18 -> 399756995)
-            val seed = 399756995
+            // 3. Extract the math seed: matches charCode-(SEED%(i+5))
+            val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
+            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995 // Fallback seed
 
             // 4. Decrypt
             val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
@@ -406,7 +409,7 @@ class HDFilmCehennemi : MainAPI() {
                     name    = source,
                     url     = decryptedUrl
                 ){
-                    this.referer = "$mainUrl/"
+                    this.referer = referer // Use the passed referer
                     this.quality = Qualities.Unknown.value
                     this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 }
@@ -429,12 +432,17 @@ class HDFilmCehennemi : MainAPI() {
 
         if (defaultSourceUrl != null) {
             val sourceName = "Close"
+            var referer = "$mainUrl/" // Default referer for non-mobi links
             
-            // 1.1. Subtitle processing: happens by visiting the iframe's URL
+            // 1.1. Subtitle processing & Referer check
             if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
                 try {
+                    // Fetch the iframe content to extract subtitles and get the base URI for the referer
                     val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
+                    // FIX 1: Set referer to the base domain of the iframe (e.g., https://hdfilmcehennemi.mobi)
                     val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
+                    referer = baseUri
+                    
                     iframedoc.select("track[kind=captions]").forEach { track ->
                         val lang = when (track.attr("srclang")) {
                             "tr" -> "Türkçe"
@@ -450,14 +458,21 @@ class HDFilmCehennemi : MainAPI() {
             }
 
             // 1.2. Decrypt the main video link using the iframe URL directly
-            invokeLocalSource(sourceName, defaultSourceUrl, callback) 
+            invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
         // --- 2. Check Alternative Links (buttons below player) ---
+        val rapidrameReferer = "$mainUrl/" // Use main URL as referer for alternative/external sources
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
                 val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
+
+                // FIX 2: Skip 'Close' to prevent duplication of links
+                if (sourceNameRaw.equals("close", ignoreCase = true)) {
+                    return@forEach
+                }
+                
                 val videoID = button.attr("data-video")
                 
                 // API call to get the iframe link (e.g., /rplayer/...)
@@ -482,7 +497,7 @@ class HDFilmCehennemi : MainAPI() {
                     } else {
                         "$sourceNameRaw $langCode"
                     }
-                    invokeLocalSource(finalSourceName, iframe, callback)
+                    invokeLocalSource(finalSourceName, iframe, rapidrameReferer, callback) // Pass the main URL as referer
                 }
             }
         }
