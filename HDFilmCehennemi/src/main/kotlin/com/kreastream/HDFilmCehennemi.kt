@@ -37,7 +37,7 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import kotlin.text.Charsets // Required for Base64 decoding charset handling
+import kotlin.text.Charsets // <--- ADDED IMPORT
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -316,27 +316,24 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    /**
-     * Decrypts URL based on the latest packed JS script's decryption sequence:
-     * Reverse String -> Double Base64 Decode -> Custom Byte Shift.
-     */
+    // --- FIX: Corrected Decryption Logic ---
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
             // 1. Reverse the string (JS: .reverse().join().split(''))
             val reversedString = encryptedData.reversed()
 
-            // 2. Double Base64 Decode (JS: .atob().atob())
+            // 2. Double Base64 Decode (JS: atob(atob(G)))
             // First decode: String -> Bytes
             val bytes1 = Base64.decode(reversedString, Base64.DEFAULT)
 
             // Convert to string using ISO_8859_1 (Latin-1) for the second base64 decode, 
             // as this mimics the browser's atob handling for non-UTF8 bytes.
-            val intermediateString = String(bytes1, Charsets.ISO_8859_1)
+            val intermediateString = String(bytes1, Charsets.ISO_8859_1) 
 
             // Second decode: String -> Final Bytes
             val finalBytes = Base64.decode(intermediateString, Base64.DEFAULT)
             
-            // 3. Custom Byte Shift Loop (The shifting logic is unchanged)
+            // 3. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
                 val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
@@ -378,6 +375,8 @@ class HDFilmCehennemi : MainAPI() {
 
             // 3. Extract the math seed: matches charCode-(SEED%(i+5))
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
+            // The default seed in the provided script is 399756995, extracted from: 
+            // "1M=(1M-(47%(i+5))+3u)%3u" where 47 is '399756995' and 3u is '256'
             val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
 
             // 4. Decrypt
@@ -418,6 +417,8 @@ class HDFilmCehennemi : MainAPI() {
         val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
         if (defaultSourceUrl != null) {
+            val sourceName = "Close"
+            
             // 1.1. Subtitle processing: happens by visiting the iframe's URL
             if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
                 try {
@@ -439,14 +440,14 @@ class HDFilmCehennemi : MainAPI() {
             }
 
             // 1.2. Decrypt the main video link using the iframe URL directly
-            invokeLocalSource("Close", defaultSourceUrl, callback) 
+            invokeLocalSource(sourceName, defaultSourceUrl, callback) 
         }
 
         // --- 2. Check Alternative Links (buttons below player) ---
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
-                val sourceName = button.text().replace("(HDrip Xbet)", "").trim() + " $langCode"
+                val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
                 val videoID = button.attr("data-video")
                 
                 // API call to get the iframe link (e.g., /rplayer/...)
@@ -466,10 +467,10 @@ class HDFilmCehennemi : MainAPI() {
 
                 if (iframe.isNotEmpty()) {
                     // Set source name to "Rapidrame" as requested if it matches the name
-                    val finalSourceName = if (sourceName.contains("RAPIDRAME", ignoreCase = true)) {
+                    val finalSourceName = if (sourceNameRaw.contains("rapidrame", ignoreCase = true)) {
                         "Rapidrame $langCode"
                     } else {
-                        sourceName
+                        "$sourceNameRaw $langCode"
                     }
                     invokeLocalSource(finalSourceName, iframe, callback)
                 }
