@@ -1,4 +1,4 @@
-name: kreaStream Derleyici
+name: kreaStream Compiler
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
@@ -15,8 +15,6 @@ on:
       - "**/*.jpg"
       - "**/*.png"
       - "**/*.py"
-      - "**/Hdfc"
-      - "Hdfc"
 
 jobs:
   kreaStreamDerleyici:
@@ -33,32 +31,103 @@ jobs:
           ref: "builds"
           path: "builds"
 
-      #- name: Eski Derlemeleri Temizle
-        #run: rm $GITHUB_WORKSPACE/builds/*.cs3 || true
-        #run: find $GITHUB_WORKSPACE/builds -name '*.cs3' -delete
-
       - name: JDK 17 Ayarla
         uses: actions/setup-java@v4.6.0
         with:
           distribution: adopt
           java-version: 17
+          cache: gradle
 
       - name: Android SDK Ayarla
         uses: android-actions/setup-android@v3.2.2
+
+      - name: Gradle Wrapper Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            src/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('src/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-wrapper-
+
+      - name: Gradle Dependencies Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/loom-cache
+            src/.gradle/caches
+            src/.gradle/loom-cache
+          key: ${{ runner.os }}-gradle-${{ hashFiles('src/*.gradle', 'src/gradle.properties', 'src/build.gradle', 'src/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Android SDK Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/cache
+            $ANDROID_HOME/cache
+          key: ${{ runner.os }}-android-sdk-${{ hashFiles('src/**/build.gradle', 'src/build.gradle') }}
+          restore-keys: |
+            ${{ runner.os }}-android-sdk-
+
+      - name: Check Dependencies Status
+        id: cache-check
+        run: |
+          if [ -f "$HOME/.gradle/caches/modules-2/modules-2.lock" ]; then
+            echo "gradle_cache_hit=true" >> $GITHUB_OUTPUT
+            echo "✅ Gradle dependencies cache found"
+          else
+            echo "gradle_cache_hit=false" >> $GITHUB_OUTPUT
+            echo "📥 Gradle dependencies will be downloaded"
+          fi
+
+      - name: Download Dependencies (if needed)
+        if: steps.cache-check.outputs.gradle_cache_hit == 'false'
+        run: |
+          cd $GITHUB_WORKSPACE/src
+          chmod +x gradlew
+          ./gradlew --version
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
 
       - name: Eklentileri Derle
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
-          ./gradlew make makePluginsJson
-          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
-          cp build/plugins.json $GITHUB_WORKSPACE/builds
+          
+          # Use build cache if available
+          if [ "${{ steps.cache-check.outputs.gradle_cache_hit }}" == "true" ]; then
+            echo "🚀 Using cached dependencies - building with cache"
+            ./gradlew make makePluginsJson --build-cache
+          else
+            echo "📦 Building with fresh dependencies"
+            ./gradlew make makePluginsJson
+          fi
+          
+          # Copy build outputs
+          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds || echo "No .cs3 files found"
+          cp build/plugins.json $GITHUB_WORKSPACE/builds || echo "plugins.json not found"
+
+      - name: Build Output Check
+        run: |
+          echo "📁 Build outputs:"
+          ls -la $GITHUB_WORKSPACE/builds/ || echo "Builds directory is empty"
 
       - name: Derlemeleri Yükle
         run: |
           cd $GITHUB_WORKSPACE/builds
+          
+          # Check if there are any changes to commit
+          if git diff --quiet --exit-code; then
+            echo "✅ No changes to commit - build outputs are up to date"
+            exit 0
+          fi
+          
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add .
-          git commit -m "$GITHUB_SHA 'nın Derlenmesi" || exit 0   # eğer commit edilecek bir şey yoksa hata verme
+          git commit -m "$GITHUB_SHA 'nın Derlenmesi"
           git push --force
