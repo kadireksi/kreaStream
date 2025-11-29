@@ -35,10 +35,6 @@ jobs:
           ref: "builds"
           path: "builds"
 
-      #- name: Eski Derlemeleri Temizle
-        #run: rm $GITHUB_WORKSPACE/builds/*.cs3 || true
-        #run: find $GITHUB_WORKSPACE/builds -name '*.cs3' -delete
-
       - name: JDK 17 Ayarla
         uses: actions/setup-java@v4.6.0
         with:
@@ -56,36 +52,42 @@ jobs:
           cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
           cp build/plugins.json $GITHUB_WORKSPACE/builds
 
-      #- name: jq Araçlarını Kur (GolgeTV ve AnimeciX eklemeleri için)
-        #run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: YerelDiziler Eklentisini plugins.json'a Elle Ekle
+      - name: build.gradle.kts Version Güncelle
         run: |
-          cd $GITHUB_WORKSPACE/builds
-          if ! jq -e '.[] | select(.internalName == "YerelDiziler")' plugins.json > /dev/null; then
-            jq '. += [{
-              "repositoryUrl": "https://github.com/kerimmkirac/cs-kerim",
-              "apiVersion": 3,
-              "status": 1,
-              "language": "tr",
-              "authors": ["kerimmkirac"],
-              "tvTypes": ["Tv"],
-              "version": 2,
-              "internalName": "YerelDiziler",
-              "description": "YerelDiziler için CloudStream eklentisi",
-              "url": "https://github.com/kerimmkirac/cs-kerim/raw/refs/heads/builds/YerelDiziler.cs3",
-              "name": "YerelDiziler",
-              "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Flag_of_Turkey.svg/960px-Flag_of_Turkey.svg.png"
-            }]' plugins.json > plugins-new.json && mv plugins-new.json plugins.json
-          else
-            echo "YerelDiziler zaten plugins.json'da mevcut, eklenmedi."
-          fi
+          cd $GITHUB_WORKSPACE/src
 
-      - name: Derlemeleri Yükle
+          # Derlenen CS3 dosyalarının isimlerini al
+          for file in $(find . -name "*.cs3"); do
+            # örnek: ./HDFilmCehennemi/build/HDFilmCehennemi.cs3 → klasör adını al
+            project=$(echo "$file" | cut -d'/' -f2)
+
+            gradleFile="$GITHUB_WORKSPACE/src/$project/build.gradle.kts"
+            
+            if [ -f "$gradleFile" ]; then
+              echo "Version güncelleniyor: $gradleFile"
+
+              # Eski version numarasını bul
+              oldVersion=$(grep -oP 'version\s*=\s*\K[0-9]+' "$gradleFile")
+              newVersion=$((oldVersion + 1))
+
+              # Version güncelle
+              sed -i "s/version\s*=\s*$oldVersion/version = $newVersion/" "$gradleFile"
+
+              echo "$project için version $oldVersion → $newVersion olarak güncellendi"
+            fi
+          done
+
+      - name: Değişiklikleri Kaydet (build.gradle.kts + derlemeler)
         run: |
-          cd $GITHUB_WORKSPACE/builds
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          cd $GITHUB_WORKSPACE/src
           git add .
-          git commit -m "$GITHUB_SHA 'nın Derlenmesi" || exit 0   # eğer commit edilecek bir şey yoksa hata verme
+          git commit -m "Plugin version auto-updated after build" || true
+          git push
+
+          cd $GITHUB_WORKSPACE/builds
+          git add .
+          git commit -m "$GITHUB_SHA 'nın Derlenmesi" || true
           git push --force
