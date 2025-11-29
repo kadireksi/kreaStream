@@ -230,13 +230,13 @@ jobs:
                 if ! grep -q "abortOnError" "$BUILD_GRADLE"; then
                   cat >> "$BUILD_GRADLE" << 'EOF'
 
-            android {
-                lint {
-                    abortOnError = false
-                    checkReleaseBuilds = false
-                }
-            }
-            EOF
+              android {
+                  lint {
+                      abortOnError = false
+                      checkReleaseBuilds = false
+                  }
+              }
+              EOF
                 fi
                 
                 # Try build again with modified configuration
