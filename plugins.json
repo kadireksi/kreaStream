@@ -1,23 +1,23 @@
 [
   {
-    "iconUrl": "https://www.canlidizi14.com/favicon.ico",
+    "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
     "apiVersion": 1,
     "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-    "fileSize": 22625,
+    "fileSize": 26171,
     "status": 1,
     "language": "tr",
     "authors": [
       "kreastream"
     ],
     "tvTypes": [
-      "TvSeries",
-      "Movie"
+      "Movie",
+      "TvSeries"
     ],
-    "version": 2,
-    "internalName": "CanliDizi",
-    "description": "Canlı Dizi için Cloudstream eklentisi",
-    "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/CanliDizi.cs3",
-    "name": "CanliDizi"
+    "version": 4,
+    "internalName": "HDFilmCehennemi",
+    "description": "Türkiye'nin en hızlı hd film izleme sitesi",
+    "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
+    "name": "HDFilmCehennemi"
   },
   {
     "repositoryUrl": "https://github.com/kerimmkirac/cs-kerim",
