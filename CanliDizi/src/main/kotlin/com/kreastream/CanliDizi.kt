@@ -163,13 +163,20 @@ class CanliDizi : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val html = app.get(data).text
+        // Fetch the document once to check for iframes
+        val doc = app.get(data).document
 
+        // Prioritize extracting links from iframes, as seen in the provided HTML structure
+        if (extractFromIframes(doc, data, callback)) {
+            return true
+        }
+
+        // Fallback: Check the main page content for direct embedded players/links
+        val html = doc.text
         return extractBetaPlayer(html, data, callback) ||
                 extractCanliPlayer(html, data, callback) ||
                 extractDirectVideo(html, data, callback) ||
-                extractYouTube(html, data, callback) ||
-                extractFromIframes(app.get(data).document, data, callback)
+                extractYouTube(html, data, callback)
     }
 
     private suspend fun extractBetaPlayer(
@@ -193,13 +200,17 @@ class CanliDizi : MainAPI() {
         referer: String,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // The regex looks for an URL containing canliplayer.com
         val playerUrl = Regex("""https?://[^\s"']*canliplayer\.com[^\s"']*""")
             .find(html)?.value ?: return false
 
         println("CanliPlayer → $playerUrl")
+        // Fetch the content of the canliplayer iframe
         return app.get(playerUrl, referer = referer).text.let { content ->
+            // Extract the base64 encoded string from the '12' key, which holds the video link
             Regex("""["']12["']\s*:\s*["']([A-Za-z0-9+/=]+)""").find(content)
                 ?.groupValues?.get(1)
+                // Decode the base64 string and add the link
                 ?.let { decodeBase64Video(it, playerUrl, callback, "CanliPlayer") }
                 ?: extractDirectVideo(content, playerUrl, callback)
         }
@@ -262,9 +273,11 @@ class CanliDizi : MainAPI() {
     ): Boolean {
         doc.select("iframe").forEach { iframe ->
             val src = fixUrl(iframe.attr("src"))
+            // Check if the iframe source points to a known player/extractor
             if (src.contains("betaplayer") || src.contains("canliplayer") || src.contains("youtube")) {
                 try {
                     val subHtml = app.get(src, referer = referer).text
+                    // Attempt to extract links from the iframe content
                     if (extractBetaPlayer(subHtml, src, callback) ||
                         extractCanliPlayer(subHtml, src, callback) ||
                         extractYouTube(subHtml, src, callback)) {
