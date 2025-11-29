@@ -36,80 +36,9 @@ jobs:
         with:
           distribution: adopt
           java-version: 17
-          cache: gradle
-
-      - name: Verify JDK Installation
-        run: |
-          java -version
-          javac -version
-          echo "JAVA_HOME: $JAVA_HOME"
-
-      - name: Cache Android SDK
-        id: cache-android-sdk
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android
-            /usr/local/lib/android
-          key: ${{ runner.os }}-android-sdk-v3
-          restore-keys: |
-            ${{ runner.os }}-android-sdk-
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3.2.2
-
-      - name: Verify Android SDK Installation
-        run: |
-          echo "ANDROID_HOME: $ANDROID_HOME"
-          if [ -d "$ANDROID_HOME" ]; then
-            echo "✅ Android SDK found at: $ANDROID_HOME"
-            ls -la "$ANDROID_HOME/" || echo "Android SDK directory listing failed"
-          else
-            echo "❌ Android SDK not found"
-          fi
-
-      - name: Cache Android Components
-        id: cache-android-components
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.ANDROID_HOME }}/platforms
-            ${{ env.ANDROID_HOME }}/platform-tools
-            ${{ env.ANDROID_HOME }}/build-tools
-            ${{ env.ANDROID_HOME }}/cmdline-tools
-          key: ${{ runner.os }}-android-components-v1
-          restore-keys: |
-            ${{ runner.os }}-android-components-
-
-      - name: Install Required Android Components
-        if: steps.cache-android-components.outputs.cache-hit != 'true'
-        run: |
-          echo "📥 Installing required Android SDK components..."
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || echo "⚠️ SDK installation had issues"
-          echo "✅ Android components installation completed"
-
-      - name: Gradle Wrapper Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/wrapper
-            src/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('src/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-wrapper-
-
-      - name: Gradle Dependencies Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/loom-cache
-            src/.gradle/caches
-            src/.gradle/loom-cache
-          key: ${{ runner.os }}-gradle-${{ hashFiles('src/*.gradle', 'src/gradle.properties', 'src/build.gradle', 'src/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
 
       - name: Find Capital Letter Folders and Check Changes
         id: find_folders
@@ -173,27 +102,7 @@ jobs:
           echo "📊 Summary:"
           echo "Folders to compile: $FOLDERS_TO_COMPILE"
 
-      - name: Check Dependencies Status
-        id: cache-check
-        run: |
-          if [ -f "$HOME/.gradle/caches/modules-2/modules-2.lock" ]; then
-            echo "gradle_cache_hit=true" >> $GITHUB_OUTPUT
-            echo "✅ Gradle dependencies cache found"
-          else
-            echo "gradle_cache_hit=false" >> $GITHUB_OUTPUT
-            echo "📥 Gradle dependencies will be downloaded"
-          fi
-
-      - name: Download Dependencies (if needed)
-        if: steps.cache-check.outputs.gradle_cache_hit == 'false' && steps.find_folders.outputs.COMPILE_NEEDED == 'true'
-        run: |
-          cd $GITHUB_WORKSPACE/src
-          chmod +x gradlew
-          ./gradlew --version
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
-
-      - name: Compile Specific Folders with Lint Handling
+      - name: Compile Specific Folders
         if: steps.find_folders.outputs.COMPILE_NEEDED == 'true'
         run: |
           cd $GITHUB_WORKSPACE/src
@@ -202,46 +111,22 @@ jobs:
           FOLDERS_TO_COMPILE="${{ steps.find_folders.outputs.folders_to_compile }}"
           echo "🔨 Compiling folders: $FOLDERS_TO_COMPILE"
           
-          # Use build cache if available
-          GRADLE_ARGS=""
-          if [ "${{ steps.cache-check.outputs.gradle_cache_hit }}" == "true" ]; then
-            echo "🚀 Using cached dependencies"
-            GRADLE_ARGS="--build-cache"
-          else
-            echo "📦 Building with fresh dependencies"
-          fi
-          
-          # Compile each folder individually with lint handling
+          # Compile each folder individually
           for folder in $FOLDERS_TO_COMPILE; do
             echo "🏗️  Compiling $folder..."
             
-            # Try building with lint checks disabled first
-            if ./gradlew :$folder:build $GRADLE_ARGS -x lint; then
-              echo "✅ $folder compiled successfully (lint skipped)"
+            # Try building with lint checks disabled
+            if ./gradlew :$folder:build -x lint; then
+              echo "✅ $folder compiled successfully"
             else
-              echo "⚠️  $folder build failed, trying alternative approaches..."
+              echo "⚠️  $folder build failed, trying with assemble..."
               
-              # Approach 1: Try with lint disabled via command line
-              if ./gradlew :$folder:build $GRADLE_ARGS -Pandroid.enableLint=false; then
-                echo "✅ $folder compiled successfully (lint disabled via property)"
+              # Try assemble if build fails
+              if ./gradlew :$folder:assemble; then
+                echo "✅ $folder assembled successfully"
               else
-                # Approach 2: Create a simple lint configuration file
-                LINT_CONFIG_FILE="$folder/lint.xml"
-                cat > "$LINT_CONFIG_FILE" << 'LINTEOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <lint>
-              <issue id="NewApi" severity="ignore" />
-              <issue id="GradleDependency" severity="ignore" />
-          </lint>
-          LINTEOF
-                
-                # Approach 3: Try with full lint suppression
-                if ./gradlew :$folder:assemble $GRADLE_ARGS; then
-                  echo "✅ $folder assembled successfully (bypassed lint)"
-                else
-                  echo "❌ $folder failed to compile with all approaches"
-                  continue
-                fi
+                echo "❌ $folder failed to compile"
+                continue
               fi
             fi
             
@@ -259,9 +144,9 @@ jobs:
             fi
           done
           
-          # Always regenerate plugins.json
+          # Generate plugins.json
           echo "📄 Generating plugins.json..."
-          if ./gradlew makePluginsJson $GRADLE_ARGS; then
+          if ./gradlew makePluginsJson; then
             cp build/plugins.json $GITHUB_WORKSPACE/builds/ || echo "⚠️ plugins.json not found"
           else
             echo "⚠️ Failed to generate plugins.json"
@@ -288,4 +173,3 @@ jobs:
           git commit -m "$GITHUB_SHA - Selective Compilation" \
                      -m "Compiled folders: ${{ steps.find_folders.outputs.folders_to_compile }}"
           git push --force
-          echo "Gradle Cache: ${{ steps.cache-check.outputs.gradle_cache_hit }}"
