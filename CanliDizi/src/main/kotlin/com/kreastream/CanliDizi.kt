@@ -172,7 +172,7 @@ class CanliDizi : MainAPI() {
         }
 
         // Fallback: Check the main page content for direct embedded players/links
-        val html = doc.text
+        val html = doc.text()
         return extractBetaPlayer(html, data, callback) ||
                 extractCanliPlayer(html, data, callback) ||
                 extractDirectVideo(html, data, callback) ||
