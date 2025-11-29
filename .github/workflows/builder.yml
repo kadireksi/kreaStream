@@ -54,14 +54,13 @@ jobs:
         uses: android-actions/setup-android@v3.2.2
 
       # ------------------------------
-      # 3) Detect Changed Plugins (Push & Dispatch Safe)
+      # 3) Detect Changed Plugins (Only Capital Start)
       # ------------------------------
       - name: Detect Changed Plugins
         id: detect_plugins
         run: |
           cd $GITHUB_WORKSPACE/src
 
-          # Build-relevant files only
           FILE_FILTER="(\.kt$|\.kts$|\.gradle$|\.json$|\.xml$|\.pro$|\.properties$)"
 
           changed=""
@@ -70,19 +69,25 @@ jobs:
           if [ -f "$GITHUB_EVENT_PATH" ]; then
             if jq -e '.commits != null' $GITHUB_EVENT_PATH >/dev/null; then
               CHANGED_FILES=$(jq -r '.commits[].added[], .commits[].modified[]' $GITHUB_EVENT_PATH)
-              changed=$(echo "$CHANGED_FILES" | grep -E "$FILE_FILTER" || true | cut -d'/' -f1 | uniq)
+              changed=$(echo "$CHANGED_FILES" \
+                | grep -E "$FILE_FILTER" || true \
+                | cut -d'/' -f1 \
+                | grep '^[A-Z]' \
+                | uniq)
             fi
           fi
 
-          # 2) Fallback: workflow_dispatch veya null commits → tüm klasörleri al
+          # 2) Fallback: workflow_dispatch veya null commits → tüm klasörler (büyük harf ile başlayan)
           if [ -z "$changed" ]; then
-            changed=$(find . -mindepth 1 -maxdepth 1 -type d | sed 's|^\./||')
+            changed=$(find . -mindepth 1 -maxdepth 1 -type d | sed 's|^\./||' | grep '^[A-Z]')
           fi
 
           echo "Detected changed plugin folders:"
           echo "$changed"
 
-          echo "plugins=$changed" >> $GITHUB_OUTPUT
+          # Github Actions output: lines to comma
+          changed_csv=$(echo "$changed" | paste -sd "," -)
+          echo "plugins=$changed_csv" >> $GITHUB_OUTPUT
 
       # ------------------------------
       # 4) Version Bump BEFORE Build
@@ -92,6 +97,9 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/src
           plugins="${{ steps.detect_plugins.outputs.plugins }}"
+
+          # Convert comma-separated to space-separated
+          plugins=$(echo "$plugins" | tr ',' ' ')
 
           for project in $plugins; do
             gradleFile="$GITHUB_WORKSPACE/src/$project/build.gradle.kts"
