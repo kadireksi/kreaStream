@@ -317,26 +317,38 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     /**
-     * FIX: Reverting to the stable decryption logic (Reverse -> Double Base64 Decode -> Byte Shift)
-     * as the new ROT13 cipher step was breaking the Base64 alphabet and resulting in binary garbage.
+     * Helper function to perform the ROT13 cipher (only affects a-z/A-Z).
+     */
+    private fun rot13(input: String): String {
+        val result = StringBuilder()
+        for (char in input) {
+            if (char in 'a'..'z') {
+                result.append(((char.code - 'a'.code + 13) % 26 + 'a'.code).toChar())
+            } else if (char in 'A'..'Z') {
+                result.append(((char.code - 'A'.code + 13) % 26 + 'A'.code).toChar())
+            } else {
+                result.append(char) // Non-letters are passed through unchanged
+            }
+        }
+        return result.toString()
+    }
+
+    /**
+     * FIX: Decrypts URL based on the latest packed JS script's decryption sequence:
+     * ROT13 -> Reverse String -> Single Base64 Decode (atob) -> Custom Byte Shift.
      */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. Reverse the string
-            val reversedString = encryptedData.reversed()
+            // 1. ROT13 (JS: result = result.replace(...ROT13...))
+            val rot13edString = rot13(encryptedData)
 
-            // 2. Double Base64 Decode
-            // First decode: String -> Bytes
-            val bytes1 = Base64.decode(reversedString, Base64.DEFAULT)
+            // 2. Reverse (JS: result = result.split('').reverse().join(''))
+            val reversedString = rot13edString.reversed()
 
-            // Convert to string using ISO_8859_1 (Latin-1) for the second base64 decode, 
-            // as this mimics the browser's atob handling for non-UTF8 bytes.
-            val intermediateString = String(bytes1, Charsets.ISO_8859_1)
-
-            // Second decode: String -> Final Bytes
-            val finalBytes = Base64.decode(intermediateString, Base64.DEFAULT)
+            // 3. Single Base64 Decode (JS: result = atob(result))
+            val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
-            // 3. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
+            // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
                 val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
