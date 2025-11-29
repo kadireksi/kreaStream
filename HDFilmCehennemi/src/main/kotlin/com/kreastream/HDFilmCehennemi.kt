@@ -37,7 +37,7 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import kotlin.text.Charsets // ADDED: Required for Base64 decoding charset handling
+import kotlin.text.Charsets // Required for Base64 decoding charset handling
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -138,8 +138,7 @@ class HDFilmCehennemi : MainAPI() {
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
         
-        // **FIXED: Use .poster-lang or .poster-meta for language info**
-        // In search results, language might be in .poster-lang. On main page, it's often in a general span.
+        // Use .poster-lang or .poster-meta for language info
         val lang = this.selectFirst(".poster-lang span, .poster-meta-genre span")?.text()?.trim()
         
         // Dubbed status: checks for "Dublaj" or "Yerli"
@@ -318,7 +317,7 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     /**
-     * FIX: Updated logic to match the new packed JS script's decryption sequence:
+     * Decrypts URL based on the latest packed JS script's decryption sequence:
      * Reverse String -> Double Base64 Decode -> Custom Byte Shift.
      */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
@@ -414,30 +413,52 @@ class HDFilmCehennemi : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        // 1. Check for iframe/rapidframe directly
-        val iframealak = fixUrlNull(
-            document.selectFirst(".close")?.attr("data-src")
-                ?: document.selectFirst(".rapidrame")?.attr("data-src")
-        ).toString()
+        // --- 1. Handle Default Player (Close) ---
+        // The default iframe is in the HTML. We use the data-src to get the videoID.
+        val defaultIframeUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
-        if (iframealak.contains("hdfilmcehennemi.mobi")) {
-            // Process subtitles for mobi iframe
-            try {
-                val iframedoc = app.get(iframealak, referer = mainUrl).document
-                val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
-                iframedoc.select("track[kind=captions]").forEach { track ->
-                    val lang = when (track.attr("srclang")) {
-                        "tr" -> "Türkçe"
-                        "en" -> "İngilizce"
-                        else -> track.attr("srclang")
-                    }
-                    val subUrl = track.attr("src").let { if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/") }
-                    subtitleCallback(SubtitleFile(lang, subUrl))
+        if (defaultIframeUrl != null) {
+            val videoID = defaultIframeUrl.substringAfter("/embed/").substringBefore("/").substringBefore("?")
+
+            if (videoID.isNotEmpty()) {
+                // Perform the same API call structure used for alternative links to get the actual iframe link
+                val apiGet = app.get(
+                    "${mainUrl}/video/$videoID/",
+                    headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
+                    referer = data
+                ).text
+
+                var iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.get(1)?.replace("\\", "") ?: ""
+                
+                // Process subtitles for the mobi iframe (if available, usually the default player)
+                if (iframe.contains("hdfilmcehennemi.mobi")) {
+                    try {
+                        val iframedoc = app.get(iframe, referer = mainUrl).document
+                        val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
+                        iframedoc.select("track[kind=captions]").forEach { track ->
+                            val lang = when (track.attr("srclang")) {
+                                "tr" -> "Türkçe"
+                                "en" -> "İngilizce"
+                                else -> track.attr("srclang")
+                            }
+                            val subUrl = track.attr("src").let { if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/") }
+                            subtitleCallback(SubtitleFile(lang, subUrl))
+                        }
+                    } catch (e: Exception) { Log.e("HDFC", "Sub extraction error", e) }
                 }
-            } catch (e: Exception) { Log.e("HDFC", "Sub extraction error", e) }
+
+                if (iframe.contains("?rapidrame_id=")) {
+                    iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
+                }
+
+                if (iframe.isNotEmpty()) {
+                    invokeLocalSource("Close", iframe, callback) // Name the source "Close"
+                }
+            }
         }
 
-        // 2. Check alternative links (buttons below player)
+
+        // --- 2. Check Alternative Links (buttons below player) ---
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
@@ -454,9 +475,14 @@ class HDFilmCehennemi : MainAPI() {
                 
                 if (iframe.contains("?rapidrame_id=")) {
                     iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
-                }
-
-                if (iframe.isNotEmpty()) {
+                    // The rapidrame source provided in the example is already extracted by the rplayer endpoint.
+                    // We name this "Rapidrame" as per your instruction.
+                    if (sourceName.contains("RAPIDRAME", ignoreCase = true)) {
+                        invokeLocalSource("Rapidrame $langCode", iframe, callback) 
+                    } else {
+                        invokeLocalSource(sourceName, iframe, callback)
+                    }
+                } else if (iframe.isNotEmpty()) {
                     invokeLocalSource(sourceName, iframe, callback)
                 }
             }
