@@ -32,12 +32,14 @@ jobs:
         uses: actions/checkout@v4.2.2
         with:
           path: src
+          fetch-depth: 0     # tüm commit geçmişi
 
       - name: Checkout builds repo
         uses: actions/checkout@v4.2.2
         with:
           ref: builds
           path: builds
+          fetch-depth: 0     # tüm commit geçmişi
 
       # ------------------------------
       # 2) Java & Android SDK
@@ -52,18 +54,24 @@ jobs:
         uses: android-actions/setup-android@v3.2.2
 
       # ------------------------------
-      # 3) Detect changed projects (clean, stable)
+      # 3) Detect changed projects (stabil)
       # ------------------------------
       - name: Detect Changed Plugins
         id: detect_plugins
         run: |
           cd $GITHUB_WORKSPACE/src
 
-          # Sadece derlemeyi etkileyen dosya türleri
+          # diff base kontrolü (ilk commit vs)
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+              base="HEAD^"
+          else
+              base="HEAD"
+          fi
+
+          # Derlemeyi etkileyen dosya uzantıları
           FILE_FILTER="\(.*\.kt\|.*\.kts\|.*\.gradle\|.*\.json\|.*\.xml\|.*\.pro\|.*\.properties\)"
 
-          # Ultra stabil klasör bulma yöntemi
-          changed=$(git diff --dirstat=files,0 HEAD^ HEAD \
+          changed=$(git diff --dirstat=files,0 $base HEAD \
             | awk '{print $2}' \
             | grep -E "$FILE_FILTER" || true \
             | cut -d'/' -f1 \
@@ -72,7 +80,6 @@ jobs:
           echo "Detected changed plugin folders:"
           echo "$changed"
 
-          # GitHub output format
           echo "plugins=$changed" >> $GITHUB_OUTPUT
 
       # ------------------------------
