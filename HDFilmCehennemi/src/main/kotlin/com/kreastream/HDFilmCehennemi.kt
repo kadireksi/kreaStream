@@ -317,26 +317,38 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     /**
+     * Helper function to perform the ROT13 cipher.
+     */
+    private fun rot13(input: String): String {
+        val result = StringBuilder()
+        for (char in input) {
+            if (char in 'a'..'z') {
+                result.append(((char.code - 'a'.code + 13) % 26 + 'a'.code).toChar())
+            } else if (char in 'A'..'Z') {
+                result.append(((char.code - 'A'.code + 13) % 26 + 'A'.code).toChar())
+            } else {
+                result.append(char)
+            }
+        }
+        return result.toString()
+    }
+
+    /**
      * Decrypts URL based on the latest packed JS script's decryption sequence:
-     * Reverse String -> Double Base64 Decode -> Custom Byte Shift.
+     * ROT13 -> Reverse String -> Single Base64 Decode -> Custom Byte Shift.
      */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. Reverse the string (JS: .reverse().join().split(''))
-            val reversedString = encryptedData.reversed()
+            // 1. ROT13 (New Step)
+            val rot13edString = rot13(encryptedData)
 
-            // 2. Double Base64 Decode (JS: atob(atob(G)))
-            // First decode: String -> Bytes
-            val bytes1 = Base64.decode(reversedString, Base64.DEFAULT)
+            // 2. Reverse the string
+            val reversedString = rot13edString.reversed()
 
-            // Convert to string using ISO_8859_1 (Latin-1) for the second base64 decode, 
-            // as this mimics the browser's atob handling for non-UTF8 bytes.
-            val intermediateString = String(bytes1, Charsets.ISO_8859_1)
-
-            // Second decode: String -> Final Bytes
-            val finalBytes = Base64.decode(intermediateString, Base64.DEFAULT)
+            // 3. Single Base64 Decode (Changed from double decode)
+            val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
-            // 3. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
+            // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
                 val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
@@ -376,8 +388,7 @@ class HDFilmCehennemi : MainAPI() {
             // Clean it up to get the single Base64 string "454l..."
             val encryptedString = arrayContent.replace("\"", "").replace("'", "").replace(",", "").replace("\\s".toRegex(), "")
 
-            // 3. Use the known constant seed from the packed script's dictionary (47 -> 399756995)
-            // This replaces the unreliable regex-based extraction.
+            // 3. Use the known constant seed from the packed script's dictionary (18 -> 399756995)
             val seed = 399756995
 
             // 4. Decrypt
@@ -414,7 +425,6 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(data).document
         
         // --- 1. Handle Default Player (Close) ---
-        // Get the iframe's data-src directly, as this URL contains the packed script.
         val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
         if (defaultSourceUrl != null) {
@@ -423,7 +433,6 @@ class HDFilmCehennemi : MainAPI() {
             // 1.1. Subtitle processing: happens by visiting the iframe's URL
             if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
                 try {
-                    // Fetch the iframe content to extract subtitles
                     val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
                     val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
                     iframedoc.select("track[kind=captions]").forEach { track ->
