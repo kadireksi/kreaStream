@@ -1,0 +1,40 @@
+[
+  {
+    "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
+    "apiVersion": 1,
+    "repositoryUrl": "https://github.com/kadireksi/kreaStream",
+    "fileSize": 26181,
+    "status": 1,
+    "language": "tr",
+    "authors": [
+      "kreastream"
+    ],
+    "tvTypes": [
+      "Movie",
+      "TvSeries"
+    ],
+    "version": 4,
+    "internalName": "HDFilmCehennemi",
+    "description": "Türkiye'nin en hızlı hd film izleme sitesi",
+    "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
+    "name": "HDFilmCehennemi"
+  },
+  {
+    "repositoryUrl": "https://github.com/kerimmkirac/cs-kerim",
+    "apiVersion": 3,
+    "status": 1,
+    "language": "tr",
+    "authors": [
+      "kerimmkirac"
+    ],
+    "tvTypes": [
+      "Tv"
+    ],
+    "version": 2,
+    "internalName": "YerelDiziler",
+    "description": "YerelDiziler için CloudStream eklentisi",
+    "url": "https://github.com/kerimmkirac/cs-kerim/raw/refs/heads/builds/YerelDiziler.cs3",
+    "name": "YerelDiziler",
+    "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Flag_of_Turkey.svg/960px-Flag_of_Turkey.svg.png"
+  }
+]
