@@ -62,7 +62,6 @@ jobs:
           cd $GITHUB_WORKSPACE/src
 
           FILE_FILTER="(\.kt$|\.kts$|\.gradle$|\.json$|\.xml$|\.pro$|\.properties$)"
-
           changed=""
 
           # 1) Push event: commits varsa
@@ -107,10 +106,18 @@ jobs:
             if [ -f "$gradleFile" ]; then
               echo "Updating version for: $project"
 
-              oldVersion=$(grep -oP 'version\\s*=\\s*\\K[0-9]+' "$gradleFile")
+              # oldVersion'u güvenli şekilde al
+              oldVersion=$(grep -oP 'version\s*=\s*\K\d+' "$gradleFile" | head -n1)
+
+              if [ -z "$oldVersion" ]; then
+                echo "WARNING: Could not find version in $gradleFile. Skipping..."
+                continue
+              fi
+
               newVersion=$((oldVersion + 1))
 
-              sed -i "s/version\\s*=\\s*$oldVersion/version = $newVersion/" "$gradleFile"
+              # sed ile değiştir
+              sed -i "s/version\s*=.*/version = $newVersion/" "$gradleFile"
 
               echo "$project version: $oldVersion → $newVersion"
             fi
