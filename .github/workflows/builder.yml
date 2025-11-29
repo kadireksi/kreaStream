@@ -288,11 +288,4 @@ jobs:
           git commit -m "$GITHUB_SHA - Selective Compilation" \
                      -m "Compiled folders: ${{ steps.find_folders.outputs.folders_to_compile }}"
           git push --force
-
-      - name: Cache Cleanup Info
-        if: always()
-        run: |
-          echo "📊 Cache Statistics:"
-          echo "Android SDK Cache: ${{ steps.cache-android-sdk.outputs.cache-hit }}"
-          echo "Android Components Cache: ${{ steps.cache-android-components.outputs.cache-hit }}"
           echo "Gradle Cache: ${{ steps.cache-check.outputs.gradle_cache_hit }}"
