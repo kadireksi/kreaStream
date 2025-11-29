@@ -37,7 +37,7 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import kotlin.text.Charsets // <--- ADDED IMPORT
+import kotlin.text.Charsets
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -316,7 +316,10 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // --- FIX: Corrected Decryption Logic ---
+    /**
+     * Decrypts URL based on the latest packed JS script's decryption sequence:
+     * Reverse String -> Double Base64 Decode -> Custom Byte Shift.
+     */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
             // 1. Reverse the string (JS: .reverse().join().split(''))
@@ -328,7 +331,7 @@ class HDFilmCehennemi : MainAPI() {
 
             // Convert to string using ISO_8859_1 (Latin-1) for the second base64 decode, 
             // as this mimics the browser's atob handling for non-UTF8 bytes.
-            val intermediateString = String(bytes1, Charsets.ISO_8859_1) 
+            val intermediateString = String(bytes1, Charsets.ISO_8859_1)
 
             // Second decode: String -> Final Bytes
             val finalBytes = Base64.decode(intermediateString, Base64.DEFAULT)
@@ -373,11 +376,9 @@ class HDFilmCehennemi : MainAPI() {
             // Clean it up to get the single Base64 string "454l..."
             val encryptedString = arrayContent.replace("\"", "").replace("'", "").replace(",", "").replace("\\s".toRegex(), "")
 
-            // 3. Extract the math seed: matches charCode-(SEED%(i+5))
-            val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
-            // The default seed in the provided script is 399756995, extracted from: 
-            // "1M=(1M-(47%(i+5))+3u)%3u" where 47 is '399756995' and 3u is '256'
-            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
+            // 3. Use the known constant seed from the packed script's dictionary (47 -> 399756995)
+            // This replaces the unreliable regex-based extraction.
+            val seed = 399756995
 
             // 4. Decrypt
             val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
