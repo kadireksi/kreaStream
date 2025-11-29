@@ -169,14 +169,14 @@ jobs:
             if ! grep -q "lint.*baseline" CanliDizi/build.gradle; then
               cat >> CanliDizi/build.gradle << 'EOF'
 
-android {
-    lint {
-        baseline = file("lint-baseline.xml")
-        checkReleaseBuilds = false
-        abortOnError = false
-    }
-}
-EOF
+          android {
+              lint {
+                  baseline = file("lint-baseline.xml")
+                  checkReleaseBuilds = false
+                  abortOnError = false
+              }
+          }
+          EOF
               echo "✅ Added lint baseline configuration to CanliDizi"
             fi
             
