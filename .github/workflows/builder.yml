@@ -1,10 +1,14 @@
-name: kreaStream Compiler
+name: kreaStream Derleyici
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
+  workflow_run:
+    workflows: ["Domain Değişiklik Kontrolü"]
+    types:
+      - completed
   workflow_dispatch:
   push:
     branches:
@@ -31,145 +35,57 @@ jobs:
           ref: "builds"
           path: "builds"
 
-      - name: Setup JDK
+      #- name: Eski Derlemeleri Temizle
+        #run: rm $GITHUB_WORKSPACE/builds/*.cs3 || true
+        #run: find $GITHUB_WORKSPACE/builds -name '*.cs3' -delete
+
+      - name: JDK 17 Ayarla
         uses: actions/setup-java@v4.6.0
         with:
           distribution: adopt
           java-version: 17
 
-      - name: Setup Android SDK
+      - name: Android SDK Ayarla
         uses: android-actions/setup-android@v3.2.2
 
-      - name: Find Capital Letter Folders and Check Changes
-        id: find_folders
-        run: |
-          cd $GITHUB_WORKSPACE/src
-          
-          # Find all directories that start with capital letters
-          CAPITAL_FOLDERS=$(find . -maxdepth 1 -type d -name "[A-Z]*" | sed 's|^\./||' | grep -v "^\." | sort)
-          echo "📁 Capital letter folders found:"
-          echo "$CAPITAL_FOLDERS"
-          
-          # Get changed files in this commit
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
-          
-          # If no previous commit (workflow_dispatch), check all folders
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "🔄 Workflow dispatch - checking all capital folders"
-            FOLDERS_TO_CHECK="$CAPITAL_FOLDERS"
-          else
-            echo "📋 Changed files:"
-            echo "$CHANGED_FILES"
-            
-            # Find which capital folders have changes
-            FOLDERS_TO_CHECK=""
-            for folder in $CAPITAL_FOLDERS; do
-              if echo "$CHANGED_FILES" | grep -q "^$folder/"; then
-                echo "✅ Folder '$folder' has changes"
-                FOLDERS_TO_CHECK="$FOLDERS_TO_CHECK $folder"
-              fi
-            done
-            
-            # If no specific folder changes detected, check all folders
-            if [ -z "$FOLDERS_TO_CHECK" ]; then
-              echo "🔍 No specific capital folder changes detected, checking all capital folders"
-              FOLDERS_TO_CHECK="$CAPITAL_FOLDERS"
-            else
-              echo "🎯 Only compiling changed folders: $FOLDERS_TO_CHECK"
-            fi
-          fi
-          
-          # Check which folders need compilation (cs3 files don't exist in builds branch)
-          FOLDERS_TO_COMPILE=""
-          for folder in $FOLDERS_TO_CHECK; do
-            CS3_FILE="$GITHUB_WORKSPACE/builds/${folder}.cs3"
-            if [ ! -f "$CS3_FILE" ]; then
-              echo "📦 '$folder' needs compilation (.cs3 file missing)"
-              FOLDERS_TO_COMPILE="$FOLDERS_TO_COMPILE $folder"
-            else
-              echo "✅ '$folder' already has .cs3 file"
-            fi
-          done
-          
-          # Save results to outputs
-          if [ -n "$FOLDERS_TO_COMPILE" ]; then
-            echo "folders_to_compile=$FOLDERS_TO_COMPILE" >> $GITHUB_OUTPUT
-            echo "COMPILE_NEEDED=true" >> $GITHUB_OUTPUT
-          else
-            echo "COMPILE_NEEDED=false" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "📊 Summary:"
-          echo "Folders to compile: $FOLDERS_TO_COMPILE"
-
-      - name: Compile Specific Folders
-        if: steps.find_folders.outputs.COMPILE_NEEDED == 'true'
+      - name: Eklentileri Derle
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
-          
-          FOLDERS_TO_COMPILE="${{ steps.find_folders.outputs.folders_to_compile }}"
-          echo "🔨 Compiling folders: $FOLDERS_TO_COMPILE"
-          
-          # Compile each folder individually
-          for folder in $FOLDERS_TO_COMPILE; do
-            echo "🏗️  Compiling $folder..."
-            
-            # Try building with lint checks disabled
-            if ./gradlew :$folder:build -x lint; then
-              echo "✅ $folder compiled successfully"
-            else
-              echo "⚠️  $folder build failed, trying with assemble..."
-              
-              # Try assemble if build fails
-              if ./gradlew :$folder:assemble; then
-                echo "✅ $folder assembled successfully"
-              else
-                echo "❌ $folder failed to compile"
-                continue
-              fi
-            fi
-            
-            # Copy the generated .cs3 file
-            CS3_SOURCE="$folder/build/*.cs3"
-            CS3_DEST="$GITHUB_WORKSPACE/builds/${folder}.cs3"
-            
-            if ls $CS3_SOURCE 1> /dev/null 2>&1; then
-              cp $CS3_SOURCE "$CS3_DEST"
-              echo "✅ Copied $folder.cs3 to builds"
-            else
-              echo "⚠️  No .cs3 file found for $folder"
-              # Try alternative .cs3 locations
-              find "$folder/build" -name "*.cs3" -exec cp {} "$GITHUB_WORKSPACE/builds/${folder}.cs3" \; || echo "No .cs3 files found in build directory"
-            fi
-          done
-          
-          # Generate plugins.json
-          echo "📄 Generating plugins.json..."
-          if ./gradlew makePluginsJson; then
-            cp build/plugins.json $GITHUB_WORKSPACE/builds/ || echo "⚠️ plugins.json not found"
-          else
-            echo "⚠️ Failed to generate plugins.json"
-          fi
+          ./gradlew make makePluginsJson
+          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
+          cp build/plugins.json $GITHUB_WORKSPACE/builds
 
-      - name: Build Output Check
+      #- name: jq Araçlarını Kur (GolgeTV ve AnimeciX eklemeleri için)
+        #run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: YerelDiziler Eklentisini plugins.json'a Elle Ekle
         run: |
-          echo "📁 Build outputs:"
-          ls -la $GITHUB_WORKSPACE/builds/ || echo "Builds directory is empty"
+          cd $GITHUB_WORKSPACE/builds
+          if ! jq -e '.[] | select(.internalName == "YerelDiziler")' plugins.json > /dev/null; then
+            jq '. += [{
+              "repositoryUrl": "https://github.com/kerimmkirac/cs-kerim",
+              "apiVersion": 3,
+              "status": 1,
+              "language": "tr",
+              "authors": ["kerimmkirac"],
+              "tvTypes": ["Tv"],
+              "version": 2,
+              "internalName": "YerelDiziler",
+              "description": "YerelDiziler için CloudStream eklentisi",
+              "url": "https://github.com/kerimmkirac/cs-kerim/raw/refs/heads/builds/YerelDiziler.cs3",
+              "name": "YerelDiziler",
+              "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Flag_of_Turkey.svg/960px-Flag_of_Turkey.svg.png"
+            }]' plugins.json > plugins-new.json && mv plugins-new.json plugins.json
+          else
+            echo "YerelDiziler zaten plugins.json'da mevcut, eklenmedi."
+          fi
 
       - name: Derlemeleri Yükle
         run: |
           cd $GITHUB_WORKSPACE/builds
-          
-          # Check if there are any changes to commit
-          if git diff --quiet --exit-code; then
-            echo "✅ No changes to commit - build outputs are up to date"
-            exit 0
-          fi
-          
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add .
-          git commit -m "$GITHUB_SHA - Selective Compilation" \
-                     -m "Compiled folders: ${{ steps.find_folders.outputs.folders_to_compile }}"
+          git commit -m "$GITHUB_SHA 'nın Derlenmesi" || exit 0   # eğer commit edilecek bir şey yoksa hata verme
           git push --force
