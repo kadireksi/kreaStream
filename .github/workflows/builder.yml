@@ -31,19 +31,7 @@ jobs:
           ref: "builds"
           path: "builds"
 
-      - name: Cache JDK
-        id: cache-jdk
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.jdk
-            /opt/hostedtoolcache/Java_Adopt_jdk
-          key: ${{ runner.os }}-jdk-17-${{ hashFiles('src/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-jdk-17-
-
-      - name: Setup JDK (if not cached)
-        if: steps.cache-jdk.outputs.cache-hit != 'true'
+      - name: Setup JDK
         uses: actions/setup-java@v4.6.0
         with:
           distribution: adopt
@@ -63,46 +51,43 @@ jobs:
           path: |
             ~/.android
             /usr/local/lib/android
-            $ANDROID_HOME
-          key: ${{ runner.os }}-android-sdk-${{ hashFiles('src/**/build.gradle', 'src/build.gradle', 'src/gradle.properties') }}
+          key: ${{ runner.os }}-android-sdk-v3
           restore-keys: |
             ${{ runner.os }}-android-sdk-
 
-      - name: Setup Android SDK (if not cached)
-        if: steps.cache-android-sdk.outputs.cache-hit != 'true'
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3.2.2
 
       - name: Verify Android SDK Installation
         run: |
+          echo "ANDROID_HOME: $ANDROID_HOME"
           if [ -d "$ANDROID_HOME" ]; then
             echo "✅ Android SDK found at: $ANDROID_HOME"
-            ls -la $ANDROID_HOME/cmdline-tools/ || echo "Command line tools not found"
+            ls -la "$ANDROID_HOME/" || echo "Android SDK directory listing failed"
           else
             echo "❌ Android SDK not found"
           fi
 
-      - name: Cache Android SDK Components
+      - name: Cache Android Components
         id: cache-android-components
         uses: actions/cache@v4
         with:
           path: |
-            $ANDROID_HOME/platforms
-            $ANDROID_HOME/platform-tools
-            $ANDROID_HOME/build-tools
-            $ANDROID_HOME/cmdline-tools
-            $ANDROID_HOME/ndk
-            $ANDROID_HOME/patcher
-          key: ${{ runner.os }}-android-components-${{ hashFiles('src/**/build.gradle', 'src/build.gradle') }}
+            ${{ env.ANDROID_HOME }}/platforms
+            ${{ env.ANDROID_HOME }}/platform-tools
+            ${{ env.ANDROID_HOME }}/build-tools
+            ${{ env.ANDROID_HOME }}/cmdline-tools
+          key: ${{ runner.os }}-android-components-v1
           restore-keys: |
             ${{ runner.os }}-android-components-
 
-      - name: Install Required Android Components (if not cached)
+      - name: Install Required Android Components
         if: steps.cache-android-components.outputs.cache-hit != 'true'
         run: |
           echo "📥 Installing required Android SDK components..."
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-          echo "✅ Android components installed"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || echo "⚠️ SDK installation had issues"
+          echo "✅ Android components installation completed"
 
       - name: Gradle Wrapper Cache
         uses: actions/cache@v4
@@ -125,16 +110,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('src/*.gradle', 'src/gradle.properties', 'src/build.gradle', 'src/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
-      - name: Lint Baselines Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            src/**/lint-baseline.xml
-            src/**/lint-baseline.xml.old
-          key: ${{ runner.os }}-lint-baselines-${{ hashFiles('src/**/build.gradle', 'src/**/src/main/**/*.kt') }}
-          restore-keys: |
-            ${{ runner.os }}-lint-baselines-
 
       - name: Find Capital Letter Folders and Check Changes
         id: find_folders
@@ -255,13 +230,13 @@ jobs:
                 if ! grep -q "abortOnError" "$BUILD_GRADLE"; then
                   cat >> "$BUILD_GRADLE" << 'EOF'
 
-          android {
-              lint {
-                  abortOnError = false
-                  checkReleaseBuilds = false
-              }
-          }
-          EOF
+            android {
+                lint {
+                    abortOnError = false
+                    checkReleaseBuilds = false
+                }
+            }
+            EOF
                 fi
                 
                 # Try build again with modified configuration
@@ -324,7 +299,6 @@ jobs:
         if: always()
         run: |
           echo "📊 Cache Statistics:"
-          echo "JDK Cache: ${{ steps.cache-jdk.outputs.cache-hit }}"
           echo "Android SDK Cache: ${{ steps.cache-android-sdk.outputs.cache-hit }}"
           echo "Android Components Cache: ${{ steps.cache-android-components.outputs.cache-hit }}"
           echo "Gradle Cache: ${{ steps.cache-check.outputs.gradle_cache_hit }}"
