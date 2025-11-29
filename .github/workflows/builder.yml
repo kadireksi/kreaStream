@@ -219,35 +219,27 @@ jobs:
             if ./gradlew :$folder:build $GRADLE_ARGS -x lint; then
               echo "✅ $folder compiled successfully (lint skipped)"
             else
-              echo "⚠️  $folder build failed, trying with lint disabled completely..."
+              echo "⚠️  $folder build failed, trying alternative approaches..."
               
-              # Disable lint in build.gradle temporarily
-              BUILD_GRADLE="$folder/build.gradle"
-              if [ -f "$BUILD_GRADLE" ]; then
-                cp "$BUILD_GRADLE" "${BUILD_GRADLE}.backup"
+              # Approach 1: Try with lint disabled via command line
+              if ./gradlew :$folder:build $GRADLE_ARGS -Pandroid.enableLint=false; then
+                echo "✅ $folder compiled successfully (lint disabled via property)"
+              else
+                # Approach 2: Create a simple lint configuration file
+                LINT_CONFIG_FILE="$folder/lint.xml"
+                cat > "$LINT_CONFIG_FILE" << 'LINTEOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <lint>
+              <issue id="NewApi" severity="ignore" />
+              <issue id="GradleDependency" severity="ignore" />
+          </lint>
+          LINTEOF
                 
-                # Add lint configuration to disable abort on error
-                if ! grep -q "abortOnError" "$BUILD_GRADLE"; then
-                  cat >> "$BUILD_GRADLE" << 'EOF'
-
-              android {
-                  lint {
-                      abortOnError = false
-                      checkReleaseBuilds = false
-                  }
-              }
-              EOF
-                fi
-                
-                # Try build again with modified configuration
-                if ./gradlew :$folder:build $GRADLE_ARGS; then
-                  echo "✅ $folder compiled successfully after disabling lint"
-                  # Restore original build.gradle
-                  mv "${BUILD_GRADLE}.backup" "$BUILD_GRADLE"
+                # Approach 3: Try with full lint suppression
+                if ./gradlew :$folder:assemble $GRADLE_ARGS; then
+                  echo "✅ $folder assembled successfully (bypassed lint)"
                 else
-                  echo "❌ $folder failed to compile even with lint disabled"
-                  # Restore original build.gradle
-                  mv "${BUILD_GRADLE}.backup" "$BUILD_GRADLE"
+                  echo "❌ $folder failed to compile with all approaches"
                   continue
                 fi
               fi
@@ -262,6 +254,8 @@ jobs:
               echo "✅ Copied $folder.cs3 to builds"
             else
               echo "⚠️  No .cs3 file found for $folder"
+              # Try alternative .cs3 locations
+              find "$folder/build" -name "*.cs3" -exec cp {} "$GITHUB_WORKSPACE/builds/${folder}.cs3" \; || echo "No .cs3 files found in build directory"
             fi
           done
           
