@@ -63,15 +63,67 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Android SDK Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android/cache
-            $ANDROID_HOME/cache
-          key: ${{ runner.os }}-android-sdk-${{ hashFiles('src/**/build.gradle', 'src/build.gradle') }}
-          restore-keys: |
-            ${{ runner.os }}-android-sdk-
+      - name: Find Capital Letter Folders and Check Changes
+        id: find_folders
+        run: |
+          cd $GITHUB_WORKSPACE/src
+          
+          # Find all directories that start with capital letters
+          CAPITAL_FOLDERS=$(find . -maxdepth 1 -type d -name "[A-Z]*" | sed 's|^\./||' | grep -v "^\." | sort)
+          echo "📁 Capital letter folders found:"
+          echo "$CAPITAL_FOLDERS"
+          
+          # Get changed files in this commit
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          
+          # If no previous commit (workflow_dispatch), check all folders
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "🔄 Workflow dispatch - checking all capital folders"
+            FOLDERS_TO_CHECK="$CAPITAL_FOLDERS"
+          else
+            echo "📋 Changed files:"
+            echo "$CHANGED_FILES"
+            
+            # Find which capital folders have changes
+            FOLDERS_TO_CHECK=""
+            for folder in $CAPITAL_FOLDERS; do
+              if echo "$CHANGED_FILES" | grep -q "^$folder/"; then
+                echo "✅ Folder '$folder' has changes"
+                FOLDERS_TO_CHECK="$FOLDERS_TO_CHECK $folder"
+              fi
+            done
+            
+            # If no specific folder changes detected, check all folders
+            if [ -z "$FOLDERS_TO_CHECK" ]; then
+              echo "🔍 No specific capital folder changes detected, checking all capital folders"
+              FOLDERS_TO_CHECK="$CAPITAL_FOLDERS"
+            else
+              echo "🎯 Only compiling changed folders: $FOLDERS_TO_CHECK"
+            fi
+          fi
+          
+          # Check which folders need compilation (cs3 files don't exist in builds branch)
+          FOLDERS_TO_COMPILE=""
+          for folder in $FOLDERS_TO_CHECK; do
+            CS3_FILE="$GITHUB_WORKSPACE/builds/${folder}.cs3"
+            if [ ! -f "$CS3_FILE" ]; then
+              echo "📦 '$folder' needs compilation (.cs3 file missing)"
+              FOLDERS_TO_COMPILE="$FOLDERS_TO_COMPILE $folder"
+            else
+              echo "✅ '$folder' already has .cs3 file"
+            fi
+          done
+          
+          # Save results to outputs
+          if [ -n "$FOLDERS_TO_COMPILE" ]; then
+            echo "folders_to_compile=$FOLDERS_TO_COMPILE" >> $GITHUB_OUTPUT
+            echo "COMPILE_NEEDED=true" >> $GITHUB_OUTPUT
+          else
+            echo "COMPILE_NEEDED=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "📊 Summary:"
+          echo "Folders to compile: $FOLDERS_TO_COMPILE"
 
       - name: Check Dependencies Status
         id: cache-check
@@ -85,7 +137,7 @@ jobs:
           fi
 
       - name: Download Dependencies (if needed)
-        if: steps.cache-check.outputs.gradle_cache_hit == 'false'
+        if: steps.cache-check.outputs.gradle_cache_hit == 'false' && steps.find_folders.outputs.COMPILE_NEEDED == 'true'
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
@@ -93,23 +145,45 @@ jobs:
         env:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false"
 
-      - name: Eklentileri Derle
+      - name: Compile Specific Folders
+        if: steps.find_folders.outputs.COMPILE_NEEDED == 'true'
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
           
+          FOLDERS_TO_COMPILE="${{ steps.find_folders.outputs.folders_to_compile }}"
+          echo "🔨 Compiling folders: $FOLDERS_TO_COMPILE"
+          
           # Use build cache if available
+          GRADLE_ARGS=""
           if [ "${{ steps.cache-check.outputs.gradle_cache_hit }}" == "true" ]; then
-            echo "🚀 Using cached dependencies - building with cache"
-            ./gradlew make makePluginsJson --build-cache
+            echo "🚀 Using cached dependencies"
+            GRADLE_ARGS="--build-cache"
           else
             echo "📦 Building with fresh dependencies"
-            ./gradlew make makePluginsJson
           fi
           
-          # Copy build outputs
-          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds || echo "No .cs3 files found"
-          cp build/plugins.json $GITHUB_WORKSPACE/builds || echo "plugins.json not found"
+          # Compile each folder individually
+          for folder in $FOLDERS_TO_COMPILE; do
+            echo "🏗️  Compiling $folder..."
+            ./gradlew :$folder:build $GRADLE_ARGS
+            
+            # Copy the generated .cs3 file
+            CS3_SOURCE="$folder/build/*.cs3"
+            CS3_DEST="$GITHUB_WORKSPACE/builds/${folder}.cs3"
+            
+            if ls $CS3_SOURCE 1> /dev/null 2>&1; then
+              cp $CS3_SOURCE "$CS3_DEST"
+              echo "✅ Copied $folder.cs3 to builds"
+            else
+              echo "⚠️  No .cs3 file found for $folder"
+            fi
+          done
+          
+          # Always regenerate plugins.json
+          echo "📄 Generating plugins.json..."
+          ./gradlew makePluginsJson $GRADLE_ARGS
+          cp build/plugins.json $GITHUB_WORKSPACE/builds/ || echo "⚠️ plugins.json not found"
 
       - name: Build Output Check
         run: |
@@ -129,5 +203,6 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add .
-          git commit -m "$GITHUB_SHA 'nın Derlenmesi"
+          git commit -m "$GITHUB_SHA - Selective Compilation" \
+                     -m "Compiled folders: ${{ steps.find_folders.outputs.folders_to_compile }}"
           git push --force
