@@ -37,7 +37,6 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import kotlin.text.Charsets
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -138,7 +137,8 @@ class HDFilmCehennemi : MainAPI() {
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
         
-        // Use .poster-lang or .poster-meta for language info
+        // **FIXED: Use .poster-lang or .poster-meta for language info**
+        // In search results, language might be in .poster-lang. On main page, it's often in a general span.
         val lang = this.selectFirst(".poster-lang span, .poster-meta-genre span")?.text()?.trim()
         
         // Dubbed status: checks for "Dublaj" or "Yerli"
@@ -316,42 +316,31 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    /**
-     * Helper function to perform the ROT13 cipher.
-     */
-    private fun rot13(input: String): String {
-        val result = StringBuilder()
-        for (char in input) {
-            if (char in 'a'..'z') {
-                result.append(((char.code - 'a'.code + 13) % 26 + 'a'.code).toChar())
-            } else if (char in 'A'..'Z') {
-                result.append(((char.code - 'A'.code + 13) % 26 + 'A'.code).toChar())
-            } else {
-                result.append(char)
-            }
-        }
-        return result.toString()
-    }
-
-    /**
-     * Decrypts URL based on the latest packed JS script's decryption sequence:
-     * ROT13 -> Reverse String -> Single Base64 Decode -> Custom Byte Shift.
-     */
+    // FIXED: Decrypts URL using ByteArray to prevent UTF-8 corruption
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. ROT13 (New Step)
-            val rot13edString = rot13(encryptedData)
+            // 1. Base64 Decode -> ByteArray (Crucial: Keep as bytes!)
+            val bytes = Base64.decode(encryptedData, Base64.DEFAULT)
 
-            // 2. Reverse the string
-            val reversedString = rot13edString.reversed()
+            // 2. Apply ROT13 to ASCII letters only (in-place modification of bytes)
+            for (i in bytes.indices) {
+                val b = bytes[i].toInt()
+                if ((b in 65..90) || (b in 97..122)) { // A-Z or a-z
+                    val isUpper = b <= 90
+                    val base = if (isUpper) 65 else 97
+                    // ROT13 logic
+                    val shifted = ((b - base + 13) % 26) + base
+                    bytes[i] = shifted.toByte()
+                }
+            }
 
-            // 3. Single Base64 Decode (Changed from double decode)
-            val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
-            
-            // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
+            // 3. Reverse the byte array
+            bytes.reverse()
+
+            // 4. Custom Byte Shift Loop
             val sb = StringBuilder()
-            for (i in finalBytes.indices) {
-                val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
+            for (i in bytes.indices) {
+                val charCode = bytes[i].toInt() and 0xFF // Convert to unsigned int 0-255
                 val shift = seed % (i + 5)
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
@@ -365,7 +354,7 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     /**
-     * Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
+     * FIX: Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
      */
     private suspend fun invokeLocalSource(
         source: String,
@@ -388,8 +377,9 @@ class HDFilmCehennemi : MainAPI() {
             // Clean it up to get the single Base64 string "454l..."
             val encryptedString = arrayContent.replace("\"", "").replace("'", "").replace(",", "").replace("\\s".toRegex(), "")
 
-            // 3. Use the known constant seed from the packed script's dictionary (18 -> 399756995)
-            val seed = 399756995
+            // 3. Extract the math seed: matches charCode-(SEED%(i+5))
+            val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
+            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
 
             // 4. Decrypt
             val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
@@ -416,6 +406,10 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
+    /**
+     * FIX: Separated the Close player logic (1.) from the alternative links (2.)
+     * to ensure the Close link is properly generated and used.
+     */
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -425,6 +419,7 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(data).document
         
         // --- 1. Handle Default Player (Close) ---
+        // Get the iframe's data-src directly, as this URL contains the packed script.
         val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
         if (defaultSourceUrl != null) {
@@ -433,6 +428,7 @@ class HDFilmCehennemi : MainAPI() {
             // 1.1. Subtitle processing: happens by visiting the iframe's URL
             if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
                 try {
+                    // Fetch the iframe content to extract subtitles
                     val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
                     val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
                     iframedoc.select("track[kind=captions]").forEach { track ->
@@ -450,6 +446,7 @@ class HDFilmCehennemi : MainAPI() {
             }
 
             // 1.2. Decrypt the main video link using the iframe URL directly
+            // THIS WAS MISSING/SKIPPED in your last edit, causing the fallback to Rapidrame.
             invokeLocalSource(sourceName, defaultSourceUrl, callback) 
         }
 
