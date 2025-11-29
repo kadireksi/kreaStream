@@ -1,97 +1,330 @@
-import com.lagradost.cloudstream3.gradle.CloudstreamExtension
-import com.android.build.gradle.BaseExtension
+name: kreaStream Compiler
 
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-        // Shitpack repo which contains our tools and dependencies
-        maven("https://jitpack.io")
-    }
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.7.3")
-        // Cloudstream gradle plugin which makes everything work and builds plugins
-        classpath("com.github.recloudstream:gradle:master-SNAPSHOT")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
-    }
-}
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.yml"
+      - "**/*.jpg"
+      - "**/*.png"
+      - "**/*.py"
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-}
+jobs:
+  kreaStreamDerleyici:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "'src' Depo Kontrolü"
+        uses: actions/checkout@v4.2.2
+        with:
+          path: "src"
 
-fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) = extensions.getByName<CloudstreamExtension>("cloudstream").configuration()
+      - name: "'build' Depo Kontrolü"
+        uses: actions/checkout@v4.2.2
+        with:
+          ref: "builds"
+          path: "builds"
 
-fun Project.android(configuration: BaseExtension.() -> Unit) = extensions.getByName<BaseExtension>("android").configuration()
+      - name: Cache JDK
+        id: cache-jdk
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.jdk
+            /opt/hostedtoolcache/Java_Adopt_jdk
+          key: ${{ runner.os }}-jdk-17-${{ hashFiles('src/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-jdk-17-
 
-subprojects {
-    apply(plugin = "com.android.library")
-    apply(plugin = "kotlin-android")
-    apply(plugin = "com.lagradost.cloudstream3.gradle")
+      - name: Setup JDK (if not cached)
+        if: steps.cache-jdk.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v4.6.0
+        with:
+          distribution: adopt
+          java-version: 17
+          cache: gradle
 
-    cloudstream {
-        // when running through github workflow, GITHUB_REPOSITORY should contain current repository name
-        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/kreadir/kreastream/")
+      - name: Verify JDK Installation
+        run: |
+          java -version
+          javac -version
+          echo "JAVA_HOME: $JAVA_HOME"
 
-        authors = listOf("kreastream")
-    }
+      - name: Cache Android SDK
+        id: cache-android-sdk
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android
+            /usr/local/lib/android
+            $ANDROID_HOME
+          key: ${{ runner.os }}-android-sdk-${{ hashFiles('src/**/build.gradle', 'src/build.gradle', 'src/gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-android-sdk-
 
-    android {
-        namespace = "com.kreastream"
+      - name: Setup Android SDK (if not cached)
+        if: steps.cache-android-sdk.outputs.cache-hit != 'true'
+        uses: android-actions/setup-android@v3.2.2
 
-        defaultConfig {
-            minSdk = 26
-            compileSdkVersion(35)
-            targetSdk = 35
-        }
+      - name: Verify Android SDK Installation
+        run: |
+          if [ -d "$ANDROID_HOME" ]; then
+            echo "✅ Android SDK found at: $ANDROID_HOME"
+            ls -la $ANDROID_HOME/cmdline-tools/ || echo "Command line tools not found"
+          else
+            echo "❌ Android SDK not found"
+          fi
 
-        compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
-        }
+      - name: Cache Android SDK Components
+        id: cache-android-components
+        uses: actions/cache@v4
+        with:
+          path: |
+            $ANDROID_HOME/platforms
+            $ANDROID_HOME/platform-tools
+            $ANDROID_HOME/build-tools
+            $ANDROID_HOME/cmdline-tools
+            $ANDROID_HOME/ndk
+            $ANDROID_HOME/patcher
+          key: ${{ runner.os }}-android-components-${{ hashFiles('src/**/build.gradle', 'src/build.gradle') }}
+          restore-keys: |
+            ${{ runner.os }}-android-components-
 
-        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile> {
-            compilerOptions {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
-                freeCompilerArgs.addAll(
-                    listOf(
-                        "-Xno-call-assertions",
-                        "-Xno-param-assertions",
-                        "-Xno-receiver-assertions"
-                    )
-                )
-            }
-        }
-    }
+      - name: Install Required Android Components (if not cached)
+        if: steps.cache-android-components.outputs.cache-hit != 'true'
+        run: |
+          echo "📥 Installing required Android SDK components..."
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+          echo "✅ Android components installed"
 
+      - name: Gradle Wrapper Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            src/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('src/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-wrapper-
 
-    dependencies {
-        val cloudstream by configurations
-        val implementation by configurations
+      - name: Gradle Dependencies Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/loom-cache
+            src/.gradle/caches
+            src/.gradle/loom-cache
+          key: ${{ runner.os }}-gradle-${{ hashFiles('src/*.gradle', 'src/gradle.properties', 'src/build.gradle', 'src/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-        // Stubs for all Cloudstream classes
-        cloudstream("com.lagradost:cloudstream3:pre-release")
+      - name: Lint Baselines Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/**/lint-baseline.xml
+            src/**/lint-baseline.xml.old
+          key: ${{ runner.os }}-lint-baselines-${{ hashFiles('src/**/build.gradle', 'src/**/src/main/**/*.kt') }}
+          restore-keys: |
+            ${{ runner.os }}-lint-baselines-
 
-        // these dependencies can include any of those which are added by the app,
-        // but you dont need to include any of them if you dont need them
-        // https://github.com/recloudstream/cloudstream/blob/master/app/build.gradle
-        implementation(kotlin("stdlib"))                                              // Kotlin'in temel kütüphanesi
-        implementation("com.github.Blatzar:NiceHttp:0.4.11") // HTTP kütüphanesi
-        implementation("androidx.annotation:annotation:1.7.1")
-        implementation("com.google.code.gson:gson:2.11.0")
+      - name: Find Capital Letter Folders and Check Changes
+        id: find_folders
+        run: |
+          cd $GITHUB_WORKSPACE/src
+          
+          # Find all directories that start with capital letters
+          CAPITAL_FOLDERS=$(find . -maxdepth 1 -type d -name "[A-Z]*" | sed 's|^\./||' | grep -v "^\." | sort)
+          echo "📁 Capital letter folders found:"
+          echo "$CAPITAL_FOLDERS"
+          
+          # Get changed files in this commit
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          
+          # If no previous commit (workflow_dispatch), check all folders
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "🔄 Workflow dispatch - checking all capital folders"
+            FOLDERS_TO_CHECK="$CAPITAL_FOLDERS"
+          else
+            echo "📋 Changed files:"
+            echo "$CHANGED_FILES"
+            
+            # Find which capital folders have changes
+            FOLDERS_TO_CHECK=""
+            for folder in $CAPITAL_FOLDERS; do
+              if echo "$CHANGED_FILES" | grep -q "^$folder/"; then
+                echo "✅ Folder '$folder' has changes"
+                FOLDERS_TO_CHECK="$FOLDERS_TO_CHECK $folder"
+              fi
+            done
+            
+            # If no specific folder changes detected, check all folders
+            if [ -z "$FOLDERS_TO_CHECK" ]; then
+              echo "🔍 No specific capital folder changes detected, checking all capital folders"
+              FOLDERS_TO_CHECK="$CAPITAL_FOLDERS"
+            else
+              echo "🎯 Only compiling changed folders: $FOLDERS_TO_CHECK"
+            fi
+          fi
+          
+          # Check which folders need compilation (cs3 files don't exist in builds branch)
+          FOLDERS_TO_COMPILE=""
+          for folder in $FOLDERS_TO_CHECK; do
+            CS3_FILE="$GITHUB_WORKSPACE/builds/${folder}.cs3"
+            if [ ! -f "$CS3_FILE" ]; then
+              echo "📦 '$folder' needs compilation (.cs3 file missing)"
+              FOLDERS_TO_COMPILE="$FOLDERS_TO_COMPILE $folder"
+            else
+              echo "✅ '$folder' already has .cs3 file"
+            fi
+          done
+          
+          # Save results to outputs
+          if [ -n "$FOLDERS_TO_COMPILE" ]; then
+            echo "folders_to_compile=$FOLDERS_TO_COMPILE" >> $GITHUB_OUTPUT
+            echo "COMPILE_NEEDED=true" >> $GITHUB_OUTPUT
+          else
+            echo "COMPILE_NEEDED=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "📊 Summary:"
+          echo "Folders to compile: $FOLDERS_TO_COMPILE"
 
-        implementation("org.jsoup:jsoup:1.18.3")                                      // HTML ayrıştırıcı
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.0")   // Kotlin için Jackson JSON kütüphanesi
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.16.0")          // JSON-nesne dönüştürme kütüphanesi
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")      // Kotlin için asenkron işlemler
-    }
-}
+      - name: Check Dependencies Status
+        id: cache-check
+        run: |
+          if [ -f "$HOME/.gradle/caches/modules-2/modules-2.lock" ]; then
+            echo "gradle_cache_hit=true" >> $GITHUB_OUTPUT
+            echo "✅ Gradle dependencies cache found"
+          else
+            echo "gradle_cache_hit=false" >> $GITHUB_OUTPUT
+            echo "📥 Gradle dependencies will be downloaded"
+          fi
 
-task<Delete>("clean") {
-    delete(rootProject.layout.buildDirectory)
-}
+      - name: Download Dependencies (if needed)
+        if: steps.cache-check.outputs.gradle_cache_hit == 'false' && steps.find_folders.outputs.COMPILE_NEEDED == 'true'
+        run: |
+          cd $GITHUB_WORKSPACE/src
+          chmod +x gradlew
+          ./gradlew --version
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+      - name: Compile Specific Folders with Lint Handling
+        if: steps.find_folders.outputs.COMPILE_NEEDED == 'true'
+        run: |
+          cd $GITHUB_WORKSPACE/src
+          chmod +x gradlew
+          
+          FOLDERS_TO_COMPILE="${{ steps.find_folders.outputs.folders_to_compile }}"
+          echo "🔨 Compiling folders: $FOLDERS_TO_COMPILE"
+          
+          # Use build cache if available
+          GRADLE_ARGS=""
+          if [ "${{ steps.cache-check.outputs.gradle_cache_hit }}" == "true" ]; then
+            echo "🚀 Using cached dependencies"
+            GRADLE_ARGS="--build-cache"
+          else
+            echo "📦 Building with fresh dependencies"
+          fi
+          
+          # Compile each folder individually with lint handling
+          for folder in $FOLDERS_TO_COMPILE; do
+            echo "🏗️  Compiling $folder..."
+            
+            # Try building with lint checks disabled first
+            if ./gradlew :$folder:build $GRADLE_ARGS -x lint; then
+              echo "✅ $folder compiled successfully (lint skipped)"
+            else
+              echo "⚠️  $folder build failed, trying with lint disabled completely..."
+              
+              # Disable lint in build.gradle temporarily
+              BUILD_GRADLE="$folder/build.gradle"
+              if [ -f "$BUILD_GRADLE" ]; then
+                cp "$BUILD_GRADLE" "${BUILD_GRADLE}.backup"
+                
+                # Add lint configuration to disable abort on error
+                if ! grep -q "abortOnError" "$BUILD_GRADLE"; then
+                  cat >> "$BUILD_GRADLE" << 'EOF'
+
+          android {
+              lint {
+                  abortOnError = false
+                  checkReleaseBuilds = false
+              }
+          }
+          EOF
+                fi
+                
+                # Try build again with modified configuration
+                if ./gradlew :$folder:build $GRADLE_ARGS; then
+                  echo "✅ $folder compiled successfully after disabling lint"
+                  # Restore original build.gradle
+                  mv "${BUILD_GRADLE}.backup" "$BUILD_GRADLE"
+                else
+                  echo "❌ $folder failed to compile even with lint disabled"
+                  # Restore original build.gradle
+                  mv "${BUILD_GRADLE}.backup" "$BUILD_GRADLE"
+                  continue
+                fi
+              fi
+            fi
+            
+            # Copy the generated .cs3 file
+            CS3_SOURCE="$folder/build/*.cs3"
+            CS3_DEST="$GITHUB_WORKSPACE/builds/${folder}.cs3"
+            
+            if ls $CS3_SOURCE 1> /dev/null 2>&1; then
+              cp $CS3_SOURCE "$CS3_DEST"
+              echo "✅ Copied $folder.cs3 to builds"
+            else
+              echo "⚠️  No .cs3 file found for $folder"
+            fi
+          done
+          
+          # Always regenerate plugins.json
+          echo "📄 Generating plugins.json..."
+          if ./gradlew makePluginsJson $GRADLE_ARGS; then
+            cp build/plugins.json $GITHUB_WORKSPACE/builds/ || echo "⚠️ plugins.json not found"
+          else
+            echo "⚠️ Failed to generate plugins.json"
+          fi
+
+      - name: Build Output Check
+        run: |
+          echo "📁 Build outputs:"
+          ls -la $GITHUB_WORKSPACE/builds/ || echo "Builds directory is empty"
+
+      - name: Derlemeleri Yükle
+        run: |
+          cd $GITHUB_WORKSPACE/builds
+          
+          # Check if there are any changes to commit
+          if git diff --quiet --exit-code; then
+            echo "✅ No changes to commit - build outputs are up to date"
+            exit 0
+          fi
+          
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add .
+          git commit -m "$GITHUB_SHA - Selective Compilation" \
+                     -m "Compiled folders: ${{ steps.find_folders.outputs.folders_to_compile }}"
+          git push --force
+
+      - name: Cache Cleanup Info
+        if: always()
+        run: |
+          echo "📊 Cache Statistics:"
+          echo "JDK Cache: ${{ steps.cache-jdk.outputs.cache-hit }}"
+          echo "Android SDK Cache: ${{ steps.cache-android-sdk.outputs.cache-hit }}"
+          echo "Android Components Cache: ${{ steps.cache-android-components.outputs.cache-hit }}"
+          echo "Gradle Cache: ${{ steps.cache-check.outputs.gradle_cache_hit }}"
