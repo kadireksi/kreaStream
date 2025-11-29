@@ -37,6 +37,7 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import kotlin.text.Charsets
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -137,8 +138,7 @@ class HDFilmCehennemi : MainAPI() {
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
         
-        // **FIXED: Use .poster-lang or .poster-meta for language info**
-        // In search results, language might be in .poster-lang. On main page, it's often in a general span.
+        // Use .poster-lang or .poster-meta for language info
         val lang = this.selectFirst(".poster-lang span, .poster-meta-genre span")?.text()?.trim()
         
         // Dubbed status: checks for "Dublaj" or "Yerli"
@@ -316,31 +316,30 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // FIXED: Decrypts URL using ByteArray to prevent UTF-8 corruption
+    /**
+     * FIX: Reverting to the stable decryption logic (Reverse -> Double Base64 Decode -> Byte Shift)
+     * as the new ROT13 cipher step was breaking the Base64 alphabet and resulting in binary garbage.
+     */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. Base64 Decode -> ByteArray (Crucial: Keep as bytes!)
-            val bytes = Base64.decode(encryptedData, Base64.DEFAULT)
+            // 1. Reverse the string
+            val reversedString = encryptedData.reversed()
 
-            // 2. Apply ROT13 to ASCII letters only (in-place modification of bytes)
-            for (i in bytes.indices) {
-                val b = bytes[i].toInt()
-                if ((b in 65..90) || (b in 97..122)) { // A-Z or a-z
-                    val isUpper = b <= 90
-                    val base = if (isUpper) 65 else 97
-                    // ROT13 logic
-                    val shifted = ((b - base + 13) % 26) + base
-                    bytes[i] = shifted.toByte()
-                }
-            }
+            // 2. Double Base64 Decode
+            // First decode: String -> Bytes
+            val bytes1 = Base64.decode(reversedString, Base64.DEFAULT)
 
-            // 3. Reverse the byte array
-            bytes.reverse()
+            // Convert to string using ISO_8859_1 (Latin-1) for the second base64 decode, 
+            // as this mimics the browser's atob handling for non-UTF8 bytes.
+            val intermediateString = String(bytes1, Charsets.ISO_8859_1)
 
-            // 4. Custom Byte Shift Loop
+            // Second decode: String -> Final Bytes
+            val finalBytes = Base64.decode(intermediateString, Base64.DEFAULT)
+            
+            // 3. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
             val sb = StringBuilder()
-            for (i in bytes.indices) {
-                val charCode = bytes[i].toInt() and 0xFF // Convert to unsigned int 0-255
+            for (i in finalBytes.indices) {
+                val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
                 val shift = seed % (i + 5)
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
@@ -354,7 +353,7 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     /**
-     * FIX: Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
+     * Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
      */
     private suspend fun invokeLocalSource(
         source: String,
@@ -381,7 +380,7 @@ class HDFilmCehennemi : MainAPI() {
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
             val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
 
-            // 4. Decrypt
+            // 4. Decrypt (using the stable Double Decode logic)
             val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
             
             if (decryptedUrl.isEmpty()) return
@@ -406,10 +405,6 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    /**
-     * FIX: Separated the Close player logic (1.) from the alternative links (2.)
-     * to ensure the Close link is properly generated and used.
-     */
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -446,7 +441,6 @@ class HDFilmCehennemi : MainAPI() {
             }
 
             // 1.2. Decrypt the main video link using the iframe URL directly
-            // THIS WAS MISSING/SKIPPED in your last edit, causing the fallback to Rapidrame.
             invokeLocalSource(sourceName, defaultSourceUrl, callback) 
         }
 
