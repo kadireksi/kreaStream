@@ -26,13 +26,13 @@ class ATV : MainAPI() {
     private val posterSelector  = "img[src]"
 
     // Load info
-    // private var titleLoadSelector = ".seo-h1__position"
-    // private var genresSelector = ".table-info__link"
-    // private var yearSelector = ".table-info__link a"
-    // private var playerSelector = "div.film-player iframe"
-    // private var descriptionSelector = ".info-clamp__hid"
-    // private var recommendationsSelector = ".related-news__small-card"
-    // private var ratingSelector = ".pmovie__subrating img"
+    private var titleLoadSelector = ".seo-h1__position"
+    private var genresSelector = ".table-info__link"
+    private var yearSelector = ".table-info__link a"
+    private var playerSelector = "div.film-player iframe"
+    private var descriptionSelector = ".info-clamp__hid"
+    private var recommendationsSelector = ".related-news__small-card"
+    private var ratingSelector = ".pmovie__subrating img"
 
     val fileRegex = "file\\s*:\\s*[\"']([^\",']+?)[\"']".toRegex()
 
