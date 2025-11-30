@@ -269,8 +269,8 @@ class HDFilmCehennemi : MainAPI() {
                     url = finalLink
                 ){
                     quality = Qualities.Unknown.value;
-                    type = ExtractorLinkType.Movie;
-                    isCastingSupported = false;
+                    //type = ExtractorLinkType.;
+                    //isCastingSupported = false;
                 }
             )
         }
