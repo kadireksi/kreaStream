@@ -114,6 +114,9 @@ class HDFilmCehennemi : MainAPI() {
         val href = fixUrlNull(this.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
             ?: this.selectFirst("img")?.attr("src"))
+            // FIX: Apply image path correction globally for standard posters
+            ?.replace("/list/", "/")
+            ?.replace("/thumb/", "/")
 
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
@@ -134,17 +137,14 @@ class HDFilmCehennemi : MainAPI() {
 
         return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub, hasSub)
     }
-
+    
+    // Updated main page categories
     override val mainPage = mainPageOf(
         "${mainUrl}/load/page/1/home/"                                         to "Yeni Filmler",
-        //"${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
         "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"           to "Türkçe Dublaj Filmler",
-        "${mainUrl}/load/page/1/home-series/"                                  to "Yeni Diziler",
-        "${mainUrl}/load/page/1/recent-episodes/"                              to "Yeni Bölümler",
+        "${mainUrl}/load/page/1/home-series/"                                  to "Yeni Eklenen Diziler", // Pagination supported
+        "${mainUrl}/load/page/1/recent-episodes/"                              to "Yeni Bölümler", // Pagination supported
         "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"             to "Tavsiye Filmler",
-        //"${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
-        //"${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
-        //"${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"               to "Aile Filmleri",
         "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"            to "Aksiyon Filmleri",
         "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"        to "Animasyon Filmleri",
     )
@@ -155,6 +155,7 @@ class HDFilmCehennemi : MainAPI() {
                 .replace("/load/page/1/genres/","/tur/")
                 .replace("/load/page/1/categories/","/category/")
                 .replace("/load/page/1/imdb7/","/imdb-7-puan-uzeri-filmler/")
+                .replace("/load/page/1/dil/","/dil/")
         } else {
             request.data.replace("/page/1/", "/page/${page}/")
         }
@@ -176,6 +177,26 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
+        // Handle "Yeni Bölümler" (Recent Episodes) which use mini-poster and link directly to episodes
+        if (this.hasClass("mini-poster")) {
+            val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
+            val href = fixUrlNull(this.attr("href")) ?: return null
+            val episodeInfo = this.selectFirst(".mini-poster-episode-info")?.text()?.trim() ?: ""
+            val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
+                ?: this.selectFirst("img")?.attr("src"))
+                // Apply poster fix for mini-poster elements
+                ?.replace("/list/", "/") 
+                ?.replace("/thumb/", "/")
+
+            // Format title to include episode info
+            val newName = "$seriesTitle - $episodeInfo"
+            
+            return newTvSeriesSearchResponse(newName, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
+        }
+        
+        // Handle standard posters for "Yeni Eklenen Diziler" and movies
         val data = this.extractPosterData() ?: return null
         
         return newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
@@ -201,7 +222,7 @@ class HDFilmCehennemi : MainAPI() {
             
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
-                    // FIX: Replace thumbnail size paths with the root image directory (effectively removes the size indicator)
+                    // FIX: Ensure poster URL is corrected for search results
                     this.posterUrl = data.posterUrl
                         ?.replace("/list/", "/")
                         ?.replace("/thumb/", "/")
@@ -212,7 +233,7 @@ class HDFilmCehennemi : MainAPI() {
         return searchResults
     }
     
-    // START NEW DOWNLOAD LOGIC FUNCTIONS
+    // START DOWNLOAD LOGIC FUNCTIONS
     
     private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
         val downloadUrl = "https://cehennempass.pw/download/$rapidrameId"
@@ -229,7 +250,7 @@ class HDFilmCehennemi : MainAPI() {
             // Build the form data for the POST request
             val postBody = okhttp3.FormBody.Builder()
                 .add("video_id", rapidrameId) // videoId is the rapidrameId
-                .add("selected_quality", qualityData) // selectedQuality is "high" or "low"
+                .add("selected_quality", qualityData) // selected_quality is "high" or "low"
                 .build()
             
             // Make the POST request to get the final download link
@@ -250,15 +271,15 @@ class HDFilmCehennemi : MainAPI() {
                     name = qualityName,
                     url = finalLink
                 ){
-                    quality = Qualities.Unknown.value;
-                    //type = ExtractorLinkType.;
-                    //isCastingSupported = false;
+                    quality = Qualities.Unknown.value
+                    type = ExtractorLinkType.DOWNLOADER // Designate as a direct download link
+                    isCastingSupported = false
                 }
             )
         }
     }
     
-    // END NEW DOWNLOAD LOGIC FUNCTIONS
+    // END DOWNLOAD LOGIC FUNCTIONS
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
@@ -329,13 +350,13 @@ class HDFilmCehennemi : MainAPI() {
 
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. ROT13 (New Step)
+            // 1. ROT13
             val rot13edString = rot13(encryptedData)
 
             // 2. Reverse the string
             val reversedString = rot13edString.reversed()
 
-            // 3. Single Base64 Decode (Changed from double decode)
+            // 3. Single Base64 Decode
             val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
             // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
@@ -427,7 +448,7 @@ class HDFilmCehennemi : MainAPI() {
                 try {
                     // Fetch the iframe content to extract subtitles and get the base URI for the referer
                     val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
-                    // FIX 1: Set referer to the base domain of the iframe (e.g., https://hdfilmcehennemi.mobi)
+                    // Set referer to the base domain of the iframe 
                     val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
                     referer = baseUri
                     
@@ -446,13 +467,14 @@ class HDFilmCehennemi : MainAPI() {
             }
 
             // Extract the rapidrame_id if it exists, for use in the download function
+            // The rapidrame_id is passed as a query parameter
             rapidrameId = defaultSourceUrl.substringAfter("?rapidrame_id=", "").takeIf { it.isNotEmpty() }
             
             // 1.2. Decrypt the main video link using the iframe URL directly
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        // --- 3. Handle Download Links (New Logic) ---
+        // --- 3. Handle Download Links ---
         // Only run if we found a rapidrame ID
         if (!rapidrameId.isNullOrEmpty()) {
             extractDownloadLinks(rapidrameId, callback)
@@ -465,7 +487,7 @@ class HDFilmCehennemi : MainAPI() {
             element.select("button.alternative-link").forEach { button ->
                 val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
 
-                // FIX 2: Skip 'Close' to prevent duplication of links
+                // Skip 'Close' to prevent duplication of links
                 if (sourceNameRaw.equals("close", ignoreCase = true)) {
                     return@forEach
                 }
