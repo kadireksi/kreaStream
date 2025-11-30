@@ -3,6 +3,7 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 import java.net.URI
@@ -117,12 +118,14 @@ class ATV : MainAPI() {
                 if (videoUrl.isNotBlank()) {
                     val fixedUrl = fixUrl(videoUrl)
                     callback(
-                        newExtractorLink {
-                            this.url = fixedUrl
-                            this.name = "$name - Bölüm"
-                            this.referer = mainUrl
+                        newExtractorLink(
+                            source = name,
+                            name = "$name - Bölüm",
+                            url = fixedUrl,
+                        ){
                             this.quality = Qualities.Unknown.value
-                            this.isM3u8 = fixedUrl.contains(".m3u8")
+                            this.referer = mainUrl
+                            //this.isM3u8 = fixedUrl.contains(".m3u8")
                         }
                     )
                 }
