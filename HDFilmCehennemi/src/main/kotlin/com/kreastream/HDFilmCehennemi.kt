@@ -6,32 +6,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.lagradost.cloudstream3.Actor
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.Score
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.JsUnpacker
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.getQualityFromString
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
@@ -158,15 +136,15 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/load/page/1/home/"                                         to "Yeni Eklenen Filmler",
+        "${mainUrl}/load/page/1/home/"                                         to "Yeni Filmler",
         //"${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
-        "${mainUrl}/load/page/1/home-series/"                                  to "Yeni Eklenen Diziler",
-        "${mainUrl}/dil/turkce-dublajli-film-izleyin-3/"                       to "Türkçe Dublaj Filmler",
-        "${mainUrl}/load/page/1/recent-episodes/"                              to "Yabancı Diziler",
+        "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"           to "Türkçe Dublaj Filmler",
+        "${mainUrl}/load/page/1/home-series/"                                  to "Yeni Diziler",
+        "${mainUrl}/load/page/1/recent-episodes/"                              to "Yeni Bölümler",
         "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"             to "Tavsiye Filmler",
         //"${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
         //"${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
-        "${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"               to "Aile Filmleri",
+        //"${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"               to "Aile Filmleri",
         "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"            to "Aksiyon Filmleri",
         "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"        to "Animasyon Filmleri",
     )
