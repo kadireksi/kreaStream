@@ -53,12 +53,12 @@ class Dizilla : MainAPI() {
 
     override val mainPage = mainPageOf(
         "${mainUrl}/tum-bolumler"   to "Yeni Eklenen Bölümler",
-        "31"                        to "Kore Dizileri",
         ""                          to "Yeni Diziler",
-        "18"                        to "Gerilim",
+        //"18"                        to "Gerilim",
         "3"                         to "Gizem",
         "4"                         to "Komedi",
-        "8"                         to "Korku",
+        //"8"                         to "Korku",
+        "31"                        to "Kore Dizileri",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -216,7 +216,7 @@ class Dizilla : MainAPI() {
 
         val dublaj = this.selectFirst("span")?.text()?.contains("Dublaj")
 
-        val title = if (dublaj == true) "🇹🇷 $name - $epName" else "$name - $epName"
+        val title = if (dublaj == true) "🇹🇷 $name - $epName" else "🇺🇸 $name - $epName"
 
         val epDoc = fixUrlNull(this.attr("href"))?.let { 
             Jsoup.parse(app.get(it, interceptor = interceptor).body.string()) 
