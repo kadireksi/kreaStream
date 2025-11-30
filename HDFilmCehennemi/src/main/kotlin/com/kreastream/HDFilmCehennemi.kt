@@ -237,8 +237,8 @@ class HDFilmCehennemi : MainAPI() {
         
         // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "high" to "Download HD", // Corresponds to Yüksek Kalite
-            "low" to "Download SD"   // Corresponds to Düşük Kalite
+            "low" to "Download SD", // Corresponds to Yüksek Kalite
+            "high" to "Download HD"   // Corresponds to Düşük Kalite
         )
 
         qualities.forEach { (qualityData, qualityName) ->
@@ -269,6 +269,7 @@ class HDFilmCehennemi : MainAPI() {
                     url = finalLink
                     ){
                     this.quality = Qualities.Unknown.value
+                    this.referer = downloadUrl
                     //this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                     //isCastingSupported = false
                     }
