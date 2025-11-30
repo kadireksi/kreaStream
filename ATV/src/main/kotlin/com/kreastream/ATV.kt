@@ -13,7 +13,7 @@ import java.net.URI
 class ATV : MainAPI() {
     override var mainUrl = "https://www.atv.com.tr"
     override var name = "ATV Türkiye"
-    override val lang = "tr"  // Turkish
+    override var lang = "tr"  // Turkish
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries)
     override val hasDownloadSupport = false  // Enable if adding download logic
@@ -51,20 +51,16 @@ class ATV : MainAPI() {
             )
         }
 
-        return HomePageResponse(home)
+        return newHomePageResponse(home)
     }
 
-    private fun Element.toSearchResponse(): HomePageListItem? {
-        // Adjust selectors based on actual HTML:
-        // - Title: Often in <h3> or <a class="title">
-        // - Image: <img src="...">
-        // - Link: <a href="...">
+    private fun Element.toSearchResponse(): HomePageListItem? { 
         val titleElement = this.selectFirst("h3 a, .title a, a[href*='/dizi/']") ?: return null
         val title = titleElement.text().trim().ifEmpty { this.text().trim() }
         val posterUrl = this.selectFirst("img")?.attr("src")?.let { fixUrl(it) } ?: ""
         val link = fixUrl(titleElement.attr("href"))
 
-        return HomePageListItem(
+        return newHomePageListItem(
             name = title,
             url = link,
             image = posterUrl,
