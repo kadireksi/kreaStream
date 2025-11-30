@@ -266,9 +266,9 @@ class HDFilmCehennemi : MainAPI() {
                 newExtractorLink(
                     source = name, 
                     name = qualityName,
-                    url = finalLink
+                    url = finalLink,
                     ){
-                    this.quality = Qualities.Unknown.value;
+                    this.quality = Qualities.Unknown.value
                     //type = ExtractorLinkType.DOWNLOADER, // Mark as a direct download link
                     //isCastingSupported = false
                     }
