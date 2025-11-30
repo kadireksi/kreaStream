@@ -251,7 +251,7 @@ class Dizilla : MainAPI() {
 
         return newTvSeriesSearchResponse(title, finalHref, TvType.TvSeries) {
             this.posterUrl = posterUrl
-            this.dublaj = dublaj
+            //this.dublaj = dublaj
         }
     }
 
