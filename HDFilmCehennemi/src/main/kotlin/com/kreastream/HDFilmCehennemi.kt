@@ -215,19 +215,17 @@ class HDFilmCehennemi : MainAPI() {
         response.results.forEach { resultHtml ->
             val document = Jsoup.parse(resultHtml)
 
-            val title     = document.selectFirst("h4.title")?.text() ?: return@forEach
-            val href      = fixUrlNull(document.selectFirst("a")?.attr("href")) ?: return@forEach
-            val posterUrl = fixUrlNull(document.selectFirst("img")?.attr("src")) ?:
-            fixUrlNull(document.selectFirst("img")?.attr("data-src"))
-
+            val data = document.selectFirst("a")?.extractPosterData() ?: return@forEach
+            
             searchResults.add(
-                newMovieSearchResponse(title, href, TvType.Movie) {
-                    this.posterUrl = posterUrl?.replace("/thumb/", "/list/")
-                    //this.score = Score.from10(data.score)
+                newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
+                    this.posterUrl = data.posterUrl?.replace("/list/", "/poster/")?.replace("/thumb/", "/poster/")
+                    this.score = Score.from10(data.score)
                 }
             )
         }
-
+        return searchResults
+    }
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
