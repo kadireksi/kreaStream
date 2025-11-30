@@ -1,4 +1,3 @@
-// ATV.kt
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
@@ -20,9 +19,26 @@ class ATV : MainAPI() {
         "$mainUrl/eski-diziler" to "Arşiv Diziler"
     )
 
+    // Main Page
+    private val serieSelector   = ".tab-item.active"
+    private val titleSelector   = "a[href]"
+    private val hrefSelector    = titleSelector
+    private val posterSelector  = "img[src]"
+
+    // Load info
+    // private var titleLoadSelector = ".seo-h1__position"
+    // private var genresSelector = ".table-info__link"
+    // private var yearSelector = ".table-info__link a"
+    // private var playerSelector = "div.film-player iframe"
+    // private var descriptionSelector = ".info-clamp__hid"
+    // private var recommendationsSelector = ".related-news__small-card"
+    // private var ratingSelector = ".pmovie__subrating img"
+
+    val fileRegex = "file\\s*:\\s*[\"']([^\",']+?)[\"']".toRegex()
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(request.data).document
-        val items = document.select("div.series-card, div.card, a[href*='/dizi/']").mapNotNull {
+        val items = document.select(serieSelector).mapNotNull {
             it.toSearchResult()
         }
 
@@ -36,12 +52,12 @@ class ATV : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val linkElement = this.selectFirst("a[href*='/dizi/']") ?: return null
+        val linkElement = this.selectFirst(hrefSelector) ?: return null
         val title = linkElement.attr("title").ifBlank { 
-            this.selectFirst("h3, .title, img")?.attr("alt") ?: "Bilinmeyen Dizi"
+            this.selectFirst(titleSelector)?.text() ?: "Bilinmeyen Dizi"
         }.trim()
         val href = fixUrl(linkElement.attr("href"))
-        val poster = this.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
+        val poster = this.selectFirst(posterSelector)?.attr("src")?.let { fixUrl(it) }
 
         return newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
             this.posterUrl = poster
@@ -52,13 +68,12 @@ class ATV : MainAPI() {
         val url = "$mainUrl/arama?q=$query"
         val doc = app.get(url).document
 
-        return doc.select("a[href*='/dizi/']").mapNotNull { element ->
-            val title = element.selectFirst("img")?.attr("alt")
-                ?: element.selectFirst("h3, .title")?.text()
+        return doc.select(hrefSelector).mapNotNull { element ->
+            val title = element.selectFirst(titleSelector)?.text()
                 ?: return@mapNotNull null
 
             val href = fixUrl(element.attr("href"))
-            val img = element.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
+            val img = element.selectFirst(posterSelector)?.attr("src")?.let { fixUrl(it) }
 
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = img
@@ -69,11 +84,10 @@ class ATV : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
 
-        val title = doc.selectFirst("h1, .dizi-baslik, title")?.text()?.trim() ?: "Bilinmeyen Dizi"
-        val poster = doc.selectFirst("img.ana-gorsel, .poster img, meta[property='og:image']")
-            ?.attr("content") ?: doc.selectFirst("img")?.attr("src")?.let { fixUrl(it) }
+        val title = doc.selectFirst(titleLoadSelector)?.text()?.trim() ?: "Bilinmeyen Dizi"
+        val poster = doc.selectFirst(posterSelector)?.attr("src")?.let { fixUrl(it) }
 
-        val plot = doc.selectFirst(".ozet p, .aciklama, meta[name='description']")?.text()
+        val plot = doc.selectFirst(descriptionSelector)?.text()
         val tags = doc.select(".turler a, .kategori a, .genre a").map { it.text() }
 
         val episodes = doc.select("a[href*='/bolum/'], a.bolum-link, .bolum-card a").mapNotNull { el ->
