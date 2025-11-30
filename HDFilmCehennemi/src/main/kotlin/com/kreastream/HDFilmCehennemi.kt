@@ -162,7 +162,7 @@ class HDFilmCehennemi : MainAPI() {
         //"${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
         "${mainUrl}/load/page/1/home-series/"                                  to "Yeni Eklenen Diziler",
         "${mainUrl}/dil/turkce-dublajli-film-izleyin-3/"                       to "Türkçe Dublaj Filmler",
-        "${mainUrl}/yabancidiziizle-5/"                                        to "Yabancı Diziler",
+        "${mainUrl}/load/page/1/recent-episodes/"                              to "Yabancı Diziler",
         "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"             to "Tavsiye Filmler",
         //"${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
         //"${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
