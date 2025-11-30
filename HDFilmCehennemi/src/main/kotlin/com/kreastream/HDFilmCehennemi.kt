@@ -219,7 +219,7 @@ class HDFilmCehennemi : MainAPI() {
             
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
-                    this.posterUrl = data.posterUrl?.replace("/thumb/", "/list/")
+                    this.posterUrl = data.posterUrl?.replace("/list/", "/poster/")?.replace("/thumb/", "/poster/")
                     this.score = Score.from10(data.score)
                 }
             )
