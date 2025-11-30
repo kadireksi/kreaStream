@@ -219,15 +219,63 @@ class HDFilmCehennemi : MainAPI() {
             
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
+                    // FIX: Replace thumbnail size paths with the root image directory (effectively removes the size indicator)
                     this.posterUrl = data.posterUrl
-                        ?.replace("/thumb/", "/")
                         ?.replace("/list/", "/")
+                        ?.replace("/thumb/", "/")
                     this.score = Score.from10(data.score)
                 }
             )
         }
         return searchResults
     }
+    
+    // START NEW DOWNLOAD LOGIC FUNCTIONS
+    
+    private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
+        val downloadUrl = "https://cehennempass.pw/download/$rapidrameId"
+        
+        // Map the qualities provided in the script to display names
+        val qualities = mapOf(
+            "high" to "Download HD", // Corresponds to Yüksek Kalite
+            "low" to "Download SD"   // Corresponds to Düşük Kalite
+        )
+
+        qualities.forEach { (qualityData, qualityName) ->
+            val postUrl = "https://cehennempass.pw/process_quality_selection.php"
+            
+            // Build the form data for the POST request
+            val postBody = okhttp3.FormBody.Builder()
+                .add("video_id", rapidrameId) // videoId is the rapidrameId
+                .add("selected_quality", qualityData) // selectedQuality is "high" or "low"
+                .build()
+            
+            // Make the POST request to get the final download link
+            val response = app.post(
+                postUrl,
+                requestBody = postBody,
+                headers = standardHeaders,
+                referer = downloadUrl // Referer must be the download page URL for the API to work
+            ).parsedSafe<DownloadResponse>()
+
+            val finalLink = response?.download_link
+
+            if (finalLink.isNullOrEmpty()) return@forEach
+
+            callback.invoke(
+                newExtractorLink(
+                    source = name, 
+                    name = qualityName,
+                    url = finalLink,
+                    quality = Qualities.Unknown.value,
+                    type = ExtractorLinkType.DOWNLOADER, // Mark as a direct download link
+                    isCastingSupported = false
+                )
+            )
+        }
+    }
+    
+    // END NEW DOWNLOAD LOGIC FUNCTIONS
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
@@ -385,6 +433,8 @@ class HDFilmCehennemi : MainAPI() {
         // --- 1. Handle Default Player (Close) ---
         val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
+        var rapidrameId: String? = null // Variable to store the ID for download links
+        
         if (defaultSourceUrl != null) {
             val sourceName = "Close"
             var referer = "$mainUrl/" // Default referer for non-mobi links
@@ -412,8 +462,17 @@ class HDFilmCehennemi : MainAPI() {
                 }
             }
 
+            // Extract the rapidrame_id if it exists, for use in the download function
+            rapidrameId = defaultSourceUrl.substringAfter("?rapidrame_id=", "").takeIf { it.isNotEmpty() }
+            
             // 1.2. Decrypt the main video link using the iframe URL directly
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
+        }
+
+        // --- 3. Handle Download Links (New Logic) ---
+        // Only run if we found a rapidrame ID
+        if (!rapidrameId.isNullOrEmpty()) {
+            extractDownloadLinks(rapidrameId, callback)
         }
 
         // --- 2. Check Alternative Links (buttons below player) ---
@@ -461,4 +520,9 @@ class HDFilmCehennemi : MainAPI() {
 
     data class Results(@JsonProperty("results") val results: List<String> = arrayListOf())
     data class HDFC(@JsonProperty("html") val html: String)
+    data class DownloadResponse(
+        @JsonProperty("status") val status: String? = null,
+        @JsonProperty("download_link") val download_link: String? = null,
+        @JsonProperty("message") val message: String? = null
+    )
 }
