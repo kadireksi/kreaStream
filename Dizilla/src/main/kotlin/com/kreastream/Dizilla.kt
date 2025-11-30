@@ -215,8 +215,7 @@ class Dizilla : MainAPI() {
             .replace(". Bölüm", "")
 
         val dublaj = this.selectFirst("span")?.text()?.contains("Dublaj")
-
-        val title = if (dublaj == true) "🇹🇷 $name - $epName" else "🇺🇸 $name - $epName"
+        val title = if (dublaj == true) "🇹🇷 ᶜᶜ $name - $epName" else "ᶜᶜ $name - $epName"
 
         val epDoc = fixUrlNull(this.attr("href"))?.let { 
             Jsoup.parse(app.get(it, interceptor = interceptor).body.string()) 
