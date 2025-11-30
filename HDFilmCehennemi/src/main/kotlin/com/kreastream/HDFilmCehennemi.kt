@@ -272,7 +272,6 @@ class HDFilmCehennemi : MainAPI() {
                     this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDE
                     //isCastingSupported = false
                     }
-                )
             )
         }
     }
