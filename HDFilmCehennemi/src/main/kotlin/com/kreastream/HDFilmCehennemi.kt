@@ -269,7 +269,7 @@ class HDFilmCehennemi : MainAPI() {
                     url = finalLink
                     ){
                     this.quality = Qualities.Unknown.value
-                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDE
+                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                     //isCastingSupported = false
                     }
             )
