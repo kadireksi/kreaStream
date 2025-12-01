@@ -275,7 +275,7 @@ class HDFilmCehennemi : MainAPI() {
                     url = finalLink
                 ) {
                     this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.LINK // Changed to LINK as DOWNLOAD/DOWNLOADER failed to resolve
+                    //this.type = ExtractorLinkType.LINK // Changed to LINK as DOWNLOAD/DOWNLOADER failed to resolve
                 }
             )
         }
