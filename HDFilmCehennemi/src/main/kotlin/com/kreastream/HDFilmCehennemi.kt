@@ -6,10 +6,32 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.Actor
+import com.lagradost.cloudstream3.HomePageResponse
+import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.MainPageRequest
+import com.lagradost.cloudstream3.Score
+import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.fixUrlNull
+import com.lagradost.cloudstream3.mainPageOf
+import com.lagradost.cloudstream3.newEpisode
+import com.lagradost.cloudstream3.newHomePageResponse
+import com.lagradost.cloudstream3.newMovieLoadResponse
+import com.lagradost.cloudstream3.newMovieSearchResponse
+import com.lagradost.cloudstream3.newTvSeriesLoadResponse
+import com.lagradost.cloudstream3.newTvSeriesSearchResponse
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.JsUnpacker
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.getQualityFromString
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
@@ -23,13 +45,11 @@ class HDFilmCehennemi : MainAPI() {
     override val hasMainPage          = true
     override var lang                 = "tr"
     override val hasQuickSearch       = true
-    override val hasDownloadSupport   = true
     override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
 
-
-    override var sequentialMainPage             = true
-    override var sequentialMainPageDelay        = 50L
-    override var sequentialMainPageScrollDelay  = 50L
+    override var sequentialMainPage = true
+    override var sequentialMainPageDelay       = 50L
+    override var sequentialMainPageScrollDelay = 50L
 
     private val cloudflareKiller by lazy { CloudflareKiller() }
     
@@ -136,17 +156,15 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/load/page/1/home/"                                         to "Yeni Filmler",
-        //"${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
-        "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"           to "Türkçe Dublaj Filmler",
-        "${mainUrl}/load/page/1/home-series/"                                  to "Yeni Diziler",
-        "${mainUrl}/load/page/1/recent-episodes/"                              to "Yeni Bölümler",
-        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"             to "Tavsiye Filmler",
-        //"${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
-        //"${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
-        //"${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"               to "Aile Filmleri",
-        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"            to "Aksiyon Filmleri",
-        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"        to "Animasyon Filmleri",
+        "${mainUrl}/load/page/1/home/"                                    to "Yeni Eklenen Filmler",
+        "${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
+        "${mainUrl}/load/page/1/home-series/"                             to "Yeni Eklenen Diziler",
+        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
+        "${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
+        "${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
+        "${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"          to "Aile Filmleri",
+        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"       to "Aksiyon Filmleri",
+        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"   to "Animasyon Filmleri",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -175,17 +193,39 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
+    /**
+     * FIX: Adds 'Dub'/'Sub' flags (posterHeaders) on posters for main pages.
+     */
     private fun Element.toSearchResult(): SearchResponse? {
         val data = this.extractPosterData() ?: return null
         
+        val headers = mutableMapOf<String, String>()
+        
+        // Use generic keys "Dub" and "Sub" for flags to work with the frontend
+        if (data.hasDub) {
+            headers["Dub"] = "" 
+        }
+        if (data.hasSub) {
+            headers["Sub"] = "" 
+        }
+        
+        val finalHeaders = if (headers.isEmpty()) null else headers
+
         return newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
             this.posterUrl = data.posterUrl
             this.score = Score.from10(data.score)
+            //this.quality = data.year.toString()
+            this.posterHeaders = finalHeaders // Flags are added here
         }
     }
 
+
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
+    /**
+     * FIX: Ensures posters are loaded by replacing '/thumb/' with '/list/'
+     * and adds 'Dub'/'Sub' flags (posterHeaders).
+     */
     override suspend fun search(query: String): List<SearchResponse> {
         val response = app.get(
             "${mainUrl}/search?q=${query}",
@@ -199,57 +239,30 @@ class HDFilmCehennemi : MainAPI() {
 
             val data = document.selectFirst("a")?.extractPosterData() ?: return@forEach
             
+            val headers = mutableMapOf<String, String>()
+            
+            // Use generic keys "Dub" and "Sub" for flags
+            if (data.hasDub) {
+                headers["Dub"] = ""
+            }
+            if (data.hasSub) {
+                headers["Sub"] = ""
+            }
+            
+            val finalHeaders = if (headers.isEmpty()) null else headers
+
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
-                    this.posterUrl = data.posterUrl
-                        ?.replace("/list/", "/")
-                        ?.replace("/thumb/", "/")
+                    // FIX: Replaces /thumb/ with /list/ for better poster resolution/loading
+                    this.posterUrl = data.posterUrl?.replace("/thumb/", "/list/")
                     this.score = Score.from10(data.score)
+                    this.posterHeaders = finalHeaders
                 }
             )
         }
         return searchResults
     }
-    
-    private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
-        val downloadUrl = "https://cehennempass.pw/download/$rapidrameId"
-        
-        val qualities = mapOf(
-            "low" to "Download SD",
-            "high" to "Download HD"
-        )
 
-        qualities.forEach { (qualityData, qualityName) ->
-            val postUrl = "https://cehennempass.pw/process_quality_selection.php"
-            
-            val postBody = okhttp3.FormBody.Builder()
-                .add("video_id", rapidrameId)
-                .add("selected_quality", qualityData)
-                .build()
-            
-            val response = app.post(
-                postUrl,
-                requestBody = postBody,
-                headers = standardHeaders,
-                referer = downloadUrl
-            ).parsedSafe<DownloadResponse>()
-
-            val finalLink = response?.download_link
-
-            if (finalLink.isNullOrEmpty()) return@forEach
-
-            callback.invoke(
-                newExtractorLink(
-                    source = name, 
-                    name = qualityName,
-                    url = finalLink
-                ){
-                    quality = Qualities.Unknown.value
-                }
-            )
-        }
-    }
-    
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val data = document.extractLoadData() ?: return null
@@ -303,6 +316,9 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
+    /**
+     * Helper function to perform the ROT13 cipher (only affects a-z/A-Z).
+     */
     private fun rot13(input: String): String {
         val result = StringBuilder()
         for (char in input) {
@@ -311,27 +327,31 @@ class HDFilmCehennemi : MainAPI() {
             } else if (char in 'A'..'Z') {
                 result.append(((char.code - 'A'.code + 13) % 26 + 'A'.code).toChar())
             } else {
-                result.append(char)
+                result.append(char) // Non-letters are passed through unchanged
             }
         }
         return result.toString()
     }
 
+    /**
+     * FIX: Decrypts URL based on the latest packed JS script's decryption sequence:
+     * ROT13 -> Reverse String -> Single Base64 Decode (atob) -> Custom Byte Shift.
+     */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. ROT13 (New Step)
+            // 1. ROT13 (JS: result = result.replace(...ROT13...))
             val rot13edString = rot13(encryptedData)
 
-            // 2. Reverse the string
+            // 2. Reverse (JS: result = result.split('').reverse().join(''))
             val reversedString = rot13edString.reversed()
 
-            // 3. Single Base64 Decode (Changed from double decode)
+            // 3. Single Base64 Decode (JS: result = atob(result))
             val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
             // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
-                val charCode = finalBytes[i].toInt() and 0xFF
+                val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
                 val shift = seed % (i + 5)
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
@@ -344,10 +364,12 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
+    /**
+     * Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
+     */
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
-        referer: String,
         callback: (ExtractorLink) -> Unit
     ) {
         try {
@@ -368,9 +390,9 @@ class HDFilmCehennemi : MainAPI() {
 
             // 3. Extract the math seed: matches charCode-(SEED%(i+5))
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
-            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995 // Fallback seed
+            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
 
-            // 4. Decrypt
+            // 4. Decrypt (using the stable Double Decode logic)
             val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
             
             if (decryptedUrl.isEmpty()) return
@@ -385,9 +407,9 @@ class HDFilmCehennemi : MainAPI() {
                     name    = source,
                     url     = decryptedUrl
                 ){
-                    this.referer = referer
+                    this.referer = "$mainUrl/"
                     this.quality = Qualities.Unknown.value
-                    //this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 }
             )
         } catch (e: Exception) {
@@ -404,23 +426,18 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(data).document
         
         // --- 1. Handle Default Player (Close) ---
+        // Get the iframe's data-src directly, as this URL contains the packed script.
         val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
-        var rapidrameId: String? = null // Variable to store the ID for download links
-        
         if (defaultSourceUrl != null) {
             val sourceName = "Close"
-            var referer = "$mainUrl/" // Default referer for non-mobi links
             
-            // 1.1. Subtitle processing & Referer check
+            // 1.1. Subtitle processing: happens by visiting the iframe's URL
             if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
                 try {
-                    // Fetch the iframe content to extract subtitles and get the base URI for the referer
+                    // Fetch the iframe content to extract subtitles
                     val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
-                    // FIX 1: Set referer to the base domain of the iframe (e.g., https://hdfilmcehennemi.mobi)
                     val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
-                    referer = baseUri
-                    
                     iframedoc.select("track[kind=captions]").forEach { track ->
                         val lang = when (track.attr("srclang")) {
                             "tr" -> "Türkçe"
@@ -435,31 +452,15 @@ class HDFilmCehennemi : MainAPI() {
                 }
             }
 
-            // Extract the rapidrame_id if it exists, for use in the download function
-            rapidrameId = defaultSourceUrl.substringAfter("?rapidrame_id=", "").takeIf { it.isNotEmpty() }
-            
             // 1.2. Decrypt the main video link using the iframe URL directly
-            invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
-        }
-
-        // --- 3. Handle Download Links (New Logic) ---
-        // Only run if we found a rapidrame ID
-        if (!rapidrameId.isNullOrEmpty()) {
-            extractDownloadLinks(rapidrameId, callback)
+            invokeLocalSource(sourceName, defaultSourceUrl, callback) 
         }
 
         // --- 2. Check Alternative Links (buttons below player) ---
-        val rapidrameReferer = "$mainUrl/" // Use main URL as referer for alternative/external sources
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
                 val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
-
-                // FIX 2: Skip 'Close' to prevent duplication of links
-                if (sourceNameRaw.equals("close", ignoreCase = true)) {
-                    return@forEach
-                }
-                
                 val videoID = button.attr("data-video")
                 
                 // API call to get the iframe link (e.g., /rplayer/...)
@@ -484,7 +485,7 @@ class HDFilmCehennemi : MainAPI() {
                     } else {
                         "$sourceNameRaw $langCode"
                     }
-                    invokeLocalSource(finalSourceName, iframe, rapidrameReferer, callback) // Pass the main URL as referer
+                    invokeLocalSource(finalSourceName, iframe, callback)
                 }
             }
         }
@@ -493,9 +494,4 @@ class HDFilmCehennemi : MainAPI() {
 
     data class Results(@JsonProperty("results") val results: List<String> = arrayListOf())
     data class HDFC(@JsonProperty("html") val html: String)
-    data class DownloadResponse(
-        @JsonProperty("status") val status: String? = null,
-        @JsonProperty("download_link") val download_link: String? = null,
-        @JsonProperty("message") val message: String? = null
-    )
 }
