@@ -23,7 +23,7 @@
         "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 27091,
+        "fileSize": 26853,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -33,7 +33,27 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 8,
+        "version": 1,
+        "internalName": "HDFC",
+        "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFC.cs3",
+        "name": "HDFC"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
+        "fileSize": 30273,
+        "status": 1,
+        "language": "tr",
+        "authors": [
+            "kreastream"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 9,
         "internalName": "HDFilmCehennemi",
         "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
