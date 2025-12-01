@@ -267,7 +267,7 @@ class HDFilmCehennemi : MainAPI() {
 
             if (finalLink.isNullOrEmpty()) return@forEach
 
-            // FIX: Restructured newExtractorLink to resolve compile errors
+            // FIX: Removed 'isCastingSupported' and changed 'DOWNLOAD' to 'LINK' to resolve compile errors.
             callback.invoke(
                 newExtractorLink(
                     source = name, 
@@ -275,8 +275,7 @@ class HDFilmCehennemi : MainAPI() {
                     url = finalLink
                 ) {
                     this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.DOWNLOAD // Corrected from DOWNLOADER
-                    this.isCastingSupported = false
+                    this.type = ExtractorLinkType.LINK // Changed to LINK as DOWNLOAD/DOWNLOADER failed to resolve
                 }
             )
         }
