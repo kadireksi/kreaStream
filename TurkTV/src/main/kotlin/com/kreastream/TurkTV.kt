@@ -178,8 +178,8 @@ class TurkTV : MainAPI() {
                         name = "Direkt Video",
                         url = url
                     ){
-                        this.referer = data,
-                        this.quality = Qualities.Unknown.value,
+                        this.referer = data
+                        this.quality = Qualities.Unknown.value
                         //this.isM3u8 = url.contains(".m3u8")
                     }
                 )
