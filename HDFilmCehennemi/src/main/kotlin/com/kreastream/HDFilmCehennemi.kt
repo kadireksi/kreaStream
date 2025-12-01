@@ -23,7 +23,7 @@ class HDFilmCehennemi : MainAPI() {
     override val hasMainPage          = true
     override var lang                 = "tr"
     override val hasQuickSearch       = true
-    override val hasDownloadSupport   = true // Added download support flag
+    override var hasDownloadSupport   = true 
     override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
 
 
@@ -267,7 +267,6 @@ class HDFilmCehennemi : MainAPI() {
 
             if (finalLink.isNullOrEmpty()) return@forEach
 
-            // FIX: Explicitly set link type to LINK. You may need ExtractorLinkType.DOWNLOAD if your API supports it.
             callback.invoke(
                 newExtractorLink(
                     source = name, 
@@ -275,7 +274,7 @@ class HDFilmCehennemi : MainAPI() {
                     url = finalLink
                 ) {
                     this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.VIDEO // Using LINK as DOWNLOAD/DOWNLOADER failed to resolve
+                    this.type = ExtractorLinkType.VIDEO 
                 }
             )
         }
@@ -355,12 +354,12 @@ class HDFilmCehennemi : MainAPI() {
             // 1. ROT13 
             val rot13edString = rot13(encryptedData)
 
-            // FIX: Removed the reversal step as it was causing corrupted output
+            // FIX: Re-introduced reversal as it seems necessary for the Base64 decode to work
             // 2. Reverse the string 
-            // val reversedString = rot13edString.reversed()
+            val reversedString = rot13edString.reversed()
 
-            // 3. Single Base64 Decode - use rot13edString directly
-            val finalBytes = Base64.decode(rot13edString, Base64.DEFAULT)
+            // 3. Single Base64 Decode 
+            val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
             // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256) 
             val sb = StringBuilder()
