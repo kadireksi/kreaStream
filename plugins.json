@@ -20,29 +20,10 @@
         "name": "ATV"
     },
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=dizilla40.com&sz=%size%",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 48210,
-        "status": 1,
-        "language": "tr",
-        "authors": [
-            "kreastream"
-        ],
-        "tvTypes": [
-            "TvSeries"
-        ],
-        "version": 10,
-        "internalName": "Dizilla",
-        "description": "Dizilla t\u00fcm yabanc\u0131 dizileri \u00fccretsiz olarak T\u00fcrk\u00e7e Dublaj ve altyaz\u0131l\u0131 se\u00e7enekleri ile 1080P kalite izleyebilece\u011finiz yeni nesil yabanc\u0131 dizi izleme siteniz.",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Dizilla.cs3",
-        "name": "Dizilla"
-    },
-    {
         "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 26635,
+        "fileSize": 27092,
         "status": 1,
         "language": "tr",
         "authors": [
