@@ -242,8 +242,8 @@ class HDFilmCehennemi : MainAPI() {
         
         // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "high" to "Download HD", // Corresponds to Yüksek Kalite
-            "low" to "Download SD"   // Corresponds to Düşük Kalite
+            "high" to "Download HD", 
+            "low" to "Download SD"   
         )
 
         qualities.forEach { (qualityData, qualityName) ->
@@ -251,8 +251,8 @@ class HDFilmCehennemi : MainAPI() {
             
             // Build the form data for the POST request
             val postBody = okhttp3.FormBody.Builder()
-                .add("video_id", rapidrameId) // videoId is the rapidrameId
-                .add("selected_quality", qualityData) // selected_quality is "high" or "low"
+                .add("video_id", rapidrameId)
+                .add("selected_quality", qualityData)
                 .build()
             
             // Make the POST request to get the final download link
@@ -260,23 +260,24 @@ class HDFilmCehennemi : MainAPI() {
                 postUrl,
                 requestBody = postBody,
                 headers = standardHeaders,
-                referer = downloadUrl // Referer must be the download page URL for the API to work
+                referer = downloadUrl 
             ).parsedSafe<DownloadResponse>()
 
             val finalLink = response?.download_link
 
             if (finalLink.isNullOrEmpty()) return@forEach
 
-            // FIX: Pass quality, type, and isCastingSupported as named arguments to newExtractorLink
+            // FIX: Restructured newExtractorLink to resolve compile errors
             callback.invoke(
                 newExtractorLink(
                     source = name, 
                     name = qualityName,
-                    url = finalLink,
-                    quality = Qualities.Unknown.value, // Fix for "No parameter with name 'quality' found."
-                    type = ExtractorLinkType.DOWNLOADER, // Fix for "Unresolved reference 'DOWNLOADER'."
-                    isCastingSupported = false // Fix for "No parameter with name 'isCastingSupported' found."
-                )
+                    url = finalLink
+                ) {
+                    this.quality = Qualities.Unknown.value
+                    this.type = ExtractorLinkType.DOWNLOAD // Corrected from DOWNLOADER
+                    this.isCastingSupported = false
+                }
             )
         }
     }
@@ -352,16 +353,16 @@ class HDFilmCehennemi : MainAPI() {
 
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. ROT13
+            // 1. ROT13 
             val rot13edString = rot13(encryptedData)
 
-            // 2. Reverse the string
+            // 2. Reverse the string 
             val reversedString = rot13edString.reversed()
 
-            // 3. Single Base64 Decode
+            // 3. Single Base64 Decode 
             val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
-            // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
+            // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256) 
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
                 val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
@@ -409,7 +410,7 @@ class HDFilmCehennemi : MainAPI() {
             if (decryptedUrl.isEmpty()) return
             Log.d("HDFC", "Decrypted URL: $decryptedUrl")
 
-            // 5. Determine if it's HLS (fixes the .txt link from hdfc1.txt)
+            // 5. Determine if it's HLS 
             val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
             
             callback.invoke(
