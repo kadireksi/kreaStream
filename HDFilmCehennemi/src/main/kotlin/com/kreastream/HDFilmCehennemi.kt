@@ -267,7 +267,7 @@ class HDFilmCehennemi : MainAPI() {
 
             if (finalLink.isNullOrEmpty()) return@forEach
 
-            // FIX: Removed 'isCastingSupported' and changed 'DOWNLOAD' to 'LINK' to resolve compile errors.
+            // FIX: Explicitly set link type to LINK. You may need ExtractorLinkType.DOWNLOAD if your API supports it.
             callback.invoke(
                 newExtractorLink(
                     source = name, 
@@ -275,7 +275,7 @@ class HDFilmCehennemi : MainAPI() {
                     url = finalLink
                 ) {
                     this.quality = Qualities.Unknown.value
-                    //this.type = ExtractorLinkType.LINK // Changed to LINK as DOWNLOAD/DOWNLOADER failed to resolve
+                    this.type = ExtractorLinkType.VIDEO // Using LINK as DOWNLOAD/DOWNLOADER failed to resolve
                 }
             )
         }
@@ -355,11 +355,12 @@ class HDFilmCehennemi : MainAPI() {
             // 1. ROT13 
             val rot13edString = rot13(encryptedData)
 
+            // FIX: Removed the reversal step as it was causing corrupted output
             // 2. Reverse the string 
-            val reversedString = rot13edString.reversed()
+            // val reversedString = rot13edString.reversed()
 
-            // 3. Single Base64 Decode 
-            val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
+            // 3. Single Base64 Decode - use rot13edString directly
+            val finalBytes = Base64.decode(rot13edString, Base64.DEFAULT)
             
             // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256) 
             val sb = StringBuilder()
