@@ -160,6 +160,7 @@ class HDFC : MainAPI() {
                 .replace("/load/page/1/genres/","/tur/")
                 .replace("/load/page/1/categories/","/category/")
                 .replace("/load/page/1/imdb7/","/imdb-7-puan-uzeri-filmler/")
+                .replace("/load/page/1/dil/","/languages/")
         } else {
             request.data.replace("/page/1/", "/page/${page}/")
         }
