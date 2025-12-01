@@ -3,7 +3,7 @@
         "iconUrl": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 11733,
+        "fileSize": 15413,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -14,49 +14,9 @@
             "Live"
         ],
         "version": 1,
-        "internalName": "ATV",
-        "description": "ATV TV & Radyo & Diziler & Programlar",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/ATV.cs3",
-        "name": "ATV"
-    },
-    {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 30493,
-        "status": 1,
-        "language": "tr",
-        "authors": [
-            "kreastream"
-        ],
-        "tvTypes": [
-            "Movie",
-            "TvSeries"
-        ],
-        "version": 2,
-        "internalName": "HDFC",
-        "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFC.cs3",
-        "name": "HDFC"
-    },
-    {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 30339,
-        "status": 1,
-        "language": "tr",
-        "authors": [
-            "kreastream"
-        ],
-        "tvTypes": [
-            "Movie",
-            "TvSeries"
-        ],
-        "version": 9,
-        "internalName": "HDFilmCehennemi",
-        "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
-        "name": "HDFilmCehennemi"
+        "internalName": "TurkTV",
+        "description": "T\u00fcrk Tv",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
+        "name": "TurkTV"
     }
 ]
