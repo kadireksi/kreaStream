@@ -242,8 +242,8 @@ class HDFilmCehennemi : MainAPI() {
         
         // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "high" to "Download HD", 
-            "low" to "Download SD"   
+            "low" to "Download SD"  ,
+            "high" to "Download HD"
         )
 
         qualities.forEach { (qualityData, qualityName) ->
@@ -351,17 +351,15 @@ class HDFilmCehennemi : MainAPI() {
 
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. ROT13 
-            val rot13edString = rot13(encryptedData)
+            // FIX: Removed ROT13. The issue is likely a combination of reversal and byte shifting, not ROT13.
+            
+            // 1. Reverse the string (This reversal seems to be necessary for the Base64 input string)
+            val reversedString = encryptedData.reversed()
 
-            // FIX: Re-introduced reversal as it seems necessary for the Base64 decode to work
-            // 2. Reverse the string 
-            val reversedString = rot13edString.reversed()
-
-            // 3. Single Base64 Decode 
+            // 2. Single Base64 Decode 
             val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
-            // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256) 
+            // 3. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256) 
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
                 val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
