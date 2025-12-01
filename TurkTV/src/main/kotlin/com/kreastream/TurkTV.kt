@@ -32,7 +32,7 @@ class TurkTV : MainAPI() {
             "https://startv-live.ercdn.net/startv/startv.m3u8"),
         Channel("now", "NOW (Fox)", "https://www.nowtv.com.tr", "/diziler/yayinda", "/diziler/arsiv",
             "https://nowtv-live.ercdn.net/nowtv/nowtv.m3u8"),
-        Channel("trt1", "TRT 1", "https://www.trt1.com.tr", "/diziler", "/arsiv/diziler",
+        Channel("trt1", "TRT 1", "https://www.trt1.com.tr", "/diziler?archive=false", "/diziler?archive=true",
             "https://tv-trt1.medya.trt.com.tr/master.m3u8")
     )
 
