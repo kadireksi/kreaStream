@@ -23,9 +23,9 @@ class TurkTV : MainAPI() {
 
     private val channels = listOf(
         Channel("atv", "ATV", "https://www.atv.com.tr", "/diziler", "/eski-diziler",
-            "https://atv.vodgc.net/atvhd/atv.m3u8"),
+            "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=0F2E3SdO1jy-8fTaE7rqXQ&e=1764664587&ppid=21d804be91b8e91f11bb3789ff83f0b4&gdpr=0"),
         Channel("kanald", "Kanal D", "https://www.kanald.com.tr", "/diziler/tum-diziler", "/diziler/arsiv-diziler",
-            "https://kanald-live.ercdn.net/kanald/kanald.m3u8"),
+            "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3&ppid=c1bfdca3b54034e7be9660071f17d132"),
         Channel("show", "Show TV", "https://www.showtv.com.tr", "/diziler/yayinda", "/diziler/arsiv",
             "https://showtv-live.ercdn.net/showtv/showtv.m3u8"),
         Channel("star", "Star TV", "https://www.startv.com.tr", "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler",
@@ -33,7 +33,7 @@ class TurkTV : MainAPI() {
         Channel("now", "NOW (Fox)", "https://www.nowtv.com.tr", "/diziler/yayinda", "/diziler/arsiv",
             "https://nowtv-live.ercdn.net/nowtv/nowtv.m3u8"),
         Channel("trt1", "TRT 1", "https://www.trt1.com.tr", "/diziler", "/arsiv/diziler",
-            "https://trt1.blutv.com.tr/live/trt1/trt1.m3u8")
+            "https://tv-trt1.medya.trt.com.tr/master.m3u8")
     )
 
     override val mainPage = mainPageOf(
