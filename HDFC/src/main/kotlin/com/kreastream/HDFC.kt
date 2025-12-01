@@ -141,8 +141,9 @@ class HDFC : MainAPI() {
     // START: Main Page Tidy Up and Pagination Support
     override val mainPage = mainPageOf(
         "${mainUrl}/load/page/1/home/"                                    to "Yeni Filmler",
-        "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"          to "Türkçe Dublaj Filmler",
-        "${mainUrl}/load/page/1/recent-episodes/"                         to "Yeni Bölümler", 
+        "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"      to "Türkçe Dublaj Filmler",
+        "${mainUrl}/load/page/1/ulke/turkiye-2/"                          to "Türk Filmleri",
+        "${mainUrl}/load/page/1/recent-episodes/"                         to "Yeni Bölümler",
         "${mainUrl}/load/page/1/home-series/"                             to "Yeni Diziler",
         "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
         "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"       to "Aksiyon Filmleri",
@@ -161,6 +162,7 @@ class HDFC : MainAPI() {
                 .replace("/load/page/1/categories/","/category/")
                 .replace("/load/page/1/imdb7/","/imdb-7-puan-uzeri-filmler/")
                 .replace("/load/page/1/dil/","/language/")
+                .replace("/load/page/1/ulke/","/country/")
         } else {
             request.data.replace("/page/1/", "/page/${page}/")
         }
