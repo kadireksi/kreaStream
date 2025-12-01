@@ -242,8 +242,8 @@ class HDFilmCehennemi : MainAPI() {
         
         // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "low" to "Download SD"  ,
-            "high" to "Download HD"
+            "high" to "Download HD", 
+            "low" to "Download SD"   
         )
 
         qualities.forEach { (qualityData, qualityName) ->
@@ -351,19 +351,22 @@ class HDFilmCehennemi : MainAPI() {
 
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // FIX: Removed ROT13. The issue is likely a combination of reversal and byte shifting, not ROT13.
-            
-            // 1. Reverse the string (This reversal seems to be necessary for the Base64 input string)
-            val reversedString = encryptedData.reversed()
+            // 1. ROT13 (K=K.4V(/[a-4S-Z]/g, ...))
+            val rot13edString = rot13(encryptedData)
 
-            // 2. Single Base64 Decode 
-            val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
+            // 2. Base64 Decode (K=3D(K) -> K=atob(K))
+            val decodedBytes = Base64.decode(rot13edString, Base64.DEFAULT)
             
-            // 3. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256) 
+            // 3. Reverse (K=K.1p('').4n().3k('') -> K.split('').reverse().join(''))
+            // Apply reversal to the decoded byte array.
+            val reversedBytes = decodedBytes.reversedArray()
+            
+            // 4. Custom Byte Shift Loop
             val sb = StringBuilder()
-            for (i in finalBytes.indices) {
-                val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
+            for (i in reversedBytes.indices) {
+                val charCode = reversedBytes[i].toInt() and 0xFF // Unsigned conversion
                 val shift = seed % (i + 5)
+                // JS: (charCode-(4z%(i+5))+2M)%2M -> (charCode - (seed % (i+5)) + 256) % 256
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
             }
