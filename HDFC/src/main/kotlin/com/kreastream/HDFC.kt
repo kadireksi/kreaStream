@@ -141,7 +141,7 @@ class HDFC : MainAPI() {
     // START: Main Page Tidy Up and Pagination Support
     override val mainPage = mainPageOf(
         "${mainUrl}/load/page/1/home/"                                    to "Yeni Filmler",
-        "${mainUrl}/load/page/1/turkce-dublajli-film-izleyin-3/"          to "Türkçe Dublaj Filmler",
+        "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"          to "Türkçe Dublaj Filmler",
         "${mainUrl}/load/page/1/recent-episodes/"                         to "Yeni Bölümler", 
         "${mainUrl}/load/page/1/home-series/"                             to "Yeni Diziler",
         "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
