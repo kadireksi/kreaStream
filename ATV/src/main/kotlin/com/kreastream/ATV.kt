@@ -1,12 +1,8 @@
-// ATV.kt - Updated & Working December 2025
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.WebViewResolver
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.https
-import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 
 class ATV : MainAPI() {
@@ -22,29 +18,25 @@ class ATV : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = request.data + if (page > 1) "?page=$page" else ""
+        val url = if (page > 1) "${request.data}?page=$page" else request.data
         val doc = app.get(url).document
-
-        val items = doc.select(".series-card").mapNotNull { element ->
-            element.toSearchResult()
-        }
-
-        val hasNextPage = doc.selectFirst(".pagination a[rel=next]") != null
-
+        val items = doc.select(".series-card, .card-item, a[href*='/dizi/']").mapNotNull { it.toSearchResult() }
+        val hasNextPage = doc.select(".pagination .next").isNotEmpty()
         return newHomePageResponse(request.name, items, hasNextPage)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
         val a = selectFirst("a") ?: return null
         val href = fixUrl(a.attr("href"))
-        val title = a.attr("title").takeIf { it.isNotBlank() }
-            ?: a.selectFirst("h3, .series-card__title")?.text()
-            ?: return null
+        if (!href.contains("/dizi/")) return null
 
-        val poster = selectFirst("img")?.attr("data-src")
-            ?: selectFirst("img")?.attr("src")
-            ?: selectFirst("img")?.attr("data-lazy")
-            ?.let { fixUrl(it) }
+        val title = a.attr("title").takeIf { it.isNotBlank() }
+            ?: a.selectFirst("h3, .title, img")?.attr("alt")
+            ?: a.text().takeIf { it.isNotBlank() } ?: return null
+
+        val poster = a.selectFirst("img")
+            ?.attr("data-src") ?: a.selectFirst("img")?.attr("src")
+            ?.let { if (it.startsWith("http")) it else fixUrl(it) }
 
         return newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
             this.posterUrl = poster
@@ -52,56 +44,35 @@ class ATV : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/arama?q=${query}"
+        val url = "$mainUrl/arama?q=${query.encodeUrl()}"
         val doc = app.get(url).document
-
-        return doc.select(".search-result a[href*='/dizi/'], .series-card a").mapNotNull {
-            it.toSearchResult()
-        }
+        return doc.select("a[href*='/dizi/']").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
 
-        val title = doc.selectFirst("h1, .seo-h1, .series-detail__title")?.text()
+        val title = doc.selectFirst("h1, .seo-h1, .series-title")?.text()
             ?: doc.selectFirst("meta[property='og:title']")?.attr("content")
             ?: "Bilinmeyen Dizi"
 
         val poster = doc.selectFirst("meta[property='og:image']")?.attr("content")
-            ?: doc.selectFirst("img.series-detail__poster")?.attr("src")?.let { fixUrl(it) }
+            ?: doc.selectFirst("img.series-poster")?.attr("src")?.let { fixUrl(it) }
 
-        val plot = doc.selectFirst(".series-detail__description, .info-clamp__text")?.text()
+        val plot = doc.selectFirst(".description, .synopsis, .info-clamp__text")?.text()
 
-        val tags = doc.select(".genre-list a, .tags a").map { it.text() }
+        val tags = doc.select(".genre a, .tags a").map { it.text() }
 
         val episodes = mutableListOf<Episode>()
 
-        // New episode list structure
-        doc.select(".episode-list a, .episodes a[href*='/bolum/'], .episode-card a").forEach { el ->
-            val epHref = fixUrl(el.attr("href"))
-            val epTitle = el.selectFirst(".episode-card__title, .episode-number")
-                ?.text()?.trim() ?: "Bölüm"
-
-            episodes.add(
-                newEpisode(epHref) {
-                    name = epTitle
-                    description = epTitle
+        doc.select("a[href*='/bolum/'], a.episode-card, .episode-item a").forEach { el ->
+            val href = fixUrl(el.attr("href"))
+            val name = el.text().trim().ifBlank { "Bölüm" }
+            if (href.contains("/bolum/")) {
+                episodes += newEpisode(href) {
+                    this.name = name
+                    this.description = name
                 }
-            )
-        }
-
-        // Fallback: load seasons/tabs
-        if (episodes.isEmpty()) {
-            doc.select("a[data-season]").forEach { seasonTab ->
-                val seasonUrl = fixUrl(seasonTab.attr("href"))
-                try {
-                    val seasonDoc = app.get(seasonUrl).document
-                    seasonDoc.select(".episode-card a").forEach { ep ->
-                        val href = fixUrl(ep.attr("href"))
-                        val name = ep.text().trim().ifBlank { "Bölüm" }
-                        episodes.add(newEpisode(href) { this.name = name })
-                    }
-                } catch (e: Exception) { /* ignore */ }
             }
         }
 
@@ -122,74 +93,59 @@ class ATV : MainAPI() {
         val res = app.get(data)
         val doc = res.document
 
-        // 1. Try iframe player
-        val iframe = doc.selectFirst("iframe[src*='player'], iframe#player")
-            ?: doc.selectFirst("div.player iframe")
-
+        // 1. Try iframe player (most common)
+        val iframe = doc.selectFirst("iframe[src*='player'], iframe#player, div.player iframe")
         if (iframe != null) {
-            val iframeUrl = fixUrl(iframe.attr("src"))
-            if (iframeUrl.contains("atvplayer.com") || iframeUrl.contains("player")) {
-                loadExtractor(iframeUrl, data, subtitleCallback, callback)
-                return true
-            }
-
-            // Some episodes use nested iframe + JS
-            if (iframeUrl.contains("http")) {
-                try {
-                    val response = app.get(iframeUrl, referer = data, timeout = 20)
-                    loadExtractor(response.url, data, subtitleCallback, callback)
-                    return true
-                } catch (e: Exception) {
-                    // continue
-                }
+            val iframeSrc = fixUrl(iframe.attr("src"))
+            if (iframeSrc.isNotBlank()) {
+                loadExtractor(iframeSrc, data, subtitleCallback, callback)
             }
         }
 
-        // 2. Try data-video attributes or script-based sources
-        val script = doc.selectFirst("script:contains(file:), script:contains(sources:)")
-        script?.data()?.let { js ->
-            val fileMatch = """["']file["']:\s*["']([^"']+)["']""".toRegex().find(js)
-            val sourcesMatch = """sources:\s*\[{[^}]*file:\s*["']([^"']+)["']""".toRegex().find(js)
-
-            (fileMatch ?: sourcesMatch)?.groupValues?.getOrNull(1)?.let { videoUrl ->
-                if (videoUrl.isNotBlank()) {
-                    callback.invoke(
-                        ExtractorLink(
-                            source = name,
-                            name = "$name - Video",
-                            url = https(videoUrl),
-                            referer = data,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = videoUrl.contains(".m3u8")
+        // 2. Try JS-embedded video URL
+        doc.select("script").forEach { script ->
+            val content = script.data()
+            if (content.contains("file") || content.contains("sources")) {
+                Regex("""["']file["']:\s*["']([^"']+)["']""").find(content)?.groupValues?.get(1)
+                    ?.takeIf { it.isNotBlank() }?.let { videoUrl ->
+                        callback.invoke(
+                            newExtractorLink {
+                                this.name = "$name - Direkt"
+                                this.url = videoUrl.trim()
+                                this.referer = data
+                                this.quality = Qualities.Unknown.value
+                                this.isM3u8 = videoUrl.contains(".m3u8")
+                            }
                         )
-                    )
-                    return true
-                }
+                    }
             }
         }
 
-        // 3. Last resort: WebView resolver for protected players
-        WebViewResolver(
-            regex = """(https?://[^"']+\.(m3u8|mp4)[^"']*)"""
-        ).resolveUsingWebView(res.url, res.text).forEach { link ->
-            callback.invoke(
-                ExtractorLink(
-                    source = name,
-                    name = "$name - WebView",
-                    url = link.url,
-                    referer = link.headers["referer"] ?: mainUrl,
-                    quality = Qualities.Unknown.value
+        // 3. WebView Resolver (for protected players like atvplayer.com)
+        val resolver = WebViewResolver(
+            interceptUrl = { url -> url.contains(".m3u8") || url.contains(".mp4") || url.contains("master") },
+            onLinkFound = { link ->
+                callback.invoke(
+                    newExtractorLink {
+                        this.name = "$name - WebView"
+                        this.url = link.url
+                        this.referer = link.headers["Referer"] ?: mainUrl
+                        this.quality = Qualities.Unknown.value
+                        this.isM3u8 = link.url.contains(".m3u8")
+                        this.headers = link.headers
+                    }
                 )
-            )
-        }
+            }
+        )
+
+        resolver.resolveUsingWebView(res.url, res.text)
 
         return true
     }
 
-    private fun fixUrl(url: String?): String {
-        if (url.isNullOrBlank()) return ""
-        return if (url.startsWith("http")) url else "$mainUrl$url".let {
-            if (it.contains("//$mainUrl")) it.replace("//$mainUrl", mainUrl) else it
-        }
+    private fun fixUrl(url: String): String {
+        if (url.startsWith("http")) return url
+        if (url.startsWith("//")) return "https:$url"
+        return mainUrl + url.trimStart('/')
     }
 }
