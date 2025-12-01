@@ -6,32 +6,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.lagradost.cloudstream3.Actor
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.Score
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.JsUnpacker
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.getQualityFromString
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
@@ -45,11 +23,13 @@ class HDFilmCehennemi : MainAPI() {
     override val hasMainPage          = true
     override var lang                 = "tr"
     override val hasQuickSearch       = true
+    override val hasDownloadSupport   = true // Added download support flag
     override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
 
-    override var sequentialMainPage = true
-    override var sequentialMainPageDelay       = 50L
-    override var sequentialMainPageScrollDelay = 50L
+
+    override var sequentialMainPage             = true
+    override var sequentialMainPageDelay        = 50L
+    override var sequentialMainPageScrollDelay  = 50L
 
     private val cloudflareKiller by lazy { CloudflareKiller() }
     
@@ -134,6 +114,9 @@ class HDFilmCehennemi : MainAPI() {
         val href = fixUrlNull(this.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
             ?: this.selectFirst("img")?.attr("src"))
+            // FIX: Apply image path correction globally for standard posters
+            ?.replace("/list/", "/")
+            ?.replace("/thumb/", "/")
 
         val year = this.selectFirst(".poster-meta span")?.text()?.trim()?.toIntOrNull()
         val score = this.selectFirst(".poster-meta .imdb")?.ownText()?.trim()?.toFloatOrNull()
@@ -155,10 +138,12 @@ class HDFilmCehennemi : MainAPI() {
         return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub, hasSub)
     }
 
+    // START: Main Page Tidy Up and Pagination Support
     override val mainPage = mainPageOf(
         "${mainUrl}/load/page/1/home/"                                    to "Yeni Eklenen Filmler",
         "${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
-        "${mainUrl}/load/page/1/home-series/"                             to "Yeni Eklenen Diziler",
+        "${mainUrl}/load/page/1/home-series/"                             to "Yeni Eklenen Diziler", // 'Yeni Diziler'
+        "${mainUrl}/load/page/1/recent-episodes/"                         to "Yeni Bölümler", // Pagination supported for episodes
         "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
         "${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
         "${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
@@ -186,7 +171,8 @@ class HDFilmCehennemi : MainAPI() {
         try {
             val hdfc: HDFC = objectMapper.readValue(response.text, HDFC::class.java)
             val document = Jsoup.parse(hdfc.html)
-            val results = document.select("a").mapNotNull { it.toSearchResult() }
+            // Select all relevant link elements
+            val results = document.select("a.poster, a.mini-poster").mapNotNull { it.toSearchResult() }
             return newHomePageResponse(request.name, results)
         } catch (e: Exception) {
             return newHomePageResponse(request.name, emptyList())
@@ -194,6 +180,25 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
+        // Handle "Yeni Bölümler" which use the mini-poster format
+        if (this.hasClass("mini-poster")) {
+            val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
+            val href = fixUrlNull(this.attr("href")) ?: return null
+            val episodeInfo = this.selectFirst(".mini-poster-episode-info")?.text()?.trim() ?: ""
+            val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
+                ?: this.selectFirst("img")?.attr("src"))
+                ?.replace("/list/", "/") 
+                ?.replace("/thumb/", "/")
+
+            // Format title to show episode info for easier identification
+            val newName = "$seriesTitle - $episodeInfo"
+            
+            return newTvSeriesSearchResponse(newName, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
+        }
+        
+        // Handle standard posters for "Yeni Eklenen Diziler" and movies
         val data = this.extractPosterData() ?: return null
         
         return newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
@@ -201,6 +206,7 @@ class HDFilmCehennemi : MainAPI() {
             this.score = Score.from10(data.score)
         }
     }
+    // END: Main Page Tidy Up and Pagination Support
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
@@ -219,7 +225,6 @@ class HDFilmCehennemi : MainAPI() {
             
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
-                    // FIX: Replace thumbnail size paths with the root image directory (effectively removes the size indicator)
                     this.posterUrl = data.posterUrl
                         ?.replace("/list/", "/")
                         ?.replace("/thumb/", "/")
@@ -230,7 +235,7 @@ class HDFilmCehennemi : MainAPI() {
         return searchResults
     }
     
-    // START NEW DOWNLOAD LOGIC FUNCTIONS
+    // START DOWNLOAD LOGIC FUNCTIONS
     
     private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
         val downloadUrl = "https://cehennempass.pw/download/$rapidrameId"
@@ -247,7 +252,7 @@ class HDFilmCehennemi : MainAPI() {
             // Build the form data for the POST request
             val postBody = okhttp3.FormBody.Builder()
                 .add("video_id", rapidrameId) // videoId is the rapidrameId
-                .add("selected_quality", qualityData) // selectedQuality is "high" or "low"
+                .add("selected_quality", qualityData) // selected_quality is "high" or "low"
                 .build()
             
             // Make the POST request to get the final download link
@@ -262,20 +267,21 @@ class HDFilmCehennemi : MainAPI() {
 
             if (finalLink.isNullOrEmpty()) return@forEach
 
+            // FIX: Pass quality, type, and isCastingSupported as named arguments to newExtractorLink
             callback.invoke(
                 newExtractorLink(
                     source = name, 
                     name = qualityName,
                     url = finalLink,
-                    quality = Qualities.Unknown.value,
-                    type = ExtractorLinkType.DOWNLOADER, // Mark as a direct download link
-                    isCastingSupported = false
+                    quality = Qualities.Unknown.value, // Fix for "No parameter with name 'quality' found."
+                    type = ExtractorLinkType.DOWNLOADER, // Fix for "Unresolved reference 'DOWNLOADER'."
+                    isCastingSupported = false // Fix for "No parameter with name 'isCastingSupported' found."
                 )
             )
         }
     }
     
-    // END NEW DOWNLOAD LOGIC FUNCTIONS
+    // END DOWNLOAD LOGIC FUNCTIONS
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
@@ -346,13 +352,13 @@ class HDFilmCehennemi : MainAPI() {
 
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. ROT13 (New Step)
+            // 1. ROT13
             val rot13edString = rot13(encryptedData)
 
             // 2. Reverse the string
             val reversedString = rot13edString.reversed()
 
-            // 3. Single Base64 Decode (Changed from double decode)
+            // 3. Single Base64 Decode
             val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
             // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
@@ -444,7 +450,7 @@ class HDFilmCehennemi : MainAPI() {
                 try {
                     // Fetch the iframe content to extract subtitles and get the base URI for the referer
                     val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
-                    // FIX 1: Set referer to the base domain of the iframe (e.g., https://hdfilmcehennemi.mobi)
+                    // Set referer to the base domain of the iframe 
                     val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
                     referer = baseUri
                     
@@ -469,7 +475,7 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        // --- 3. Handle Download Links (New Logic) ---
+        // --- 3. Handle Download Links ---
         // Only run if we found a rapidrame ID
         if (!rapidrameId.isNullOrEmpty()) {
             extractDownloadLinks(rapidrameId, callback)
@@ -482,7 +488,7 @@ class HDFilmCehennemi : MainAPI() {
             element.select("button.alternative-link").forEach { button ->
                 val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
 
-                // FIX 2: Skip 'Close' to prevent duplication of links
+                // Skip 'Close' to prevent duplication of links
                 if (sourceNameRaw.equals("close", ignoreCase = true)) {
                     return@forEach
                 }
