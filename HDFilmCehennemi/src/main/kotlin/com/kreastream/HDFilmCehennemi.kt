@@ -37,7 +37,7 @@ import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import kotlin.text.Charsets // Required for Base64 decoding charset handling
+import kotlin.text.Charsets
 
 class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
@@ -317,26 +317,38 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     /**
+     * Helper function to perform the ROT13 cipher.
+     */
+    private fun rot13(input: String): String {
+        val result = StringBuilder()
+        for (char in input) {
+            if (char in 'a'..'z') {
+                result.append(((char.code - 'a'.code + 13) % 26 + 'a'.code).toChar())
+            } else if (char in 'A'..'Z') {
+                result.append(((char.code - 'A'.code + 13) % 26 + 'A'.code).toChar())
+            } else {
+                result.append(char)
+            }
+        }
+        return result.toString()
+    }
+
+    /**
      * Decrypts URL based on the latest packed JS script's decryption sequence:
-     * Reverse String -> Double Base64 Decode -> Custom Byte Shift.
+     * ROT13 -> Reverse String -> Single Base64 Decode -> Custom Byte Shift.
      */
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. Reverse the string (JS: .reverse().join().split(''))
-            val reversedString = encryptedData.reversed()
+            // 1. ROT13 (New Step)
+            val rot13edString = rot13(encryptedData)
 
-            // 2. Double Base64 Decode (JS: .atob().atob())
-            // First decode: String -> Bytes
-            val bytes1 = Base64.decode(reversedString, Base64.DEFAULT)
+            // 2. Reverse the string
+            val reversedString = rot13edString.reversed()
 
-            // Convert to string using ISO_8859_1 (Latin-1) for the second base64 decode, 
-            // as this mimics the browser's atob handling for non-UTF8 bytes.
-            val intermediateString = String(bytes1, Charsets.ISO_8859_1)
-
-            // Second decode: String -> Final Bytes
-            val finalBytes = Base64.decode(intermediateString, Base64.DEFAULT)
+            // 3. Single Base64 Decode (Changed from double decode)
+            val finalBytes = Base64.decode(reversedString, Base64.DEFAULT)
             
-            // 3. Custom Byte Shift Loop (The shifting logic is unchanged)
+            // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
                 val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
@@ -354,10 +366,12 @@ class HDFilmCehennemi : MainAPI() {
 
     /**
      * Correctly extracts, unpacks, and decrypts the final M3U8/TXT link from the JS.
+     * FIX: Added a referer parameter for correct playback.
      */
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
+        referer: String,
         callback: (ExtractorLink) -> Unit
     ) {
         try {
@@ -378,7 +392,7 @@ class HDFilmCehennemi : MainAPI() {
 
             // 3. Extract the math seed: matches charCode-(SEED%(i+5))
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
-            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
+            val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995 // Fallback seed
 
             // 4. Decrypt
             val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
@@ -395,7 +409,7 @@ class HDFilmCehennemi : MainAPI() {
                     name    = source,
                     url     = decryptedUrl
                 ){
-                    this.referer = "$mainUrl/"
+                    this.referer = referer // Use the passed referer
                     this.quality = Qualities.Unknown.value
                     this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 }
@@ -414,76 +428,76 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(data).document
         
         // --- 1. Handle Default Player (Close) ---
-        // The default iframe is in the HTML. We use the data-src to get the videoID.
-        val defaultIframeUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
+        val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
-        if (defaultIframeUrl != null) {
-            val videoID = defaultIframeUrl.substringAfter("/embed/").substringBefore("/").substringBefore("?")
+        if (defaultSourceUrl != null) {
+            val sourceName = "Close"
+            var referer = "$mainUrl/" // Default referer for non-mobi links
+            
+            // 1.1. Subtitle processing & Referer check
+            if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
+                try {
+                    // Fetch the iframe content to extract subtitles and get the base URI for the referer
+                    val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
+                    // FIX 1: Set referer to the base domain of the iframe (e.g., https://hdfilmcehennemi.mobi)
+                    val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
+                    referer = baseUri
+                    
+                    iframedoc.select("track[kind=captions]").forEach { track ->
+                        val lang = when (track.attr("srclang")) {
+                            "tr" -> "Türkçe"
+                            "en" -> "İngilizce"
+                            else -> track.attr("srclang")
+                        }
+                        val subUrl = track.attr("src").let { if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/") }
+                        subtitleCallback(SubtitleFile(lang, subUrl))
+                    }
+                } catch (e: Exception) { 
+                    Log.e("HDFC", "Sub extraction error for default source", e) 
+                }
+            }
 
-            if (videoID.isNotEmpty()) {
-                // Perform the same API call structure used for alternative links to get the actual iframe link
+            // 1.2. Decrypt the main video link using the iframe URL directly
+            invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
+        }
+
+        // --- 2. Check Alternative Links (buttons below player) ---
+        val rapidrameReferer = "$mainUrl/" // Use main URL as referer for alternative/external sources
+        document.select("div.alternative-links").forEach { element ->
+            val langCode = element.attr("data-lang").uppercase()
+            element.select("button.alternative-link").forEach { button ->
+                val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
+
+                // FIX 2: Skip 'Close' to prevent duplication of links
+                if (sourceNameRaw.equals("close", ignoreCase = true)) {
+                    return@forEach
+                }
+                
+                val videoID = button.attr("data-video")
+                
+                // API call to get the iframe link (e.g., /rplayer/...)
                 val apiGet = app.get(
                     "${mainUrl}/video/$videoID/",
                     headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
                     referer = data
                 ).text
 
+                // Extract the data-src from the JSON response
                 var iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.get(1)?.replace("\\", "") ?: ""
                 
-                // Process subtitles for the mobi iframe (if available, usually the default player)
-                if (iframe.contains("hdfilmcehennemi.mobi")) {
-                    try {
-                        val iframedoc = app.get(iframe, referer = mainUrl).document
-                        val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
-                        iframedoc.select("track[kind=captions]").forEach { track ->
-                            val lang = when (track.attr("srclang")) {
-                                "tr" -> "Türkçe"
-                                "en" -> "İngilizce"
-                                else -> track.attr("srclang")
-                            }
-                            val subUrl = track.attr("src").let { if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/") }
-                            subtitleCallback(SubtitleFile(lang, subUrl))
-                        }
-                    } catch (e: Exception) { Log.e("HDFC", "Sub extraction error", e) }
-                }
-
+                // Convert the internal rapidrame link to the /playerr/ format for extraction
                 if (iframe.contains("?rapidrame_id=")) {
                     iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
                 }
 
                 if (iframe.isNotEmpty()) {
-                    invokeLocalSource("Close", iframe, callback) // Name the source "Close"
-                }
-            }
-        }
-
-
-        // --- 2. Check Alternative Links (buttons below player) ---
-        document.select("div.alternative-links").forEach { element ->
-            val langCode = element.attr("data-lang").uppercase()
-            element.select("button.alternative-link").forEach { button ->
-                val sourceName = button.text().replace("(HDrip Xbet)", "").trim() + " $langCode"
-                val videoID = button.attr("data-video")
-                
-                val apiGet = app.get(
-                    "${mainUrl}/video/$videoID/",
-                    headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
-                    referer = data
-                ).text
-
-                var iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.get(1)?.replace("\\", "") ?: ""
-                
-                if (iframe.contains("?rapidrame_id=")) {
-                    iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
-                    // The rapidrame source provided in the example is already extracted by the rplayer endpoint.
-                    // We name this "Rapidrame" as per your instruction.
-                    if (sourceName.contains("RAPIDRAME", ignoreCase = true)) {
-                        invokeLocalSource("Rapidrame $langCode", iframe, callback) 
+                    // Set source name to "Rapidrame" as requested if it matches the name
+                    val finalSourceName = if (sourceNameRaw.contains("rapidrame", ignoreCase = true)) {
+                        "Rapidrame $langCode"
                     } else {
-                        invokeLocalSource(sourceName, iframe, callback)
+                        "$sourceNameRaw $langCode"
                     }
-                } else if (iframe.isNotEmpty()) {
-                    invokeLocalSource(sourceName, iframe, callback)
+                    invokeLocalSource(finalSourceName, iframe, rapidrameReferer, callback) // Pass the main URL as referer
                 }
             }
         }
