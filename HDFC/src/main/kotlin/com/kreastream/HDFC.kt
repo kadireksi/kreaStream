@@ -140,18 +140,18 @@ class HDFC : MainAPI() {
 
     // START: Main Page Tidy Up and Pagination Support
     override val mainPage = mainPageOf(
-        "${mainUrl}/load/page/1/home/"                                    to "Yeni Filmler",
-        "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"      to "Türkçe Dublaj Filmler",
-        "${mainUrl}/load/page/1/ulke/turkiye-2/"                          to "Türk Filmleri",
-        "${mainUrl}/load/page/1/recent-episodes/"                         to "Yeni Bölümler",
-        "${mainUrl}/load/page/1/home-series/"                             to "Yeni Diziler",
-        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
-        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"       to "Aksiyon Filmleri",
-        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"   to "Animasyon Filmleri",
-        //"${mainUrl}/load/page/1/imdb7/"                                 to "IMDB 7+ Filmler",
-        //"${mainUrl}/load/page/1/mostLiked/"                             to "En Çok Beğenilenler",
-        //"${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"        to "Aile Filmleri",
-        //"${mainUrl}/load/page/1/categories/nette-ilk-filmler/"          to "Nette İlk Filmler",
+        "${mainUrl}/load/page/1/home/"                                      to "Yeni Filmler",
+        "${mainUrl}/load/page/1/languages/turkce-dublajli-film-izleyin-3/"   to "Türkçe Dublaj Filmler",
+        "${mainUrl}/load/page/1/countries/turkiye-2/"                        to "Türk Filmleri",
+        "${mainUrl}/load/page/1/recent-episodes/"                            to "Yeni Bölümler",
+        "${mainUrl}/load/page/1/home-series/"                                to "Yeni Diziler",
+        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"           to "Tavsiye Filmler",
+        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"          to "Aksiyon Filmleri",
+        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"      to "Animasyon Filmleri",
+    //"${mainUrl}/load/page/1/imdb7/"                                       to "IMDB 7+ Filmler",
+    //"${mainUrl}/load/page/1/mostLiked/"                                   to "En Çok Beğenilenler",
+    //"${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"              to "Aile Filmleri",
+    //"${mainUrl}/load/page/1/categories/nette-ilk-filmler/"                to "Nette İlk Filmler",
 
     )
 
@@ -161,8 +161,8 @@ class HDFC : MainAPI() {
                 .replace("/load/page/1/genres/","/tur/")
                 .replace("/load/page/1/categories/","/category/")
                 .replace("/load/page/1/imdb7/","/imdb-7-puan-uzeri-filmler/")
-                //.replace("/load/page/1/dil/","/language/")
-                //.replace("/load/page/1/ulke/","/country/")
+                .replace("/load/page/1/languages/","/dil/")
+                .replace("/load/page/1/countries/","/ulke/")
         } else {
             request.data.replace("/page/1/", "/page/${page}/")
         }
@@ -278,6 +278,7 @@ class HDFC : MainAPI() {
                     name = qualityName,
                     url = finalLink
                 ) {
+                    this.headers = mapOf("Referer" to "${mainUrl}/", "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Norton/124.0.0.0")
                     this.quality = Qualities.Unknown.value
                     this.type = ExtractorLinkType.VIDEO 
                 }
