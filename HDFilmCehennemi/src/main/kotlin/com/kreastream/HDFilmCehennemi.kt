@@ -6,32 +6,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.lagradost.cloudstream3.Actor
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.Score
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.JsUnpacker
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.getQualityFromString
 import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.Jsoup
@@ -45,11 +23,13 @@ class HDFilmCehennemi : MainAPI() {
     override val hasMainPage          = true
     override var lang                 = "tr"
     override val hasQuickSearch       = true
+    override val hasDownloadSupport   = true
     override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
 
-    override var sequentialMainPage = true
-    override var sequentialMainPageDelay       = 50L
-    override var sequentialMainPageScrollDelay = 50L
+
+    override var sequentialMainPage             = true
+    override var sequentialMainPageDelay        = 50L
+    override var sequentialMainPageScrollDelay  = 50L
 
     private val cloudflareKiller by lazy { CloudflareKiller() }
     
@@ -156,15 +136,17 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/load/page/1/home/"                                    to "Yeni Eklenen Filmler",
-        "${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
-        "${mainUrl}/load/page/1/home-series/"                             to "Yeni Eklenen Diziler",
-        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
-        "${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
-        "${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
-        "${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"          to "Aile Filmleri",
-        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"       to "Aksiyon Filmleri",
-        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"   to "Animasyon Filmleri",
+        "${mainUrl}/load/page/1/home/"                                         to "Yeni Filmler",
+        //"${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
+        "${mainUrl}/load/page/1/dil/turkce-dublajli-film-izleyin-3/"           to "Türkçe Dublaj Filmler",
+        "${mainUrl}/load/page/1/home-series/"                                  to "Yeni Diziler",
+        "${mainUrl}/load/page/1/recent-episodes/"                              to "Yeni Bölümler",
+        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"             to "Tavsiye Filmler",
+        //"${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
+        //"${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
+        //"${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"               to "Aile Filmleri",
+        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"            to "Aksiyon Filmleri",
+        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"        to "Animasyon Filmleri",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -219,7 +201,6 @@ class HDFilmCehennemi : MainAPI() {
             
             searchResults.add(
                 newMovieSearchResponse(data.newTitle, data.href, data.tvType) {
-                    // FIX: Replace thumbnail size paths with the root image directory (effectively removes the size indicator)
                     this.posterUrl = data.posterUrl
                         ?.replace("/list/", "/")
                         ?.replace("/thumb/", "/")
@@ -230,32 +211,27 @@ class HDFilmCehennemi : MainAPI() {
         return searchResults
     }
     
-    // START NEW DOWNLOAD LOGIC FUNCTIONS
-    
     private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
         val downloadUrl = "https://cehennempass.pw/download/$rapidrameId"
         
-        // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "low" to "Download SD", // Corresponds to Yüksek Kalite
-            "high" to "Download HD"   // Corresponds to Düşük Kalite
+            "low" to "Download SD",
+            "high" to "Download HD"
         )
 
         qualities.forEach { (qualityData, qualityName) ->
             val postUrl = "https://cehennempass.pw/process_quality_selection.php"
             
-            // Build the form data for the POST request
             val postBody = okhttp3.FormBody.Builder()
-                .add("video_id", rapidrameId) // videoId is the rapidrameId
-                .add("selected_quality", qualityData) // selectedQuality is "high" or "low"
+                .add("video_id", rapidrameId)
+                .add("selected_quality", qualityData)
                 .build()
             
-            // Make the POST request to get the final download link
             val response = app.post(
                 postUrl,
                 requestBody = postBody,
                 headers = standardHeaders,
-                referer = downloadUrl // Referer must be the download page URL for the API to work
+                referer = downloadUrl
             ).parsedSafe<DownloadResponse>()
 
             val finalLink = response?.download_link
@@ -267,18 +243,13 @@ class HDFilmCehennemi : MainAPI() {
                     source = name, 
                     name = qualityName,
                     url = finalLink
-                    ){
-                    this.quality = Qualities.Unknown.value
-                    this.referer = downloadUrl
-                    //this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                    //isCastingSupported = false
-                    }
+                ){
+                    quality = Qualities.Unknown.value
+                }
             )
         }
     }
     
-    // END NEW DOWNLOAD LOGIC FUNCTIONS
-
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val data = document.extractLoadData() ?: return null
@@ -360,7 +331,7 @@ class HDFilmCehennemi : MainAPI() {
             // 4. Custom Byte Shift Loop (JS: (charCode-(seed%(i+5))+256)%256)
             val sb = StringBuilder()
             for (i in finalBytes.indices) {
-                val charCode = finalBytes[i].toInt() and 0xFF // Unsigned conversion
+                val charCode = finalBytes[i].toInt() and 0xFF
                 val shift = seed % (i + 5)
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
@@ -414,9 +385,9 @@ class HDFilmCehennemi : MainAPI() {
                     name    = source,
                     url     = decryptedUrl
                 ){
-                    this.referer = referer // Use the passed referer
+                    this.referer = referer
                     this.quality = Qualities.Unknown.value
-                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    //this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 }
             )
         } catch (e: Exception) {
