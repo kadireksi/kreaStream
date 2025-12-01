@@ -247,8 +247,8 @@ class HDFC : MainAPI() {
         
         // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "low" to "zDownload SD", 
-            "high" to "zDownload HD"   
+            "low" to "Download SD", 
+            "high" to "Download HD"   
         )
 
         qualities.forEach { (qualityData, qualityName) ->
@@ -482,12 +482,6 @@ class HDFC : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        // --- 3. Handle Download Links ---
-        // Only run if we found a rapidrame ID
-        if (!rapidrameId.isNullOrEmpty()) {
-            extractDownloadLinks(rapidrameId, callback)
-        }
-
         // --- 2. Check Alternative Links (buttons below player) ---
         val rapidrameReferer = "$mainUrl/" // Use main URL as referer for alternative/external sources
         document.select("div.alternative-links").forEach { element ->
@@ -528,6 +522,13 @@ class HDFC : MainAPI() {
                 }
             }
         }
+
+        // --- 3. Handle Download Links ---
+        // Only run if we found a rapidrame ID
+        if (!rapidrameId.isNullOrEmpty()) {
+            extractDownloadLinks(rapidrameId, callback)
+        }
+        
         return true
     }
 
