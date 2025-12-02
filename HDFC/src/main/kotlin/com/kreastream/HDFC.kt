@@ -182,20 +182,7 @@ class HDFC : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         // Handle "Yeni Bölümler" which use the mini-poster format
         if (this.hasClass("mini-poster")) {
-            //val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
-            val seriesTitle = this.selectFirst(".mini-poster-title").text().trim()
-                .takeIf { it.isNotEmpty() }
-                .takeUnless {
-                    it?.contains("Seri Filmler", ignoreCase = true) == true
-                    || it?.contains("Japonya Filmleri", ignoreCase = true) == true
-                    || it?.contains("Kore Filmleri", ignoreCase = true) == true
-                    || it?.contains("Hint Filmleri", ignoreCase = true) == true
-                    || it?.contains("Türk Filmleri", ignoreCase = true) == true
-                    || it?.contains("DC Yapımları", ignoreCase = true) == true
-                    || it?.contains("Marvel Yapımları", ignoreCase = true) == true
-                    || it?.contains("Amazon Yapımları", ignoreCase = true) == true
-                    || it?.contains("1080p Film izle", ignoreCase = true) == true
-                } ?: return null
+            val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
 
             val href = fixUrlNull(this.attr("href")) ?: return null
             val episodeInfo = this.selectFirst(".mini-poster-episode-info")?.text()?.trim() ?: ""
