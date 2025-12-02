@@ -267,8 +267,8 @@ class TurkTV : MainAPI() {
                             name = "Direkt",
                             url = url
                             ){
-                            this.data = data,
-                            this.quality = Qualities.Unknown.value,
+                            //this.data = data
+                            this.quality = Qualities.Unknown.value
                             //this.isM3u8 = url.contains(".m3u8")
                             }
                     )
