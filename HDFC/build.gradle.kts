@@ -1,4 +1,4 @@
-version = 1
+version = 251202
 cloudstream {
     authors     = listOf("kreastream")
     language    = "tr"
