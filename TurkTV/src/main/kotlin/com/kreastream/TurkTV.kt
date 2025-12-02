@@ -55,19 +55,19 @@ class TurkTV : MainAPI() {
 
     override val mainPage = mainPageOf(
         "trt_series" to "TRT - Güncel Diziler",
-        "trt_archive_series" to "TRT - Arşiv Diziler",
-        "trt_programs" to "TRT - Programlar",
-        "trt_archive_programs" to "TRT - Arşiv Programlar",
-        
-        "atv_current" to "ATV - Güncel Diziler",
-        "atv_archive" to "ATV - Arşiv Diziler",
-        "kanald_current" to "Kanal D - Güncel Diziler",
-        "kanald_archive" to "Kanal D - Arşiv Diziler",
         "show_current" to "Show TV - Diziler",
         "star_current" to "Star TV - Güncel Diziler",
-        "star_archive" to "Star TV - Arşiv Diziler",
+        "atv_current" to "ATV - Güncel Diziler",
         "now_current" to "NOW - Güncel Diziler",
+        "kanald_current" to "Kanal D - Güncel Diziler",
+ 
+        "trt_archive_series" to "TRT - Arşiv Diziler",
+        "atv_archive" to "ATV - Arşiv Diziler",
+        "kanald_archive" to "Kanal D - Arşiv Diziler",
+        "star_archive" to "Star TV - Arşiv Diziler",
         "now_archive" to "NOW - Arşiv Diziler",
+        "trt_programs" to "TRT - Programlar",
+        "trt_archive_programs" to "TRT - Arşiv Programlar", 
 
         "live_tv" to "TRT Canlı TV",
         "live_radio" to "TRT Canlı Radyo",
