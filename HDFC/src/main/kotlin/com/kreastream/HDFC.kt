@@ -504,7 +504,7 @@ class HDFC : MainAPI() {
                             else -> track.attr("srclang")
                         }
                         val subUrl = track.attr("src").let { if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/") }
-                        subtitleCallback(SubtitleFile(lang, subUrl))
+                        subtitleCallback(newSubtitleFile(lang, subUrl))
                     }
                 } catch (e: Exception) { 
                     Log.e("HDFC", "Sub extraction error for default source", e) 
