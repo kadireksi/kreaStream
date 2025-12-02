@@ -19,6 +19,7 @@ class TurkTV : MainAPI() {
     
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
+    private val showTvUrl = "https://www.showtv.com.tr"
     private val liveBase = "$tabiiUrl/watch/live"
     private val dummyTvUrl = tabiiUrl
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
@@ -38,7 +39,7 @@ class TurkTV : MainAPI() {
             "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=0F2E3SdO1jy-8fTaE7rqXQ&e=1764664587&ppid=21d804be91b8e91f11bb3789ff83f0b4&gdpr=0"),
         Channel("kanald", "Kanal D", "https://www.kanald.com.tr", "/diziler/tum-diziler", "/diziler/arsiv-diziler",
             "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3&ppid=c1bfdca3b54034e7be9660071f17d132"),
-        Channel("show", "Show TV", "https://www.showtv.com.tr", "/diziler/yayinda", "/diziler/arsiv",
+        Channel("show", "Show TV", showTvUrl, "/diziler", null,
             "https://showtv-live.ercdn.net/showtv/showtv.m3u8"),
         Channel("star", "Star TV", "https://www.startv.com.tr", "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler",
             "https://startv-live.ercdn.net/startv/startv.m3u8"),
@@ -62,8 +63,7 @@ class TurkTV : MainAPI() {
         "atv_archive" to "ATV - Arşiv Diziler",
         "kanald_current" to "Kanal D - Güncel Diziler",
         "kanald_archive" to "Kanal D - Arşiv Diziler",
-        "show_current" to "Show TV - Güncel Diziler",
-        "show_archive" to "Show TV - Arşiv Diziler",
+        "show_current" to "Show TV - Diziler",
         "star_current" to "Star TV - Güncel Diziler",
         "star_archive" to "Star TV - Arşiv Diziler",
         "now_current" to "NOW - Güncel Diziler",
@@ -261,35 +261,155 @@ class TurkTV : MainAPI() {
 
     private fun fixTrtUrl(url: String): String = if (url.startsWith("http")) url else "$trt1Url$url"
 
-    // === Other Channel Functions ===
-    private suspend fun getChannelSeries(channel: Channel, isArchive: Boolean, page: Int = 1): List<SearchResponse> {
+    // === Show TV Specific Functions ===
+    private suspend fun getShowTvSeries(page: Int = 1): List<SearchResponse> {
         return try {
-            val path = if (isArchive) channel.archivePath ?: channel.currentPath else channel.currentPath
-            val url = if (page == 1) channel.baseUrl + path else "${channel.baseUrl}$path?page=$page"
+            val url = if (page == 1) "$showTvUrl/diziler" else "$showTvUrl/diziler?page=$page"
             
             val doc = app.get(url, timeout = 15).document
             
-            val items = doc.select("a[href*='/dizi/'], .series-card a, .card a, article a").mapNotNull { el ->
-                var href = el.attr("href")
-                if (href.startsWith("/")) href = channel.baseUrl + href
+            val items = doc.select("ul.grid li div[data-name='box-type6']").mapNotNull { item ->
+                val a = item.selectFirst("a.group")
+                val title = a?.attr("title") ?: return@mapNotNull null
+                val href = a.attr("href")
+                if (href.isBlank() || !href.contains("/dizi/tanitim/")) return@mapNotNull null
                 
-                // Filter for series only
-                if (!href.contains("/dizi/") && !href.contains("/program/")) return@mapNotNull null
+                val poster = item.selectFirst("img")?.attr("src")?.let {
+                    if (it.startsWith("http")) it else showTvUrl + it
+                }
                 
-                val title = el.attr("title").takeIf { it.isNotBlank() }
-                    ?: el.selectFirst("h3, h2, .title, .name, img")?.attr("alt")
-                    ?: el.text().takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                
-                val poster = el.selectFirst("img")?.attr("data-src") 
-                    ?: el.selectFirst("img")?.attr("src")
-                    ?.let { if (it.startsWith("http")) it else channel.baseUrl + it }
-                
-                newTvSeriesSearchResponse(title.trim(), href, TvType.TvSeries) {
+                newTvSeriesSearchResponse(title.trim(), showTvUrl + href, TvType.TvSeries) {
                     this.posterUrl = poster
                 }
             }
             
             items
+        } catch (e: Exception) {
+            Log.e("TurkTV", "Error loading Show TV series: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private suspend fun getShowTvEpisodes(seriesUrl: String): List<Episode> {
+        return try {
+            val doc = app.get(seriesUrl, timeout = 15).document
+            
+            // Extract episodes from the select dropdown
+            val select = doc.selectFirst("select#seasonWithJs")
+            if (select != null) {
+                return select.select("option[data-href]").mapNotNull { option ->
+                    val href = option.attr("data-href")
+                    if (href.isBlank()) return@mapNotNull null
+                    
+                    val title = option.text().trim()
+                    val seasonId = option.attr("data-season-id").toIntOrNull() ?: 1
+                    val episodeNum = extractEpisodeNumber(title) ?: 0
+                    
+                    newEpisode(showTvUrl + href) {
+                        name = title
+                        season = seasonId
+                        episode = episodeNum
+                    }
+                }.reversed() // Reverse to show episodes in chronological order
+            }
+            
+            // Fallback: try to find episode links in the page
+            val fallbackEpisodes = doc.select("a[href*='/dizi/tum_bolumler/']").mapNotNull { a ->
+                val href = a.attr("href")
+                if (href.isBlank()) return@mapNotNull null
+                
+                val title = a.text().trim().ifBlank { "Bölüm" }
+                val episodeNum = extractEpisodeNumber(title) ?: 0
+                
+                newEpisode(showTvUrl + href) {
+                    name = title
+                    episode = episodeNum
+                    season = 1
+                }
+            }
+            
+            fallbackEpisodes
+        } catch (e: Exception) {
+            Log.e("TurkTV", "Error loading Show TV episodes: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun extractShowTvM3u8(jsonStr: String): String? {
+        return try {
+            // Clean the JSON string
+            var cleanJson = jsonStr.trim()
+            if (cleanJson.startsWith("data-hope-video='")) {
+                cleanJson = cleanJson.removePrefix("data-hope-video='").removeSuffix("'")
+            }
+            
+            // Parse JSON
+            val json = JSONObject(cleanJson)
+            val media = json.getJSONObject("media")
+            
+            // Try to get M3U8 URLs first (better quality)
+            if (media.has("m3u8")) {
+                val m3u8Array = media.getJSONArray("m3u8")
+                if (m3u8Array.length() > 0) {
+                    val m3u8 = m3u8Array.getJSONObject(0)
+                    return m3u8.getString("src")
+                }
+            }
+            
+            // Fallback to MP4
+            if (media.has("mp4")) {
+                val mp4Array = media.getJSONArray("mp4")
+                // Get the highest quality (last one in array)
+                if (mp4Array.length() > 0) {
+                    val highestQuality = mp4Array.getJSONObject(mp4Array.length() - 1)
+                    return highestQuality.getString("src")
+                }
+            }
+            
+            null
+        } catch (e: Exception) {
+            Log.e("TurkTV", "Error parsing Show TV video JSON: ${e.message}")
+            
+            // Fallback regex extraction
+            Regex("""["']src["']\s*:\s*["']([^"']+\.(?:m3u8|mp4)[^"']*)["']""", RegexOption.IGNORE_CASE)
+                .find(jsonStr)?.groupValues?.get(1)
+        }
+    }
+
+    // === Other Channel Functions ===
+    private suspend fun getChannelSeries(channel: Channel, isArchive: Boolean, page: Int = 1): List<SearchResponse> {
+        return try {
+            when (channel.key) {
+                "show" -> getShowTvSeries(page)
+                else -> {
+                    val path = if (isArchive) channel.archivePath ?: channel.currentPath else channel.currentPath
+                    val url = if (page == 1) channel.baseUrl + path else "${channel.baseUrl}$path?page=$page"
+                    
+                    val doc = app.get(url, timeout = 15).document
+                    
+                    val items = doc.select("a[href*='/dizi/'], .series-card a, .card a, article a").mapNotNull { el ->
+                        var href = el.attr("href")
+                        if (href.startsWith("/")) href = channel.baseUrl + href
+                        
+                        // Filter for series only
+                        if (!href.contains("/dizi/") && !href.contains("/program/")) return@mapNotNull null
+                        
+                        val title = el.attr("title").takeIf { it.isNotBlank() }
+                            ?: el.selectFirst("h3, h2, .title, .name, img")?.attr("alt")
+                            ?: el.text().takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                        
+                        val poster = el.selectFirst("img")?.attr("data-src") 
+                            ?: el.selectFirst("img")?.attr("src")
+                            ?.let { if (it.startsWith("http")) it else channel.baseUrl + it }
+                        
+                        newTvSeriesSearchResponse(title.trim(), href, TvType.TvSeries) {
+                            this.posterUrl = poster
+                        }
+                    }
+                    
+                    items
+                }
+            }
         } catch (e: Exception) {
             Log.e("TurkTV", "Error loading ${channel.displayName} series: ${e.message}")
             emptyList()
@@ -336,8 +456,7 @@ class TurkTV : MainAPI() {
             "atv_archive" -> getChannelSeries(channels[0], isArchive = true, page = page)
             "kanald_current" -> getChannelSeries(channels[1], isArchive = false, page = page)
             "kanald_archive" -> getChannelSeries(channels[1], isArchive = true, page = page)
-            "show_current" -> getChannelSeries(channels[2], isArchive = false, page = page)
-            "show_archive" -> getChannelSeries(channels[2], isArchive = true, page = page)
+            "show_current" -> getShowTvSeries(page)
             "star_current" -> getChannelSeries(channels[3], isArchive = false, page = page)
             "star_archive" -> getChannelSeries(channels[3], isArchive = true, page = page)
             "now_current" -> getChannelSeries(channels[4], isArchive = false, page = page)
@@ -361,6 +480,9 @@ class TurkTV : MainAPI() {
                     items.isNotEmpty()
                 }
             }
+            request.data == "show_current" -> {
+                items.isNotEmpty()
+            }
             request.data.endsWith("_current") || request.data.endsWith("_archive") -> {
                 items.isNotEmpty()
             }
@@ -383,6 +505,31 @@ class TurkTV : MainAPI() {
                 data = url
             ) {
                 this.posterUrl = "https://www.trt.net.tr/logos/our-logos/corporate/trt.png"
+            }
+        }
+
+        // Handle Show TV content
+        if (url.contains(showTvUrl) && url.contains("/dizi/tanitim/")) {
+            try {
+                val doc = app.get(url, timeout = 15).document
+                
+                val title = doc.selectFirst("h1")?.text()?.trim()
+                    ?: doc.selectFirst("meta[property='og:title']")?.attr("content")
+                    ?: throw ErrorLoadingException("Başlık bulunamadı")
+                
+                val plot = doc.selectFirst("meta[name=description]")?.attr("content") ?: ""
+                val poster = doc.selectFirst("meta[property='og:image']")?.attr("content")
+                    ?: doc.selectFirst("img[src*='.jpg'], img[src*='.jpeg'], img[src*='.png']")?.attr("src")
+                    ?.let { if (it.startsWith("http")) it else showTvUrl + it }
+                
+                val episodes = getShowTvEpisodes(url)
+                
+                return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                    this.posterUrl = poster
+                    this.plot = plot
+                }
+            } catch (e: Exception) {
+                throw ErrorLoadingException("Show TV dizisi yüklenemedi: ${e.message}")
             }
         }
 
@@ -570,6 +717,77 @@ class TurkTV : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Handle Show TV episode URLs
+        if (data.contains(showTvUrl) && data.contains("/dizi/tum_bolumler/")) {
+            try {
+                val doc = app.get(data, timeout = 10).document
+                
+                // Look for the hope-video element
+                val hopeVideoDiv = doc.selectFirst("div.hope-video[data-hope-video]")
+                if (hopeVideoDiv != null) {
+                    val videoJson = hopeVideoDiv.attr("data-hope-video")
+                    val streamUrl = extractShowTvM3u8(videoJson)
+                    
+                    if (streamUrl != null) {
+                        // Try to extract subtitles
+                        try {
+                            val subtitleMatch = Regex("""["']subtitles["']\s*:\s*\[([^\]]+)\]""").find(videoJson)
+                            subtitleMatch?.let {
+                                val subtitlesStr = it.groupValues[1]
+                                val subtitleRegex = Regex("""["']src["']\s*:\s*["']([^"']+\.vtt[^"']*)["']""")
+                                subtitleRegex.findAll(subtitlesStr).forEach { match ->
+                                    val subtitleUrl = match.groupValues[1]
+                                    subtitleCallback.invoke(SubtitleFile("Türkçe", subtitleUrl))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e("TurkTV", "Error extracting subtitles: ${e.message}")
+                        }
+                        
+                        if (streamUrl.contains(".m3u8")) {
+                            M3u8Helper.generateM3u8(
+                                source = name,
+                                streamUrl = streamUrl,
+                                referer = showTvUrl,
+                                headers = mapOf(
+                                    "User-Agent" to "Mozilla/5.0",
+                                    "Referer" to showTvUrl,
+                                    "Origin" to showTvUrl
+                                )
+                            ).forEach(callback)
+                        } else {
+                            // MP4 stream
+                            callback(newExtractorLink(
+                                source = name,
+                                name = "Show TV",
+                                url = streamUrl
+                            ) {
+                                this.referer = showTvUrl
+                                this.quality = if (streamUrl.contains("360")) Qualities.P360.value
+                                    else if (streamUrl.contains("480")) Qualities.P480.value
+                                    else if (streamUrl.contains("720")) Qualities.P720.value
+                                    else if (streamUrl.contains("1080")) Qualities.P1080.value
+                                    else Qualities.P240.value
+                            })
+                        }
+                        return true
+                    }
+                }
+                
+                // Fallback: try to find iframe
+                val iframe = doc.selectFirst("iframe[src*='player']")
+                if (iframe != null) {
+                    val src = iframe.attr("src")
+                    if (src.isNotBlank()) {
+                        return loadExtractor(if (src.startsWith("http")) src else "https:$src", data, subtitleCallback, callback)
+                    }
+                }
+                
+            } catch (e: Exception) {
+                Log.e("TurkTV", "Error loading Show TV links: ${e.message}")
+            }
+        }
+        
         // Handle direct stream URLs
         if (data.contains(".m3u8", ignoreCase = true)) {
             M3u8Helper.generateM3u8(
@@ -596,7 +814,7 @@ class TurkTV : MainAPI() {
             return loadExtractor(data, "", subtitleCallback, callback)
         }
 
-        // Try to extract from page
+        // Try to extract from page (for other channels)
         try {
             val doc = app.get(data, timeout = 10).document
             
@@ -701,8 +919,29 @@ class TurkTV : MainAPI() {
                 }
         } catch (_: Exception) {}
 
+        // Search Show TV content
+        try {
+            val searchUrl = "$showTvUrl/arama?q=$query"
+            val doc = app.get(searchUrl, timeout = 10).document
+            
+            // Look for series in search results
+            doc.select("a[href*='/dizi/tanitim/']").forEach { el ->
+                val href = el.attr("href")
+                val title = el.attr("title").takeIf { it.isNotBlank() }
+                    ?: el.selectFirst("h3, .title")?.text()
+                    ?: return@forEach
+                
+                val poster = el.selectFirst("img")?.attr("src")
+                    ?.let { if (it.startsWith("http")) it else showTvUrl + it }
+                
+                out += newTvSeriesSearchResponse(title.trim(), showTvUrl + href, TvType.TvSeries) {
+                    this.posterUrl = poster
+                }
+            }
+        } catch (_: Exception) {}
+
         // Search other channel content
-        for (channel in channels.filterNot { it.isTrt }) {
+        for (channel in channels.filterNot { it.isTrt && it.key != "show" }) {
             try {
                 val searchUrl = "${channel.baseUrl}/search?q=${query}"
                 val doc = app.get(searchUrl, timeout = 10).document
