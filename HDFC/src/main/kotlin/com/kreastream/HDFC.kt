@@ -17,9 +17,9 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import kotlin.text.Charsets
 
-class HDFC : MainAPI() {
+class HDFilmCehennemi : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
-    override var name                 = "HDFC"
+    override var name                 = "HDFilmCehennemi"
     override val hasMainPage          = true
     override var lang                 = "tr"
     override val hasQuickSearch       = true
@@ -140,14 +140,16 @@ class HDFC : MainAPI() {
 
     // START: Main Page Tidy Up and Pagination Support
     override val mainPage = mainPageOf(
-        "${mainUrl}/load/page/1/home/"                                       to "Yeni Filmler",
-        "${mainUrl}/load/page/1/languages/turkce-dublajli-film-izleyin-3/"   to "Türkçe Dublaj Filmler",
-        "${mainUrl}/load/page/1/countries/turkiye-2/"                        to "Türk Filmleri",
-        "${mainUrl}/load/page/1/recent-episodes/"                            to "Yeni Bölümler",
-        "${mainUrl}/load/page/1/home-series/"                                to "Yeni Diziler",
-        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"           to "Tavsiye Filmler",
-        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"          to "Aksiyon Filmleri",
-        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"      to "Animasyon Filmleri",
+        "${mainUrl}/load/page/1/home/"                                    to "Yeni Eklenen Filmler",
+        "${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
+        "${mainUrl}/load/page/1/home-series/"                             to "Yeni Eklenen Diziler", // 'Yeni Diziler'
+        "${mainUrl}/load/page/1/recent-episodes/"                         to "Yeni Bölümler", // Pagination supported for episodes
+        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
+        "${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
+        "${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
+        "${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"          to "Aile Filmleri",
+        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"       to "Aksiyon Filmleri",
+        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"   to "Animasyon Filmleri",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -156,8 +158,6 @@ class HDFC : MainAPI() {
                 .replace("/load/page/1/genres/","/tur/")
                 .replace("/load/page/1/categories/","/category/")
                 .replace("/load/page/1/imdb7/","/imdb-7-puan-uzeri-filmler/")
-                .replace("/load/page/1/languages/","/dil/")
-                .replace("/load/page/1/countries/","/ulke/")
         } else {
             request.data.replace("/page/1/", "/page/${page}/")
         }
@@ -273,9 +273,8 @@ class HDFC : MainAPI() {
                     name = qualityName,
                     url = finalLink
                 ) {
-                    this.headers = mapOf("Referer" to "${mainUrl}/", "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Norton/124.0.0.0")
                     this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.VIDEO 
+                    this.type = ExtractorLinkType.VIDEO
                 }
             )
         }
@@ -335,46 +334,53 @@ class HDFC : MainAPI() {
             }
         }
     }
-
-    private fun rot13(input: String): String {
-        val result = StringBuilder()
-        for (char in input) {
-            if (char in 'a'..'z') {
-                result.append(((char.code - 'a'.code + 13) % 26 + 'a'.code).toChar())
-            } else if (char in 'A'..'Z') {
-                result.append(((char.code - 'A'.code + 13) % 26 + 'A'.code).toChar())
-            } else {
-                result.append(char)
-            }
-        }
-        return result.toString()
-    }
+    
+    // REMOVED old rot13(String) helper as it's no longer used in the new sequence.
 
     private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
         try {
-            // 1. ROT13 (K=K.4V(/[a-4S-Z]/g, ...))
-            val rot13edString = rot13(encryptedData)
+            // New sequence derived from latest unpacked JS: 
+            // 1. Reverse -> 2. Base64 Decode -> 3. ROT13 on Bytes -> 4. Custom Shift
 
-            // 2. Base64 Decode (K=3D(K) -> K=atob(K))
-            val decodedBytes = Base64.decode(rot13edString, Base64.DEFAULT)
+            // 1. Reverse the input string
+            val reversedString = encryptedData.reversed()
             
-            // 3. Reverse (K=K.1p('').4n().3k('') -> K.split('').reverse().join(''))
-            // Apply reversal to the decoded byte array.
-            val reversedBytes = decodedBytes.reversedArray()
+            // 2. Base64 Decode. This is the new Base64 input.
+            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
+            
+            // 3. ROT13 on the decoded byte array (treating bytes as characters)
+            val rot13edBytes = ByteArray(decodedBytes.size)
+            for (i in decodedBytes.indices) {
+                val charCode = decodedBytes[i].toInt()
+                val char = charCode.toChar()
+                if (char in 'a'..'z') {
+                    // +13 shift for lowercase
+                    rot13edBytes[i] = (((charCode - 'a'.code + 13) % 26 + 'a'.code).toChar()).code.toByte()
+                } else if (char in 'A'..'Z') {
+                    // +13 shift for uppercase
+                    rot13edBytes[i] = (((charCode - 'A'.code + 13) % 26 + 'A'.code).toChar()).code.toByte()
+                } else {
+                    // Keep non-alphabetic characters as is
+                    rot13edBytes[i] = decodedBytes[i]
+                }
+            }
             
             // 4. Custom Byte Shift Loop
             val sb = StringBuilder()
-            for (i in reversedBytes.indices) {
-                val charCode = reversedBytes[i].toInt() and 0xFF // Unsigned conversion
+            for (i in rot13edBytes.indices) {
+                val charCode = rot13edBytes[i].toInt() and 0xFF // Unsigned conversion
                 val shift = seed % (i + 5)
-                // JS: (charCode-(4z%(i+5))+2M)%2M -> (charCode - (seed % (i+5)) + 256) % 256
+                // JS: (charCode - (seed % (i+5)) + 256) % 256
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
             }
 
             return sb.toString()
+        } catch (e: IllegalArgumentException) {
+            Log.e("HDFC", "Decryption failed, Bad Base64 input or padding issue.")
+            return ""
         } catch (e: Exception) {
-            Log.e("HDFC", "Decryption failed", e)
+            Log.e("HDFC", "Decryption failed: ${e.message}", e)
             return ""
         }
     }
@@ -523,7 +529,7 @@ class HDFC : MainAPI() {
         if (!rapidrameId.isNullOrEmpty()) {
             extractDownloadLinks(rapidrameId, callback)
         }
-        
+
         return true
     }
 
