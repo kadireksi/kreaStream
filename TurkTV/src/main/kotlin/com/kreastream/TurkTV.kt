@@ -50,10 +50,6 @@ class TurkTV : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "live_tv" to "TRT Canlı TV",
-        "live_radio" to "TRT Canlı Radyo",
-        "other_live" to "Diğer TV Kanalları",
-        
         "trt_series" to "TRT - Güncel Diziler",
         "trt_archive_series" to "TRT - Arşiv Diziler",
         "trt_programs" to "TRT - Programlar",
@@ -67,7 +63,11 @@ class TurkTV : MainAPI() {
         "star_current" to "Star TV - Güncel Diziler",
         "star_archive" to "Star TV - Arşiv Diziler",
         "now_current" to "NOW - Güncel Diziler",
-        "now_archive" to "NOW - Arşiv Diziler"
+        "now_archive" to "NOW - Arşiv Diziler",
+
+        "live_tv" to "TRT Canlı TV",
+        "live_radio" to "TRT Canlı Radyo",
+        "other_live" to "Diğer TV Kanalları"
     )
 
     // === TRT Data Structures ===
@@ -420,7 +420,7 @@ class TurkTV : MainAPI() {
             
             null
         } catch (e: Exception) {
-            Log.e("TurkTV", "Error parsing Show TV video JSON: ${e.message}")
+            Log.e("Show TV", "Error parsing Show TV video JSON: ${e.message}")
             
             // Fallback regex extraction
             Regex("""["']src["']\s*:\s*["']([^"']+\.(?:m3u8|mp4)[^"']*)["']""", RegexOption.IGNORE_CASE)
@@ -531,7 +531,7 @@ class TurkTV : MainAPI() {
                 
                 liveItems
             }
-            
+
             else -> emptyList()
         }
 
@@ -825,7 +825,7 @@ class TurkTV : MainAPI() {
                         
                         if (streamUrl.contains(".m3u8")) {
                             M3u8Helper.generateM3u8(
-                                source = name,
+                                source = "Show TV",
                                 streamUrl = streamUrl,
                                 referer = showTvUrl,
                                 headers = mapOf(
@@ -837,7 +837,7 @@ class TurkTV : MainAPI() {
                         } else {
                             // MP4 stream
                             callback(newExtractorLink(
-                                source = name,
+                                source = "Show TV",
                                 name = "Show TV",
                                 url = streamUrl
                             ) {
@@ -846,7 +846,7 @@ class TurkTV : MainAPI() {
                                     else if (streamUrl.contains("720")) Qualities.P720.value
                                     else if (streamUrl.contains("480")) Qualities.P480.value
                                     else if (streamUrl.contains("360")) Qualities.P360.value
-                                    else Qualities.P240.value
+                                    else Qualities.Unknown.value
                             })
                         }
                         return true
