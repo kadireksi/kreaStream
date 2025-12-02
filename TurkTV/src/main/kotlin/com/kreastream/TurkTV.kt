@@ -828,11 +828,12 @@ class TurkTV : MainAPI() {
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.e("TurkTV", "Error extracting subtitles: ${e.message}")
+                            Log.e("Show TV", "Error extracting subtitles: ${e.message}")
                         }
                         
                         if (streamUrl.contains(".m3u8")) {
                             M3u8Helper.generateM3u8(
+                                name = "Show TV",
                                 source = "Show TV",
                                 streamUrl = streamUrl,
                                 referer = showTvUrl,
@@ -878,6 +879,7 @@ class TurkTV : MainAPI() {
         // Handle direct stream URLs (including live streams)
         if (data.contains(".m3u8", ignoreCase = true)) {
             M3u8Helper.generateM3u8(
+                name = name,
                 source = name,
                 streamUrl = data,
                 referer = when {
@@ -917,6 +919,7 @@ class TurkTV : MainAPI() {
                     val m3u8Url = extractM3u8FromJson(scriptContent)
                     if (m3u8Url != null) {
                         M3u8Helper.generateM3u8(
+                            name = name,
                             source = name,
                             streamUrl = m3u8Url,
                             referer = data,
@@ -943,6 +946,7 @@ class TurkTV : MainAPI() {
                 if (m != null) {
                     val found = m.value
                     M3u8Helper.generateM3u8(
+                        name = name,
                         source = name,
                         streamUrl = found,
                         referer = data,
