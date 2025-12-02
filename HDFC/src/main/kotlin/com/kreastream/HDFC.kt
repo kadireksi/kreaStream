@@ -140,16 +140,14 @@ class HDFC : MainAPI() {
 
     // START: Main Page Tidy Up and Pagination Support
     override val mainPage = mainPageOf(
-        "${mainUrl}/load/page/1/home/"                                    to "Yeni Eklenen Filmler",
-        "${mainUrl}/load/page/1/categories/nette-ilk-filmler/"            to "Nette İlk Filmler",
-        "${mainUrl}/load/page/1/home-series/"                             to "Yeni Eklenen Diziler", // 'Yeni Diziler'
-        "${mainUrl}/load/page/1/recent-episodes/"                         to "Yeni Bölümler", // Pagination supported for episodes
-        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"        to "Tavsiye Filmler",
-        "${mainUrl}/load/page/1/imdb7/"                                   to "IMDB 7+ Filmler",
-        "${mainUrl}/load/page/1/mostLiked/"                               to "En Çok Beğenilenler",
-        "${mainUrl}/load/page/1/genres/aile-filmleri-izleyin-6/"          to "Aile Filmleri",
-        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"       to "Aksiyon Filmleri",
-        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"   to "Animasyon Filmleri",
+        "${mainUrl}/load/page/1/home/"                                      to "Yeni Filmler",
+        "${mainUrl}/load/page/1/languages/turkce-dublajli-film-izleyin-3/"   to "Türkçe Dublaj Filmler",
+        "${mainUrl}/load/page/1/countries/turkiye-2/"                        to "Türk Filmleri",
+        "${mainUrl}/load/page/1/recent-episodes/"                            to "Yeni Bölümler",
+        "${mainUrl}/load/page/1/home-series/"                                to "Yeni Diziler",
+        "${mainUrl}/load/page/1/categories/tavsiye-filmler-izle2/"           to "Tavsiye Filmler",
+        "${mainUrl}/load/page/1/genres/aksiyon-filmleri-izleyin-5/"          to "Aksiyon Filmleri",
+        "${mainUrl}/load/page/1/genres/animasyon-filmlerini-izleyin-5/"      to "Animasyon Filmleri",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -158,6 +156,8 @@ class HDFC : MainAPI() {
                 .replace("/load/page/1/genres/","/tur/")
                 .replace("/load/page/1/categories/","/category/")
                 .replace("/load/page/1/imdb7/","/imdb-7-puan-uzeri-filmler/")
+                .replace("/load/page/1/languages/","/dil/")
+                .replace("/load/page/1/countries/","/ulke/")
         } else {
             request.data.replace("/page/1/", "/page/${page}/")
         }
@@ -182,7 +182,21 @@ class HDFC : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         // Handle "Yeni Bölümler" which use the mini-poster format
         if (this.hasClass("mini-poster")) {
-            val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
+            //val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
+            val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim()
+                .takeIf { it.isNotEmpty() }
+                .takeUnless {
+                    it?.contains("Seri Filmler", ignoreCase = true) == true
+                    || it?.contains("Japonya Filmleri", ignoreCase = true) == true
+                    || it?.contains("Kore Filmleri", ignoreCase = true) == true
+                    || it?.contains("Hint Filmleri", ignoreCase = true) == true
+                    || it?.contains("Türk Filmleri", ignoreCase = true) == true
+                    || it?.contains("DC Yapımları", ignoreCase = true) == true
+                    || it?.contains("Marvel Yapımları", ignoreCase = true) == true
+                    || it?.contains("Amazon Yapımları", ignoreCase = true) == true
+                    || it?.contains("1080p Film izle", ignoreCase = true) == true
+                } ?: return null
+
             val href = fixUrlNull(this.attr("href")) ?: return null
             val episodeInfo = this.selectFirst(".mini-poster-episode-info")?.text()?.trim() ?: ""
             val posterUrl = fixUrlNull(this.selectFirst("img[data-src], img[src]")?.attr("data-src")
@@ -242,8 +256,8 @@ class HDFC : MainAPI() {
         
         // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "high" to "Download HD", 
-            "low" to "Download SD"   
+            "low" to "Download SD", 
+            "high" to "Download HD"   
         )
 
         qualities.forEach { (qualityData, qualityName) ->
