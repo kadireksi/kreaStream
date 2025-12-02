@@ -99,35 +99,6 @@ class TurkTV : MainAPI() {
         val extractedNum: Int?
     )
 
-    // === Updated Universal Turkish DaionCDN Parser ===
-    private suspend fun getAllDaionStreams(): Map<String, String> {
-        val channels = mapOf(
-            "ATV" to ("https://www.atv.com.tr/canli-yayin" to "atv" to "trkvz"),
-            "A2" to ("https://www.atv.com.tr/a2tv/canli-yayin" to "a2" to "trkvz"),
-            "Star TV" to ("https://www.startv.com.tr/canli-yayin" to "startv" to "dogus"),
-            "Kanal D" to ("https://www.kanald.com.tr/canli-yayin" to "kanald" to "dogus"),
-            "TV4" to ("https://www.tv4.com.tr/canli-yayin" to "tv4" to "dogus"),
-            "TV360" to ("https://www.tv360.com.tr/canli-yayin" to "tv360" to "dogus"),
-            "Teve2" to ("https://www.teve2.com.tr/canli-yayin" to "teve2" to "dogus")
-        )
-
-        val allStreams = mutableMapOf<String, String>()
-        channels.forEach { (name, triple) ->
-            val (url, slug, subdomain) = triple
-            try {
-                val html = app.get(url).text
-                val stream = Regex("""(https?://$subdomain\.daioncdn\.net/$slug/$slug\.m3u8\?[^"'\s]*)""")
-                    .find(html)?.groupValues?.get(1)
-                    ?: Regex("""streamUrl["']?\s*:\s*["'](https?[^"']+\.m3u8)""").find(html)?.groupValues?.get(1)
-                    ?: "https://$subdomain.daioncdn.net/$slug/$slug.m3u8"
-                allStreams[name] = stream
-            } catch (e: Exception) {
-                allStreams[name] = "https://$subdomain.daioncdn.net/$slug/$slug.m3u8"
-            }
-        }
-        return allStreams
-}
-
     // === ATV Live Stream Functions ===
     private suspend fun getAtvLiveStream(): String? {
         return try {
