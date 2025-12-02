@@ -183,7 +183,7 @@ class HDFC : MainAPI() {
         // Handle "Yeni Bölümler" which use the mini-poster format
         if (this.hasClass("mini-poster")) {
             //val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
-            val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim()
+            val seriesTitle = this.selectFirst(".mini-poster-title").text().trim()
                 .takeIf { it.isNotEmpty() }
                 .takeUnless {
                     it?.contains("Seri Filmler", ignoreCase = true) == true
