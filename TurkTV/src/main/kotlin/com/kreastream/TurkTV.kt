@@ -1,3 +1,4 @@
+// TurkTV.kt - Enhanced Turkish TV Plugin with Full TRT Support
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
@@ -19,11 +20,6 @@ class TurkTV : MainAPI() {
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
     private val showTvUrl = "https://www.showtv.com.tr"
-    private val showTurkUrl = "https://www.showturk.com.tr"
-    private val atvUrl = "https://www.atv.com.tr"
-    private val kanaldUrl = "https://www.kanald.com.tr"
-    private val starTvUrl = "https://www.startv.com.tr"
-    private val nowTvUrl = "https://www.nowtv.com.tr"
     private val liveBase = "$tabiiUrl/watch/live"
     private val dummyTvUrl = tabiiUrl
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
@@ -39,19 +35,17 @@ class TurkTV : MainAPI() {
     )
 
     private val channels = listOf(
-        Channel("atv", "ATV", atvUrl, "/diziler", "/eski-diziler",
+        Channel("atv", "ATV", "https://www.atv.com.tr", "/diziler", "/eski-diziler",
             "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=0F2E3SdO1jy-8fTaE7rqXQ&e=1764664587&ppid=21d804be91b8e91f11bb3789ff83f0b4&gdpr=0"),
-        Channel("kanald", "Kanal D", kanaldUrl, "/diziler/tum-diziler", "/diziler/arsiv-diziler",
+        Channel("kanald", "Kanal D", "https://www.kanald.com.tr", "/diziler/tum-diziler", "/diziler/arsiv-diziler",
             "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3&ppid=c1bfdca3b54034e7be9660071f17d132"),
         Channel("show", "Show TV", showTvUrl, "/diziler", null,
-            null), // Will be fetched dynamically   
-        Channel("showturk", "Show Türk", showTurkUrl, "/diziler", null,
             null), // Will be fetched dynamically
-        Channel("star", "Star TV", starTvUrl, "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler",
+        Channel("star", "Star TV", "https://www.startv.com.tr", "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler",
             "https://startv-live.ercdn.net/startv/startv.m3u8"),
-        Channel("now", "NOW (Fox)", nowTvUrl, "/diziler/yayinda", "/diziler/arsiv",
+        Channel("now", "NOW (Fox)", "https://www.nowtv.com.tr", "/diziler/yayinda", "/diziler/arsiv",
             "https://nowtv-live.ercdn.net/nowtv/nowtv.m3u8"),
-        Channel("trt1", "TRT 1", trt1Url, "/diziler?archive=false", "/diziler?archive=true",
+        Channel("trt1", "TRT 1", "https://www.trt1.com.tr", "/diziler?archive=false", "/diziler?archive=true",
             null, isTrt = true)
     )
 
@@ -70,9 +64,6 @@ class TurkTV : MainAPI() {
         "kanald_current" to "Kanal D - Güncel Diziler",
         "kanald_archive" to "Kanal D - Arşiv Diziler",
         "show_current" to "Show TV - Diziler",
-        "show_archive" to "Show TV - Arşiv Diziler",
-        "showturk_current" to "Show Türk - Diziler",
-        "showturk_archive" to "Show Türk - Arşiv Diziler",
         "star_current" to "Star TV - Güncel Diziler",
         "star_archive" to "Star TV - Arşiv Diziler",
         "now_current" to "NOW - Güncel Diziler",
@@ -479,6 +470,24 @@ class TurkTV : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = when (request.data) {
+            
+            // TRT Content Sections
+            "trt_series" -> getTrtContent("diziler", archive = false, page = page)
+            "trt_archive_series" -> getTrtContent("diziler", archive = true, page = page)
+            "trt_programs" -> getTrtContent("programlar", archive = false, page = page)
+            "trt_archive_programs" -> getTrtContent("programlar", archive = true, page = page)
+            
+            // Other Channel Sections
+            "atv_current" -> getChannelSeries(channels[0], isArchive = false, page = page)
+            "atv_archive" -> getChannelSeries(channels[0], isArchive = true, page = page)
+            "kanald_current" -> getChannelSeries(channels[1], isArchive = false, page = page)
+            "kanald_archive" -> getChannelSeries(channels[1], isArchive = true, page = page)
+            "show_current" -> getShowTvSeries(page)
+            "star_current" -> getChannelSeries(channels[3], isArchive = false, page = page)
+            "star_archive" -> getChannelSeries(channels[3], isArchive = true, page = page)
+            "now_current" -> getChannelSeries(channels[4], isArchive = false, page = page)
+            "now_archive" -> getChannelSeries(channels[4], isArchive = true, page = page)
+            
             // TRT Live Sections
             "live_tv" -> {
                 val tvChannels = getTvChannels()
@@ -522,23 +531,6 @@ class TurkTV : MainAPI() {
                 
                 liveItems
             }
-            
-            // TRT Content Sections
-            "trt_series" -> getTrtContent("diziler", archive = false, page = page)
-            "trt_archive_series" -> getTrtContent("diziler", archive = true, page = page)
-            "trt_programs" -> getTrtContent("programlar", archive = false, page = page)
-            "trt_archive_programs" -> getTrtContent("programlar", archive = true, page = page)
-            
-            // Other Channel Sections
-            "atv_current" -> getChannelSeries(channels[0], isArchive = false, page = page)
-            "atv_archive" -> getChannelSeries(channels[0], isArchive = true, page = page)
-            "kanald_current" -> getChannelSeries(channels[1], isArchive = false, page = page)
-            "kanald_archive" -> getChannelSeries(channels[1], isArchive = true, page = page)
-            "show_current" -> getShowTvSeries(page)
-            "star_current" -> getChannelSeries(channels[3], isArchive = false, page = page)
-            "star_archive" -> getChannelSeries(channels[3], isArchive = true, page = page)
-            "now_current" -> getChannelSeries(channels[4], isArchive = false, page = page)
-            "now_archive" -> getChannelSeries(channels[4], isArchive = true, page = page)
             
             else -> emptyList()
         }
@@ -828,13 +820,12 @@ class TurkTV : MainAPI() {
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.e("Show TV", "Error extracting subtitles: ${e.message}")
+                            Log.e("TurkTV", "Error extracting subtitles: ${e.message}")
                         }
                         
                         if (streamUrl.contains(".m3u8")) {
                             M3u8Helper.generateM3u8(
-                                name = "Show TV",
-                                source = "Show TV",
+                                source = name,
                                 streamUrl = streamUrl,
                                 referer = showTvUrl,
                                 headers = mapOf(
@@ -846,16 +837,16 @@ class TurkTV : MainAPI() {
                         } else {
                             // MP4 stream
                             callback(newExtractorLink(
-                                source = "Show TV",
+                                source = name,
                                 name = "Show TV",
                                 url = streamUrl
                             ) {
                                 this.referer = showTvUrl
-                                this.quality = if (streamUrl.contains("360")) Qualities.P360.value
-                                    else if (streamUrl.contains("480")) Qualities.P480.value
+                                this.quality = if (streamUrl.contains("1080")) Qualities.FullHDP.value
                                     else if (streamUrl.contains("720")) Qualities.P720.value
-                                    else if (streamUrl.contains("1080")) Qualities.P1080.value
-                                    else Qualities.Unknown.value
+                                    else if (streamUrl.contains("480")) Qualities.P480.value
+                                    else if (streamUrl.contains("360")) Qualities.P360.value
+                                    else Qualities.P240.value
                             })
                         }
                         return true
@@ -879,7 +870,6 @@ class TurkTV : MainAPI() {
         // Handle direct stream URLs (including live streams)
         if (data.contains(".m3u8", ignoreCase = true)) {
             M3u8Helper.generateM3u8(
-                name = name,
                 source = name,
                 streamUrl = data,
                 referer = when {
@@ -893,7 +883,7 @@ class TurkTV : MainAPI() {
         } else if (data.endsWith(".aac", ignoreCase = true)) {
             callback(newExtractorLink(
                 source = name,
-                name = name,
+                name = "Audio AAC",
                 url = data
             ) {
                 this.referer = "https://www.trtdinle.com"
@@ -919,7 +909,6 @@ class TurkTV : MainAPI() {
                     val m3u8Url = extractM3u8FromJson(scriptContent)
                     if (m3u8Url != null) {
                         M3u8Helper.generateM3u8(
-                            name = name,
                             source = name,
                             streamUrl = m3u8Url,
                             referer = data,
@@ -946,7 +935,6 @@ class TurkTV : MainAPI() {
                 if (m != null) {
                     val found = m.value
                     M3u8Helper.generateM3u8(
-                        name = name,
                         source = name,
                         streamUrl = found,
                         referer = data,
@@ -990,8 +978,8 @@ class TurkTV : MainAPI() {
                 if (name.contains(query, ignoreCase = true)) {
                     out += newLiveSearchResponse(name, streamUrl, TvType.Live) {
                         posterUrl = when (name) {
-                            "Show TV" -> "https://www.showtv.com.tr/images/showtv-logo.png"
-                            "Show Türk" -> "https://www.showtv.com.tr/images/showturk-logo.png"
+                            "Show TV" -> "https://www.showtv.com.tr/assets/v4/images/common/logo/svg/show-tv-logo.svg"
+                            "Show Türk" -> "https://www.showturk.com.tr/scripts/assets/dist/images/logo.svg"
                             else -> "https://www.showtv.com.tr/favicon.ico"
                         }
                     }
