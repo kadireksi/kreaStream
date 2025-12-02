@@ -842,7 +842,7 @@ class TurkTV : MainAPI() {
                                 url = streamUrl
                             ) {
                                 this.referer = showTvUrl
-                                this.quality = if (streamUrl.contains("1080")) Qualities.FullHDP.value
+                                this.quality = if (streamUrl.contains("1080")) Qualities.P1080.value
                                     else if (streamUrl.contains("720")) Qualities.P720.value
                                     else if (streamUrl.contains("480")) Qualities.P480.value
                                     else if (streamUrl.contains("360")) Qualities.P360.value
