@@ -568,7 +568,7 @@ class TurkTV : MainAPI() {
         }
 
         return newHomePageResponse(
-            listOf(HomePageList(request.name, items, isHorizontal = true)),
+            listOf(HomePageList(request.name, items, true)),
             hasNext = hasNext
         )
     }
