@@ -20,6 +20,10 @@ class TurkTV : MainAPI() {
     private val tabiiUrl = "https://www.tabii.com/tr"
     private val trt1Url = "https://www.trt1.com.tr"
     private val showTvUrl = "https://www.showtv.com.tr"
+    private val atvUrl = "https://www.atv.com.tr"
+    private val kanaldUrl = "https://www.kanald.com.tr"
+    private val starTvUrl = "https://www.startv.com.tr"
+    private val nowTvUrl = "https://www.nowtv.com.tr"
     private val liveBase = "$tabiiUrl/watch/live"
     private val dummyTvUrl = tabiiUrl
     private val dummyRadioUrl = "https://www.trtdinle.com/radyolar"
@@ -35,17 +39,17 @@ class TurkTV : MainAPI() {
     )
 
     private val channels = listOf(
-        Channel("atv", "ATV", "https://www.atv.com.tr", "/diziler", "/eski-diziler",
-            "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=0F2E3SdO1jy-8fTaE7rqXQ&e=1764664587&ppid=21d804be91b8e91f11bb3789ff83f0b4&gdpr=0"),
-        Channel("kanald", "Kanal D", "https://www.kanald.com.tr", "/diziler/tum-diziler", "/diziler/arsiv-diziler",
+        Channel("atv", "ATV", atvUrl, "/diziler", "/eski-diziler",
+            "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=sjgxmwUaY9j62XIKI14Hfg&e=1764747850&ppid=21d804be91b8e91f11bb3789ff83f0b4&gdpr=0"),
+        Channel("kanald", "Kanal D", kanaldUrl, "/diziler/tum-diziler", "/diziler/arsiv-diziler",
             "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3&ppid=c1bfdca3b54034e7be9660071f17d132"),
         Channel("show", "Show TV", showTvUrl, "/diziler", null,
-            null), // Will be fetched dynamically
-        Channel("star", "Star TV", "https://www.startv.com.tr", "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler",
+            null),
+        Channel("star", "Star TV", starTvUrl, "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler",
             "https://startv-live.ercdn.net/startv/startv.m3u8"),
-        Channel("now", "NOW (Fox)", "https://www.nowtv.com.tr", "/diziler/yayinda", "/diziler/arsiv",
+        Channel("now", "NOW (Fox)", nowTvUrl, "/diziler/yayinda", "/diziler/arsiv",
             "https://nowtv-live.ercdn.net/nowtv/nowtv.m3u8"),
-        Channel("trt1", "TRT 1", "https://www.trt1.com.tr", "/diziler?archive=false", "/diziler?archive=true",
+        Channel("trt1", "TRT 1", trt1Url, "/diziler?archive=false", "/diziler?archive=true",
             null, isTrt = true)
     )
 
@@ -515,6 +519,7 @@ class TurkTV : MainAPI() {
                         this.posterUrl = when (name) {
                             "Show TV" -> "https://www.showtv.com.tr/images/showtv-logo.png"
                             "Show Türk" -> "https://www.showtv.com.tr/images/showturk-logo.png"
+                            "ATV" -> "https://i.tmgrup.com.tr/atv/c/i/player_imaj_v3.png"
                             else -> "https://www.showtv.com.tr/favicon.ico"
                         }
                     })
