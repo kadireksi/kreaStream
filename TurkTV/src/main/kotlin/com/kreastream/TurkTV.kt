@@ -261,7 +261,17 @@ class TurkTV : MainAPI() {
             } else {
                 val script = el.html()
                 Regex("""["']file["']\s*:\s*["']([^"']+)["']""").find(script)?.groupValues?.get(1)?.let { url ->
-                    callback(newExtractorLink(name, "Direkt", url, data, Qualities.Unknown.value, url.contains(".m3u8")))
+                    callback(
+                        newExtractorLink(
+                            source = name,
+                            name = "Direkt",
+                            url = url
+                            ){
+                            this.data = data,
+                            this.quality = Qualities.Unknown.value,
+                            //this.isM3u8 = url.contains(".m3u8")
+                            }
+                    )
                 }
             }
         }
