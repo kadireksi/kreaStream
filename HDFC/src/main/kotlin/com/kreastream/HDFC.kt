@@ -17,9 +17,9 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import kotlin.text.Charsets
 
-class HDFilmCehennemi : MainAPI() {
+class HDFC : MainAPI() {
     override var mainUrl              = "https://www.hdfilmcehennemi.la"
-    override var name                 = "HDFilmCehennemi"
+    override var name                 = "HDFC"
     override val hasMainPage          = true
     override var lang                 = "tr"
     override val hasQuickSearch       = true
@@ -242,8 +242,8 @@ class HDFilmCehennemi : MainAPI() {
         
         // Map the qualities provided in the script to display names
         val qualities = mapOf(
-            "low" to "Download SD", 
-            "high" to "Download HD"   
+            "high" to "Download HD", 
+            "low" to "Download SD"   
         )
 
         qualities.forEach { (qualityData, qualityName) ->
@@ -335,55 +335,90 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
     
-    // REMOVED old rot13(String) helper as it's no longer used in the new sequence.
-
-    private fun decryptHdfcUrl(encryptedData: String, seed: Int): String {
-        try {
-            // New sequence derived from latest unpacked JS: 
-            // 1. Reverse -> 2. Base64 Decode -> 3. ROT13 on Bytes -> 4. Custom Shift
-
-            // 1. Reverse the input string
-            val reversedString = encryptedData.reversed()
-            
-            // 2. Base64 Decode. This is the new Base64 input.
-            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
-            
-            // 3. ROT13 on the decoded byte array (treating bytes as characters)
-            val rot13edBytes = ByteArray(decodedBytes.size)
-            for (i in decodedBytes.indices) {
-                val charCode = decodedBytes[i].toInt()
+    /**
+     * Helper object to encapsulate and execute the decryption logic attempts.
+     */
+    private object HDFCDecrypter {
+        
+        private fun applyRot13(inputBytes: ByteArray): ByteArray {
+            val rot13edBytes = ByteArray(inputBytes.size)
+            for (i in inputBytes.indices) {
+                val charCode = inputBytes[i].toInt()
                 val char = charCode.toChar()
-                if (char in 'a'..'z') {
-                    // +13 shift for lowercase
-                    rot13edBytes[i] = (((charCode - 'a'.code + 13) % 26 + 'a'.code).toChar()).code.toByte()
-                } else if (char in 'A'..'Z') {
-                    // +13 shift for uppercase
-                    rot13edBytes[i] = (((charCode - 'A'.code + 13) % 26 + 'A'.code).toChar()).code.toByte()
-                } else {
-                    // Keep non-alphabetic characters as is
-                    rot13edBytes[i] = decodedBytes[i]
+                rot13edBytes[i] = when (char) {
+                    in 'a'..'z' -> (((charCode - 'a'.code + 13) % 26 + 'a'.code).toChar()).code.toByte()
+                    in 'A'..'Z' -> (((charCode - 'A'.code + 13) % 26 + 'A'.code).toChar()).code.toByte()
+                    else -> inputBytes[i]
                 }
             }
-            
-            // 4. Custom Byte Shift Loop
+            return rot13edBytes
+        }
+
+        private fun applyCustomShift(inputBytes: ByteArray, seed: Int): String {
             val sb = StringBuilder()
-            for (i in rot13edBytes.indices) {
-                val charCode = rot13edBytes[i].toInt() and 0xFF // Unsigned conversion
+            for (i in inputBytes.indices) {
+                val charCode = inputBytes[i].toInt() and 0xFF // Unsigned conversion
                 val shift = seed % (i + 5)
                 // JS: (charCode - (seed % (i+5)) + 256) % 256
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
             }
-
             return sb.toString()
-        } catch (e: IllegalArgumentException) {
-            Log.e("HDFC", "Decryption failed, Bad Base64 input or padding issue.")
-            return ""
-        } catch (e: Exception) {
-            Log.e("HDFC", "Decryption failed: ${e.message}", e)
+        }
+
+        // Attempt 1: Reverse String -> Base64 Decode -> ROT13 on Bytes -> Custom Shift
+        private fun attempt1(encryptedData: String, seed: Int): String {
+            val reversedString = encryptedData.reversed()
+            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
+            val rot13edBytes = applyRot13(decodedBytes)
+            return applyCustomShift(rot13edBytes, seed)
+        }
+
+        // Attempt 2: ROT13 on String -> Reverse String -> Base64 Decode -> Custom Shift
+        private fun attempt2(encryptedData: String, seed: Int): String {
+            val rot13edString = applyRot13(encryptedData.toByteArray()).toString(Charsets.UTF_8)
+            val reversedString = rot13edString.reversed()
+            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
+            return applyCustomShift(decodedBytes, seed)
+        }
+
+        // Attempt 3: Reverse String -> ROT13 on String -> Base64 Decode -> Custom Shift
+        private fun attempt3(encryptedData: String, seed: Int): String {
+            val reversedString = encryptedData.reversed()
+            val rot13edString = applyRot13(reversedString.toByteArray()).toString(Charsets.UTF_8)
+            val decodedBytes = Base64.decode(rot13edString, Base64.DEFAULT)
+            return applyCustomShift(decodedBytes, seed)
+        }
+
+        // Main function to try all known orders
+        fun dynamicDecrypt(encryptedData: String, seed: Int): String {
+            val decryptionAttempts = listOf<() -> String>(
+                { attempt1(encryptedData, seed) },
+                { attempt2(encryptedData, seed) },
+                { attempt3(encryptedData, seed) }
+            )
+
+            for ((index, attempt) in decryptionAttempts.withIndex()) {
+                try {
+                    val decryptedUrl = attempt()
+                    // A successful decryption should yield a URL starting with "http"
+                    if (decryptedUrl.startsWith("http")) {
+                        Log.d("HDFC", "Decryption Success with Attempt ${index + 1}")
+                        return decryptedUrl
+                    }
+                } catch (e: IllegalArgumentException) {
+                    // This typically means bad Base64 input, which is expected for incorrect orders.
+                    Log.d("HDFC", "Decryption Attempt ${index + 1} failed: Bad Base64")
+                } catch (e: Exception) {
+                    Log.e("HDFC", "Decryption Attempt ${index + 1} failed: ${e.message}")
+                }
+            }
+
+            Log.e("HDFC", "All decryption attempts failed.")
             return ""
         }
     }
+
 
     private suspend fun invokeLocalSource(
         source: String,
@@ -411,8 +446,8 @@ class HDFilmCehennemi : MainAPI() {
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
             val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995 // Fallback seed
 
-            // 4. Decrypt
-            val decryptedUrl = decryptHdfcUrl(encryptedString, seed)
+            // 4. Decrypt dynamically
+            val decryptedUrl = HDFCDecrypter.dynamicDecrypt(encryptedString, seed)
             
             if (decryptedUrl.isEmpty()) return
             Log.d("HDFC", "Decrypted URL: $decryptedUrl")
@@ -523,13 +558,11 @@ class HDFilmCehennemi : MainAPI() {
                 }
             }
         }
-
         // --- 3. Handle Download Links ---
         // Only run if we found a rapidrame ID
         if (!rapidrameId.isNullOrEmpty()) {
             extractDownloadLinks(rapidrameId, callback)
         }
-
         return true
     }
 
