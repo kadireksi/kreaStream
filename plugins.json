@@ -23,7 +23,7 @@
         "iconUrl": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 16175,
+        "fileSize": 22498,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -33,7 +33,7 @@
             "TvSeries",
             "Live"
         ],
-        "version": 1,
+        "version": 251202,
         "internalName": "TurkTV",
         "description": "T\u00fcrk Tv",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
