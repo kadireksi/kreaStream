@@ -568,7 +568,7 @@ class TurkTV : MainAPI() {
         }
 
         return newHomePageResponse(
-            listOf(HomePageList(request.name, items, true)),
+            listOf(HomePageList(request.name, items, isHorizontal = true)),
             hasNext = hasNext
         )
     }
@@ -833,7 +833,7 @@ class TurkTV : MainAPI() {
                         
                         if (streamUrl.contains(".m3u8")) {
                             M3u8Helper.generateM3u8(
-                                source = name,
+                                source = "Show TV",
                                 streamUrl = streamUrl,
                                 referer = showTvUrl,
                                 headers = mapOf(
@@ -845,16 +845,16 @@ class TurkTV : MainAPI() {
                         } else {
                             // MP4 stream
                             callback(newExtractorLink(
-                                source = name,
+                                source = "Show TV",
                                 name = "Show TV",
                                 url = streamUrl
                             ) {
                                 this.referer = showTvUrl
-                                this.quality = if (streamUrl.contains("1080")) Qualities.P1080.value
-                                    else if (streamUrl.contains("720")) Qualities.P720.value
+                                this.quality = if (streamUrl.contains("360")) Qualities.P360.value
                                     else if (streamUrl.contains("480")) Qualities.P480.value
-                                    else if (streamUrl.contains("360")) Qualities.P360.value
-                                    else Qualities.P240.value
+                                    else if (streamUrl.contains("720")) Qualities.P720.value
+                                    else if (streamUrl.contains("1080")) Qualities.P1080.value
+                                    else Qualities.Unknown.value
                             })
                         }
                         return true
@@ -891,7 +891,7 @@ class TurkTV : MainAPI() {
         } else if (data.endsWith(".aac", ignoreCase = true)) {
             callback(newExtractorLink(
                 source = name,
-                name = "Audio AAC",
+                name = name,
                 url = data
             ) {
                 this.referer = "https://www.trtdinle.com"
