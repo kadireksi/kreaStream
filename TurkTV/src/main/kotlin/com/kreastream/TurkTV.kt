@@ -53,20 +53,21 @@ class TurkTV : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "trt_series" to "TRT - Güncel Diziler",
+        "trt_series" to "TRT - Güncel Diziler",   
+        "atv_current" to "ATV - Güncel Diziler",
+        "show_current" to "Show TV - Diziler",
+        "kanald_current" to "Kanal D - Güncel Diziler",
+        "star_current" to "Star TV - Güncel Diziler",
+        "now_current" to "NOW - Güncel Diziler",
+
         "trt_archive_series" to "TRT - Arşiv Diziler",
+        "atv_archive" to "ATV - Arşiv Diziler",
+        "kanald_archive" to "Kanal D - Arşiv Diziler",
+        "star_archive" to "Star TV - Arşiv Diziler",
+        "now_archive" to "NOW - Arşiv Diziler",
+
         "trt_programs" to "TRT - Programlar",
         "trt_archive_programs" to "TRT - Arşiv Programlar",
-        
-        "atv_current" to "ATV - Güncel Diziler",
-        "atv_archive" to "ATV - Arşiv Diziler",
-        "kanald_current" to "Kanal D - Güncel Diziler",
-        "kanald_archive" to "Kanal D - Arşiv Diziler",
-        "show_current" to "Show TV - Diziler",
-        "star_current" to "Star TV - Güncel Diziler",
-        "star_archive" to "Star TV - Arşiv Diziler",
-        "now_current" to "NOW - Güncel Diziler",
-        "now_archive" to "NOW - Arşiv Diziler",
 
         "live_tv" to "TRT Canlı TV",
         "live_radio" to "TRT Canlı Radyo",
@@ -532,11 +533,31 @@ class TurkTV : MainAPI() {
             
             if (media.has("mp4")) {
                 val mp4Array = media.getJSONArray("mp4")
-                if (mp4Array.length() > 0) {
-                    val highestQuality = mp4Array.getJSONObject(mp4Array.length() - 1)
-                    return highestQuality.getString("src")
+
+                for (i in 0 until mp4Array.length()) {
+                    val item = mp4Array.getJSONObject(i)
+                    val src = item.getString("src")
+
+                    // Detect quality
+                    val qString = item.optString("quality", "")
+                        .ifEmpty { "(\\d{3,4})p?".toRegex().find(src)?.groupValues?.get(1) ?: "" }
+
+                    val quality = qString.toIntOrNull() ?: Qualities.Unknown.value
+
+                    callback.invoke(
+                        newExtractorLink(
+                            source = name,
+                            name = "$name $quality",
+                            url = src
+                        ){
+                            this.referer = mainUrl,
+                            this.quality = quality
+                        }
+                    )
                 }
             }
+
+
             
             null
         } catch (e: Exception) {
@@ -548,37 +569,56 @@ class TurkTV : MainAPI() {
     }
     
     // === ATV Link Extraction Helpers ===
-    private fun extractAtvVideoUrl(html: String): String? {
-        // ... (Original extractAtvVideoUrl logic)
-        return try {
+    private fun extractAtvVideoUrls(html: String, callback: (ExtractorLink) -> Unit) {
+        try {
             val jsonLdRegex = Regex("""<script type="application/ld\+json">(.*?)</script>""", RegexOption.DOT_MATCHES_ALL)
             val jsonLdMatch = jsonLdRegex.find(html)
-            
+
             if (jsonLdMatch != null) {
                 val jsonStr = jsonLdMatch.groupValues[1].trim()
                 val json = JSONObject(jsonStr)
-                
+
                 if (json.optString("@type") == "VideoObject") {
+                    // Direct mp4/m3u8
                     val contentUrl = json.optString("contentUrl")
-                    if (contentUrl.isNotBlank() && (contentUrl.contains(".mp4") || contentUrl.contains(".m3u8"))) {
-                        return contentUrl
+                    if (contentUrl.isNotBlank()) {
+                        callback(makeLink(contentUrl))
                     }
-                    
+
+                    // Embedded player (usually multi-quality)
                     val embedUrl = json.optString("embedUrl")
                     if (embedUrl.isNotBlank()) {
-                        return "$atvUrl$embedUrl"
+                        callback(makeLink("$atvUrl$embedUrl"))
                     }
                 }
             }
-            
+
+            // Fallback: find multiple mp4/m3u8 qualities
             val videoRegex = Regex("""["']contentUrl["']\s*:\s*["']([^"']+\.(?:mp4|m3u8)[^"']*)["']""")
-            val videoMatch = videoRegex.find(html)
-            videoMatch?.groupValues?.get(1)
-        } catch (e: Exception) {
-            Log.e("TurkTV", "Error extracting ATV video URL: ${e.message}")
-            null
+            val matches = videoRegex.findAll(html)
+
+            for (match in matches) {
+                val url = match.groupValues[1]
+                callback(makeLink(url))
+            }
+
+        } catch (_: Exception) {}
+    }
+
+    private fun makeLink(url: String): ExtractorLink {
+        val qMatch = Regex("(\\d{3,4})p").find(url)?.groupValues?.get(1)
+        val quality = qMatch?.toIntOrNull() ?: Qualities.Unknown.value
+
+        return newExtractorLink(
+            source = "ATV",
+            name = "ATV $quality",
+            url = url
+        ){
+            this.referer = atvUrl,
+            this.quality = quality
         }
     }
+
 
     private fun extractAtvM3u8FromPage(html: String): String? {
         // ... (Original extractAtvM3u8FromPage logic)
