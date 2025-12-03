@@ -73,6 +73,7 @@ class TurkTV : MainAPI() {
         "other_live" to "Diğer TV Kanalları"
     )
 
+    // === TRT Data Structures ===
     data class TvChannel(
         val name: String,
         val slug: String,
@@ -865,9 +866,9 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // === Main Page and Load Functions (Keep as is) ===
+    // === Main Page and Load Functions ===
 
-    override suspend fun getChannelSeries(channel: Channel, isArchive: Boolean, page: Int): List<SearchResponse> {
+    private suspend fun getChannelSeries(channel: Channel, isArchive: Boolean, page: Int): List<SearchResponse> {
         // ... (Original getChannelSeries logic)
         return try {
             when (channel.key) {
