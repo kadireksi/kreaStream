@@ -5,10 +5,6 @@ java {
     }
 }
 
-dependencies {
-    implementation("com.lagradost:cloudstream-meta:1.4.1")
-}
-
 cloudstream {
     authors     = listOf("kreastream")
     language    = "tr"
