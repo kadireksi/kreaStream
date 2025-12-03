@@ -513,16 +513,15 @@ class TurkTV : MainAPI() {
     }
     
     private fun extractShowTvM3u8(jsonStr: String): String? {
-        // ... (Original extractShowTvM3u8 logic)
         return try {
             var cleanJson = jsonStr.trim()
             if (cleanJson.startsWith("data-hope-video='")) {
                 cleanJson = cleanJson.removePrefix("data-hope-video='").removeSuffix("'")
             }
-            
+
             val json = JSONObject(cleanJson)
             val media = json.getJSONObject("media")
-            
+
             if (media.has("m3u8")) {
                 val m3u8Array = media.getJSONArray("m3u8")
                 if (m3u8Array.length() > 0) {
@@ -530,46 +529,26 @@ class TurkTV : MainAPI() {
                     return m3u8.getString("src")
                 }
             }
-            
+
             if (media.has("mp4")) {
                 val mp4Array = media.getJSONArray("mp4")
-
-                for (i in 0 until mp4Array.length()) {
-                    val item = mp4Array.getJSONObject(i)
-                    val src = item.getString("src")
-
-                    // Detect quality
-                    val qString = item.optString("quality", "")
-                        .ifEmpty { "(\\d{3,4})p?".toRegex().find(src)?.groupValues?.get(1) ?: "" }
-
-                    val quality = qString.toIntOrNull() ?: Qualities.Unknown.value
-
-                    callback.invoke(
-                        newExtractorLink(
-                            source = name,
-                            name = "$name $quality",
-                            url = src
-                        ){
-                            this.referer = mainUrl,
-                            this.quality = quality
-                        }
-                    )
+                if (mp4Array.length() > 0) {
+                    // Return the first mp4 src found
+                    val item = mp4Array.getJSONObject(0)
+                    return item.getString("src")
                 }
             }
-
-
-            
             null
         } catch (e: Exception) {
             Log.e("Show TV", "Error parsing Show TV video JSON: ${e.message}")
-            
+
             Regex("""["']src["']\s*:\s*["']([^"']+\.(?:m3u8|mp4)[^"']*)["']""", RegexOption.IGNORE_CASE)
                 .find(jsonStr)?.groupValues?.get(1)
         }
     }
     
-    // === ATV Link Extraction Helpers ===
-    private fun extractAtvVideoUrls(html: String, callback: (ExtractorLink) -> Unit) {
+    // Renamed to singular and returns String? to match usage in extractAtvLinks
+    private fun extractAtvVideoUrl(html: String): String? {
         try {
             val jsonLdRegex = Regex("""<script type="application/ld\+json">(.*?)</script>""", RegexOption.DOT_MATCHES_ALL)
             val jsonLdMatch = jsonLdRegex.find(html)
@@ -582,30 +561,30 @@ class TurkTV : MainAPI() {
                     // Direct mp4/m3u8
                     val contentUrl = json.optString("contentUrl")
                     if (contentUrl.isNotBlank()) {
-                        callback(makeLink(contentUrl))
+                        return contentUrl
                     }
 
-                    // Embedded player (usually multi-quality)
+                    // Embedded player
                     val embedUrl = json.optString("embedUrl")
                     if (embedUrl.isNotBlank()) {
-                        callback(makeLink("$atvUrl$embedUrl"))
+                        return "$atvUrl$embedUrl"
                     }
                 }
             }
 
             // Fallback: find multiple mp4/m3u8 qualities
             val videoRegex = Regex("""["']contentUrl["']\s*:\s*["']([^"']+\.(?:mp4|m3u8)[^"']*)["']""")
-            val matches = videoRegex.findAll(html)
-
-            for (match in matches) {
-                val url = match.groupValues[1]
-                callback(makeLink(url))
+            val match = videoRegex.find(html)
+            if (match != null) {
+                return match.groupValues[1]
             }
 
         } catch (_: Exception) {}
+        return null
     }
 
-    private fun makeLink(url: String): ExtractorLink {
+    // Added 'suspend' and fixed syntax (removed comma after referer)
+    private suspend fun makeLink(url: String): ExtractorLink {
         val qMatch = Regex("(\\d{3,4})p").find(url)?.groupValues?.get(1)
         val quality = qMatch?.toIntOrNull() ?: Qualities.Unknown.value
 
@@ -614,7 +593,7 @@ class TurkTV : MainAPI() {
             name = "ATV $quality",
             url = url
         ){
-            this.referer = atvUrl,
+            this.referer = atvUrl
             this.quality = quality
         }
     }
