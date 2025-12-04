@@ -10,7 +10,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import okhttp3.*
+import okhttp3.Interceptor
+import okhttp3.Response
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -34,7 +35,7 @@ class HDFilmCehennemi : MainAPI() {
     private val seenDownloadIds = mutableSetOf<String>()
     private val seenVideoUrls = mutableSetOf<String>()
 
-    private val cloudflareKiller by lazy { CloudflareKiller() }
+   private val cloudflareKiller by lazy { CloudflareKiller() }
     
     class CloudflareKiller { 
         fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request()) 
@@ -47,10 +48,6 @@ class HDFilmCehennemi : MainAPI() {
             return response
         }
     }
-
-    override val client: OkHttpClient = defaultOkHttpClient.newBuilder()
-        .addInterceptor(CloudflareInterceptor(cloudflareKiller))
-        .build()
 
     private val objectMapper = ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
