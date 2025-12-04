@@ -173,7 +173,7 @@ class HDFilmCehennemi : MainAPI() {
         }
 
         try {
-            val hdfc: HDFC = objectMapper.readValue(response.text, HDFC::class.java)
+            val hdfc: HDFilmCehennemi = objectMapper.readValue(response.text, HDFilmCehennemi::class.java)
             val document = Jsoup.parse(hdfc.html)
             // Select all relevant link elements
             val results = document.select("a.poster, a.mini-poster").mapNotNull { it.toSearchResult() }
