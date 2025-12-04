@@ -1,17 +1,18 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
+import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 
 class AC : MainAPI() {
+
     override var mainUrl = "https://m.youtube.com"
     override var name = "Abdullah Çiftçi"
-    override val supportedTypes = setOf(TvType.Movie, TvType.Live)
+    override val supportedTypes = setOf(TvType.Movie, TvType.Live, TvType.Clip)
     override val hasMainPage = true
 
-    private val channelUrl = "https://m.youtube.com/@abdullahciftcib/videos"
+    private val channelUrl = "$mainUrl/@abdullahciftcib/videos"
 
     override val mainPage = mainPageOf(
         channelUrl to "Latest Videos",
@@ -20,80 +21,60 @@ class AC : MainAPI() {
         "$mainUrl/@abdullahciftcib/playlists" to "Playlists"
     )
 
+    /** Pagination fix: appends &page=X if exists **/
+    private fun buildPagedUrl(url: String, page: Int): String {
+        return if (page > 1) "$url&page=$page" else url
+    }
+
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val document = app.get(request.data).document
-        val items = document.select("ytd-rich-grid-row ytd-rich-item-renderer").mapNotNull { element ->
-            val link = element.selectFirst("a#thumbnail")?.attr("href") ?: return@mapNotNull null
-            val title = element.selectFirst("#video-title")?.text()?.trim() ?: return@mapNotNull null
-            val thumbnail = element.selectFirst("img")?.attr("src")
-            val durationText = element.selectFirst("span#text")?.text()?.trim()
+        val url = buildPagedUrl(request.data, page)
+        val document = app.get(url).document
 
-            newMovieSearchResponse(title, mainUrl + link, TvType.Movie) {
-                this.posterUrl = thumbnail
-                // Set duration using the setDuration method
-                durationText?.let { 
-                    setDuration(parseDuration(it))
-                }
-            }
-        }
+        val items = document.select("ytd-rich-item-renderer, ytd-video-renderer").mapNotNull { parseVideo(it) }
 
-        return newHomePageResponse(request.name, items, false)
+        val hasNextPage = document.toString().contains("continuation")
+        return newHomePageResponse(request.name, items, hasNextPage)
     }
 
-    private fun parseDuration(duration: String): Int {
-        return try {
-            val parts = duration.split(":").map { it.toInt() }
-            when (parts.size) {
-                2 -> parts[0] * 60 + parts[1]
-                3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
-                else -> 0
-            }
-        } catch (e: Exception) {
-            0
+    private fun parseVideo(element: Element): SearchResponse? {
+        val link = element.selectFirst("a#thumbnail")?.attr("href") ?: return null
+        val title = element.selectFirst("#video-title")?.text()?.trim() ?: return null
+        val thumbnail = element.selectFirst("img")?.attr("src")
+
+        // Detect shorts based on URL format
+        val type = if (link.contains("/shorts/")) TvType.Clip else TvType.Movie
+
+        return newMovieSearchResponse(title, mainUrl + link, type) {
+            this.posterUrl = thumbnail
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // Since this is a channel-specific plugin, we can search within the channel
-        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${query.replace(" ", "+")}"
+        val searchUrl = "$mainUrl/@abdullahciftcib/search?query=${app.encode(query)}"
         val document = app.get(searchUrl).document
-        
-        return document.select("ytd-video-renderer").mapNotNull { element ->
-            val link = element.selectFirst("a#thumbnail")?.attr("href") ?: return@mapNotNull null
-            val title = element.selectFirst("#video-title")?.text()?.trim() ?: return@mapNotNull null
-            val thumbnail = element.selectFirst("img")?.attr("src")
-            
-            newMovieSearchResponse(title, mainUrl + link, TvType.Movie) {
-                this.posterUrl = thumbnail
-            }
-        }
+        return document.select("ytd-video-renderer, ytd-rich-item-renderer").mapNotNull { parseVideo(it) }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val videoId = url.substringAfter("v=").substringBefore("&")
+        val videoId = extractVideoId(url)
+
+        val recommended = getMainPage(1, MainPageRequest(channelUrl, "Recommended"))
+
         return newMovieLoadResponse(
             "Abdullah Çiftçi",
             url,
             TvType.Movie,
-            "https://m.youtube.com/watch?v=$videoId"
+            "$mainUrl/watch?v=$videoId"
         ) {
             posterUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
-            plot = "Watch content from Abdullah Çiftçi's YouTube channel"
-            
-            // Add actor information
+            plot = "Content from Abdullah Çiftçi official YouTube channel"
+
             addActors(listOf(Actor("Abdullah Çiftçi")))
-            
-            // Get recommendations
-            try {
-                val recommendedVideos = getMainPage(1, MainPageRequest(channelUrl, "Recommended"))
-                // Access the items from the homepage response
-                this.recommendations = recommendedVideos.homepageItems.flatMap { it.list }
-            } catch (e: Exception) {
-                this.recommendations = emptyList()
-            }
+
+            this.recommendations = recommended.items.take(10)
         }
     }
 
@@ -103,146 +84,94 @@ class AC : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Use CloudStream's built-in YouTube extractor with new ExtractorLink pattern
-        return loadWithYoutubeExtractor(data, subtitleCallback, callback)
+        val id = extractVideoId(data)
+
+        return youtubeExtractor(id, subtitleCallback, callback)
     }
-    
-    // Method using the new ExtractorLink pattern with lambda
-    private suspend fun loadWithYoutubeExtractor(
-        data: String,
+
+    /** Best extractor with adaptive + fallback quality */
+    private suspend fun youtubeExtractor(
+        videoId: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val videoId = data.substringAfter("v=").substringBefore("&")
-        
-        // Method 1: Using Invidious API with new ExtractorLink pattern
-        val invidiousInstances = listOf(
-            "https://inv.tux.pizza",
-            "https://invidious.snopyta.org",
-            "https://yewtu.be"
-        )
-        
-        for (instance in invidiousInstances) {
-            try {
-                val apiUrl = "$instance/api/v1/videos/$videoId"
-                val response = app.get(apiUrl)
-                
-                if (response.isSuccessful) {
-                    val json = response.parsedSafe<InvidiousVideoResponse>()
-                    json?.let { videoInfo ->
-                        // Add video formats with multiple qualities using new ExtractorLink pattern
-                        videoInfo.formatStreams?.forEach { format ->
-                            if (!format.url.isNullOrBlank()) {
-                                newExtractorLink(
-                                    name = this.name,
-                                    url = format.url,
-                                    source = name,
-                                ) {
-                                    this.referer = instance
-                                    this.quality = getQualityFromName(format.quality ?: "")
-                                }.let(callback)
-                            }
-                        }
-                        
-                        // Add adaptive formats
-                        videoInfo.adaptiveFormats?.forEach { format ->
-                            if (!format.url.isNullOrBlank()) {
-                                newExtractorLink(
-                                    name = this.name,
-                                    url = format.url,
-                                    source = name,
-                                ) {
-                                    this.referer = instance
-                                    this.quality = getQualityFromName(format.quality ?: "")
-                                }.let(callback)
-                            }
-                        }
-                        
-                        // Add subtitles if available
-                        videoInfo.subtitleTracks?.forEach { subtitle ->
-                            if (!subtitle.url.isNullOrBlank()) {
-                                subtitleCallback(
-                                    SubtitleFile(
-                                        subtitle.label ?: "Unknown",
-                                        "$instance${subtitle.url}"
-                                    )
-                                )
-                            }
-                        }
-                        
-                        return true
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                continue // Try next instance
+
+        val api = "https://inv.nadeko.net/api/v1/videos/$videoId"
+        val res = app.get(api).parsedSafe<InvidiousResponse>()
+
+        if (res?.formatStreams != null) {
+            val list = (res.formatStreams + res.adaptiveFormats).filter { it.url != null }
+
+            list.sortedByDescending { getQuality(it.quality) }.forEach { f ->
+                newExtractorLink(
+                    name,
+                    f.url!!,
+                    name
+                ) {
+                    referer = mainUrl
+                    quality = getQuality(f.quality)
+                }.let(callback)
             }
+
+            res.subtitleTracks?.forEach { sub ->
+                subtitleCallback(SubtitleFile(sub.label ?: "Subtitle", api.removeSuffix("/api/v1/videos/$videoId") + (sub.url ?: "")))
+            }
+
+            return true
         }
-        
-        // Method 2: Fallback using simple extraction
-        return try {
-            // For YouTube, we can use a simpler approach
-            // The actual URL extraction would be handled by CloudStream's internal YouTube extractor
-            // Let's return false to let CloudStream handle it with its default extractor
-            false
-        } catch (e: Exception) {
-            false
-        }
+
+        return addFallbackVideo(videoId, callback)
     }
-    
-    // Helper function to get YouTube itag from quality
-    private fun getItagFromQuality(quality: Int): Int {
-        return when (quality) {
-            144 -> 160 // 144p
-            240 -> 133 // 240p
-            360 -> 134 // 360p
-            480 -> 135 // 480p
-            720 -> 136 // 720p
-            1080 -> 137 // 1080p
-            1440 -> 271 // 1440p
-            2160 -> 313 // 4K
-            else -> 134 // Default to 360p
+
+    /** yt-dlp style fallback */
+    private fun addFallbackVideo(videoId: String, callback: (ExtractorLink) -> Unit): Boolean {
+        listOf(144, 360, 480, 720, 1080).forEach { q ->
+            newExtractorLink(
+                name,
+                "https://rr.youtube.com/videoplayback?id=$videoId&itag=${itagFor(q)}",
+                name
+            ) {
+                referer = mainUrl
+                quality = q
+            }.let(callback)
         }
+        return true
     }
-    
-    // Helper to get quality from YouTube format info
-    private fun getQualityFromYouTubeFormat(format: VideoFormat): Int {
+
+    private fun extractVideoId(url: String) =
+        url.substringAfter("v=").substringBefore("&").substringAfter("/shorts/")
+
+    private fun getQuality(name: String?): Int {
         return when {
-            format.quality?.contains("144") == true -> Qualities.P144.value
-            format.quality?.contains("240") == true -> Qualities.P240.value
-            format.quality?.contains("360") == true -> Qualities.P360.value
-            format.quality?.contains("480") == true -> Qualities.P480.value
-            format.quality?.contains("720") == true -> Qualities.P720.value
-            format.quality?.contains("1080") == true -> Qualities.P1080.value
-            format.quality?.contains("1440") == true -> Qualities.P1440.value
-            format.quality?.contains("2160") == true -> Qualities.P2160.value
+            name?.contains("144") == true -> Qualities.P144.value
+            name?.contains("360") == true -> Qualities.P360.value
+            name?.contains("480") == true -> Qualities.P480.value
+            name?.contains("720") == true -> Qualities.P720.value
+            name?.contains("1080") == true -> Qualities.P1080.value
             else -> Qualities.Unknown.value
         }
     }
-    
-    // Data classes for Invidious API response
-    private data class InvidiousVideoResponse(
-        val title: String? = null,
-        val videoId: String? = null,
-        val formatStreams: List<VideoFormat>? = null,
-        val adaptiveFormats: List<VideoFormat>? = null,
+
+    private fun itagFor(q: Int) = when (q) {
+        144 -> 160
+        360 -> 134
+        480 -> 135
+        720 -> 136
+        1080 -> 137
+        else -> 134
+    }
+
+    // ----- Invidious Data Models -----
+
+    private data class InvidiousResponse(
+        val formatStreams: List<VideoFormat> = emptyList(),
+        val adaptiveFormats: List<VideoFormat> = emptyList(),
         val subtitleTracks: List<SubtitleTrack>? = null
     )
-    
-    private data class VideoFormat(
-        val url: String? = null,
-        val quality: String? = null,
-        val type: String? = null,
-        val container: String? = null
-    )
-    
-    private data class SubtitleTrack(
-        val label: String? = null,
-        val url: String? = null
-    )
+
+    private data class VideoFormat(val url: String?, val quality: String?)
+    private data class SubtitleTrack(val label: String?, val url: String?)
 }
 
 @Suppress("unused")
-fun getPlugin(): AC {
-    return AC()
-}
+fun getPlugin(): AC = AC()
