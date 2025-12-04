@@ -320,8 +320,8 @@ class HDFilmCehennemi : MainAPI() {
                 name = sourceName,
                 url = decrypted
             ){
-                this.referer = referer,
-                this.quality = Qualities.Unknown.value,
+                this.referer = referer
+                this.quality = Qualities.Unknown.value
                 this.type = if (isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
             }
         )
@@ -355,8 +355,8 @@ class HDFilmCehennemi : MainAPI() {
                 name = sourceName,
                 url = decrypted
             ){
-                this.referer = referer,
-                this.quality = Qualities.Unknown.value,
+                this.referer = referer
+                this.quality = Qualities.Unknown.value
                 this.type = if (isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
             }
         )
@@ -378,7 +378,17 @@ class HDFilmCehennemi : MainAPI() {
                 ).parsedSafe<DownloadResponse>()
 
                 res?.download_link?.takeIf { it.isNotEmpty() }?.let { link ->
-                    callback(newExtractorLink(name, name, link, "", Qualities.Unknown.value, ExtractorLinkType.VIDEO))
+                    callback(
+                        newExtractorLink(
+                            name = name,
+                            source = name,
+                            url = link
+                        ){
+                            this.referer = mainUrl
+                            this.quality = Qualities.Unknown.value
+                            this.type = ExtractorLinkType.VIDEO
+                        }
+                    )
                 }
             } catch (_: Exception) {}
         }
