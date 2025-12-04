@@ -5,12 +5,12 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
 class AC : MainAPI() {
-    override var mainUrl = "https://www.youtube.com"
+    override var mainUrl = "https://m.youtube.com"
     override var name = "Abdullah Çiftçi"
     override val supportedTypes = setOf(TvType.Movie, TvType.LiveStream)
     override val hasMainPage = true
 
-    private val channelUrl = "https://www.youtube.com/@abdullahciftcib/videos"
+    private val channelUrl = "https://m.youtube.com/@abdullahciftcib/videos"
 
     override val mainPage = mainPageOf(
         channelUrl to "Latest Videos",
@@ -54,7 +54,7 @@ class AC : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         // Since this is a channel-specific plugin, we can search within the channel
-        val searchUrl = "https://www.youtube.com/@abdullahciftcib/search?query=${query.encodeURL()}"
+        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${query.encodeURL()}"
         val document = app.get(searchUrl).document
         
         return document.select("ytd-video-renderer").mapNotNull { element ->
@@ -74,7 +74,7 @@ class AC : MainAPI() {
             "Abdullah Çiftçi Video",
             url,
             TvType.Movie,
-            "https://www.youtube.com/watch?v=$videoId"
+            "https://m.youtube.com/watch?v=$videoId"
         ) {
             posterUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
             plot = "Watch content from Abdullah Çiftçi's YouTube channel"
@@ -206,7 +206,7 @@ class AC : MainAPI() {
             ExtractorLink(
                 name = this.name,
                 url = "https://rr3---sn-4g5e6ns6.googlevideo.com/videoplayback?ip=xxx&id=$videoId&itag=${getItagFromQuality(qualityValue)}&source=youtube",
-                referer = "https://www.youtube.com",
+                referer = "https://m.youtube.com",
             ).apply {
                 quality = getQualityFromName(qualityLabel)
                 this.isM3u8 = false
@@ -217,8 +217,8 @@ class AC : MainAPI() {
                     "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                     "Accept" to "*/*",
                     "Accept-Language" to "en-US,en;q=0.5",
-                    "Origin" to "https://www.youtube.com",
-                    "Referer" to "https://www.youtube.com/",
+                    "Origin" to "https://m.youtube.com",
+                    "Referer" to "https://m.youtube.com/",
                 )
                 
                 callback(this)
