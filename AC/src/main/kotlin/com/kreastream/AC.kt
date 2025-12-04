@@ -2,8 +2,7 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import org.jsoup.nodes.Element
 
 class AC : MainAPI() {
@@ -30,18 +29,18 @@ class AC : MainAPI() {
             val link = element.selectFirst("a#thumbnail")?.attr("href") ?: return@mapNotNull null
             val title = element.selectFirst("#video-title")?.text()?.trim() ?: return@mapNotNull null
             val thumbnail = element.selectFirst("img")?.attr("src")
-            val duration = element.selectFirst("span#text")?.text()?.trim()
+            val durationText = element.selectFirst("span#text")?.text()?.trim()
 
             newMovieSearchResponse(title, mainUrl + link, TvType.Movie) {
                 this.posterUrl = thumbnail
-                // Duration is set as a property in the builder
-                duration?.let { 
-                    this.duration = parseDuration(it)
+                // Set duration using the setDuration method
+                durationText?.let { 
+                    setDuration(parseDuration(it))
                 }
             }
         }
 
-        return newHomePageResponse(request.name, items, hasNext = true)
+        return newHomePageResponse(request.name, items, false)
     }
 
     private fun parseDuration(duration: String): Int {
@@ -59,7 +58,7 @@ class AC : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         // Since this is a channel-specific plugin, we can search within the channel
-        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${query.urlEncoded()}"
+        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${query.replace(" ", "+")}"
         val document = app.get(searchUrl).document
         
         return document.select("ytd-video-renderer").mapNotNull { element ->
@@ -88,8 +87,13 @@ class AC : MainAPI() {
             addActors(listOf(Actor("Abdullah Çiftçi")))
             
             // Get recommendations
-            val recommendedVideos = getMainPage(1, MainPageRequest(channelUrl, "Recommended"))
-            this.recommendations = recommendedVideos.homepageItems.firstOrNull()?.items?.take(10) ?: emptyList()
+            try {
+                val recommendedVideos = getMainPage(1, MainPageRequest(channelUrl, "Recommended"))
+                // Access the items from the homepage response
+                this.recommendations = recommendedVideos.homepageItems.flatMap { it.list }
+            } catch (e: Exception) {
+                this.recommendations = emptyList()
+            }
         }
     }
 
@@ -133,7 +137,6 @@ class AC : MainAPI() {
                                     name = this.name,
                                     url = format.url,
                                     source = name,
-                                    
                                 ) {
                                     this.referer = instance
                                     this.quality = getQualityFromName(format.quality ?: "")
@@ -151,7 +154,6 @@ class AC : MainAPI() {
                                 ) {
                                     this.referer = instance
                                     this.quality = getQualityFromName(format.quality ?: "")
-                                    //this.isM3u8 = format.type?.contains("m3u8") == true
                                 }.let(callback)
                             }
                         }
@@ -177,60 +179,15 @@ class AC : MainAPI() {
             }
         }
         
-        // Method 2: Fallback using yt-dlp style extraction
+        // Method 2: Fallback using simple extraction
         return try {
-            loadWithYtDlpStyle(videoId, callback)
+            // For YouTube, we can use a simpler approach
+            // The actual URL extraction would be handled by CloudStream's internal YouTube extractor
+            // Let's return false to let CloudStream handle it with its default extractor
+            false
         } catch (e: Exception) {
             false
         }
-    }
-    
-    // Alternative method using yt-dlp style pattern
-    private suspend fun loadWithYtDlpStyle(
-        videoId: String,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        // This simulates getting YouTube formats through various methods
-        // You would typically use a proper yt-dlp integration here
-        
-        // For demonstration, we'll create some dummy quality links
-        // In production, you'd parse actual YouTube player response
-        
-        val qualityMap = mapOf(
-            "144p" to Pair(144, "mp4"),
-            "360p" to Pair(360, "mp4"),
-            "480p" to Pair(480, "mp4"),
-            "720p" to Pair(720, "mp4"),
-            "1080p" to Pair(1080, "mp4"),
-        )
-        
-        qualityMap.forEach { (qualityLabel, pair) ->
-            val (qualityValue, container) = pair
-            
-            // Create ExtractorLink using lambda/apply pattern
-            newExtractorLink(
-                name = this.name,
-                url = "https://rr3---sn-4g5e6ns6.googlevideo.com/videoplayback?ip=xxx&id=$videoId&itag=${getItagFromQuality(qualityValue)}&source=youtube",
-                source = this.name,
-            ) {
-                this.referer = "https://m.youtube.com"
-                this.quality = getQualityFromName(qualityLabel)
-                //this.isM3u8 = false
-                //this.extraName = "$qualityLabel • $container"
-                
-                // Add headers
-                this.headers = mapOf(
-                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    "Accept" to "*/*",
-                    "Accept-Language" to "en-US,en;q=0.5",
-                    "Origin" to "https://m.youtube.com",
-                    "Referer" to "https://m.youtube.com/",
-                )
-                
-            }.let(callback)
-        }
-        
-        return qualityMap.isNotEmpty()
     }
     
     // Helper function to get YouTube itag from quality
