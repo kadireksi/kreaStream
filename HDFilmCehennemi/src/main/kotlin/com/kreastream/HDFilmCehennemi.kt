@@ -221,6 +221,60 @@ class HDFilmCehennemi : MainAPI() {
         return searchResults
     }
 
+    override suspend fun load(url: String): LoadResponse? {
+        val document = app.get(url).document
+        val data = document.extractLoadData() ?: return null
+
+        val recommendations = document.select("div.section-slider-container div.slider-slide").mapNotNull {
+            val recName      = it.selectFirst("a")?.attr("title") ?: return@mapNotNull null
+            val recHref      = fixUrlNull(it.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
+            val recPosterUrl = fixUrlNull(it.selectFirst("img")?.attr("data-src")) ?:
+            fixUrlNull(it.selectFirst("img")?.attr("src"))
+
+            newTvSeriesSearchResponse(recName, recHref, data.tvType) { 
+                this.posterUrl = recPosterUrl
+            }
+        }
+
+        return if (data.tvType == TvType.TvSeries) {
+            val episodes = document.select("div.seasons-tab-content a").mapNotNull {
+                val epName    = it.selectFirst("h4")?.text()?.trim() ?: return@mapNotNull null
+                val epHref    = fixUrlNull(it.attr("href")) ?: return@mapNotNull null
+                val epEpisode = Regex("""(\d+)\. ?Bölüm""").find(epName)?.groupValues?.get(1)?.toIntOrNull()
+                val epSeason  = Regex("""(\d+)\. ?Sezon""").find(epName)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+
+                newEpisode(epHref) {
+                    this.name = epName
+                    this.season = epSeason
+                    this.episode = epEpisode
+                }
+            }
+
+            newTvSeriesLoadResponse(data.newTitle, url, data.tvType, episodes) {
+                this.posterUrl       = data.poster
+                this.year            = data.year
+                this.plot            = data.description
+                this.tags            = data.tags
+                this.score           = Score.from10(data.score)
+                this.recommendations = recommendations
+                addActors(data.actors)
+                addTrailer(data.trailer)
+            }
+        } else {
+            newMovieLoadResponse(data.newTitle, url, data.tvType, url) {
+                this.posterUrl       = data.poster
+                this.year            = data.year
+                this.plot            = data.description
+                this.tags            = data.tags
+                this.score           = Score.from10(data.score)
+                this.recommendations = recommendations
+                addActors(data.actors)
+                addTrailer(data.trailer)
+            }
+        }
+    }
+
+
     // ────────────────────────────── DECRYPTER (4 METHODS - NEW ONE FIRST) ──────────────────────────────
     private object HDFCDecrypter {
 
