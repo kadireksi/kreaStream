@@ -13,7 +13,6 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.OkHttpClient // FIX: Required import
-import com.lagradost.cloudstream3.utils.AppUtils.defaultOkHttpClient // FIX: Required import
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -36,25 +35,6 @@ class HDFilmCehennemi : MainAPI() {
     // Tracks to prevent processing the same download ID or video URL multiple times in loadLinks
     private val seenDownloadIds = mutableSetOf<String>()
     private val seenVideoUrls = mutableSetOf<String>()
-
-    private val cloudflareKiller by lazy { CloudflareKiller() }
-    
-    class CloudflareKiller { 
-        fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request()) 
-    }
-    
-    class CloudflareInterceptor(private val cloudflareKiller: CloudflareKiller): Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val request  = chain.request()
-            val response = chain.proceed(request)
-            return response
-        }
-    }
-
-    // FIX: Client property now correctly imports OkHttpClient and defaultOkHttpClient
-    override val client: OkHttpClient = defaultOkHttpClient.newBuilder()
-        .addInterceptor(CloudflareInterceptor(cloudflareKiller))
-        .build()
 
     private val objectMapper = ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
