@@ -28,22 +28,25 @@ class AC : MainAPI() {
         val doc = app.get(paged(request.data, page)).document
 
         val items = doc.select("ytd-video-renderer, ytd-rich-item-renderer").mapNotNull { toSearch(it) }
-
         val hasNext = doc.toString().contains("continuation")
 
-        return newHomePageResponse(request.name, items, hasNext)
+        return newHomePageResponse(
+            request.name,
+            items,
+            hasNext,
+            emptyList() // <-- FIX for horizontalImages
+        )
     }
 
     private fun toSearch(el: Element): SearchResponse? {
         val href = el.selectFirst("a#thumbnail")?.attr("href") ?: return null
         var title = el.selectFirst("#video-title")?.text()?.trim() ?: "Video"
-        val img = el.selectFirst("img")?.attr("src")
+        val thumb = el.selectFirst("img")?.attr("src")
 
-        // Shorts label
         if (href.contains("/shorts/")) title = "🎬 SHORT · $title"
 
         return newMovieSearchResponse(title, fixUrl(href), TvType.Movie) {
-            posterUrl = img
+            posterUrl = thumb
         }
     }
 
@@ -67,10 +70,9 @@ class AC : MainAPI() {
             "$mainUrl/watch?v=$videoId"
         ) {
             posterUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
-            plot = "Content from Abdullah Çiftçi Official YouTube channel."
+            plot = "Video from Abdullah Çiftçi Official YouTube channel."
 
-            // Fix recommendations type
-            recommendations = rec.items.flatMap { it.items }.take(10)
+            recommendations = rec.items.firstOrNull()?.list ?: emptyList() // <-- FIX
         }
     }
 
@@ -83,50 +85,67 @@ class AC : MainAPI() {
 
         val id = extractId(data)
 
-        val apiList = listOf(
+        val servers = listOf(
             "https://inv.nadeko.net",
             "https://yewtu.be",
             "https://invidious.snopyta.org"
         )
 
-        for (base in apiList) {
+        for (host in servers) {
             try {
-                val json = app.get("$base/api/v1/videos/$id").parsedSafe<Invidious>() ?: continue
+                val json = app.get("$host/api/v1/videos/$id").parsedSafe<Invidious>() ?: continue
 
-                json.formatStreams?.sortedByDescending { q(it.quality) }?.forEach { fmt ->
-                    newExtractorLink(
-                        name,
-                        fmt.url ?: return@forEach,
-                        name,
-                        referer = mainUrl,
-                        quality = q(fmt.quality)
-                    ).let(callback)
+                json.formatStreams?.sortedByDescending { detectQuality(it.quality) }?.forEach { fmt ->
+
+                    callback(
+                        ExtractorLink(
+                            name,
+                            name,
+                            fmt.url ?: return@forEach,
+                            mainUrl,                     // referer param position
+                            detectQuality(fmt.quality), // quality param position
+                            false                       // isM3u8
+                        )
+                    )
                 }
 
                 return true
             } catch (_: Exception) {}
         }
 
-        return fallback(id, callback)
+        return fallbackExtract(id, callback)
     }
 
-    private fun fallback(videoId: String, callback: (ExtractorLink) -> Unit): Boolean {
+    private fun fallbackExtract(id: String, cb: (ExtractorLink) -> Unit): Boolean {
         val qualities = listOf(144, 360, 480, 720, 1080)
 
         qualities.forEach { q ->
-            newExtractorLink(
-                name,
-                "https://rr.youtube.com/videoplayback?id=$videoId&itag=${itag(q)}",
-                name,
-                referer = mainUrl,
-                quality = q
-            ).let(callback)
+            cb(
+                ExtractorLink(
+                    name,
+                    name,
+                    "https://rr.youtube.com/videoplayback?id=$id&itag=${itag(q)}",
+                    mainUrl,
+                    q,
+                    false
+                )
+            )
         }
         return true
     }
 
     private fun extractId(url: String): String =
         url.substringAfter("v=").substringBefore("&").substringAfter("/shorts/")
+
+    private fun detectQuality(q: String?): Int =
+        when {
+            q?.contains("144") == true -> Qualities.P144.value
+            q?.contains("360") == true -> Qualities.P360.value
+            q?.contains("480") == true -> Qualities.P480.value
+            q?.contains("720") == true -> Qualities.P720.value
+            q?.contains("1080") == true -> Qualities.P1080.value
+            else -> Qualities.Unknown.value
+        }
 
     private fun itag(q: Int) = when (q) {
         144 -> 160
@@ -135,15 +154,6 @@ class AC : MainAPI() {
         720 -> 136
         1080 -> 137
         else -> 134
-    }
-
-    private fun q(q: String?): Int = when {
-        q?.contains("144") == true -> Qualities.P144.value
-        q?.contains("360") == true -> Qualities.P360.value
-        q?.contains("480") == true -> Qualities.P480.value
-        q?.contains("720") == true -> Qualities.P720.value
-        q?.contains("1080") == true -> Qualities.P1080.value
-        else -> Qualities.Unknown.value
     }
 
     private data class Invidious(
