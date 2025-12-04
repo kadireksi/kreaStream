@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import okhttp3.Interceptor
@@ -32,6 +31,7 @@ class HDFilmCehennemi : MainAPI() {
     override var sequentialMainPageDelay        = 50L
     override var sequentialMainPageScrollDelay  = 50L
 
+    // Tracks to prevent processing the same download ID or video URL multiple times in loadLinks
     private val seenDownloadIds = mutableSetOf<String>()
     private val seenVideoUrls = mutableSetOf<String>()
 
@@ -48,6 +48,10 @@ class HDFilmCehennemi : MainAPI() {
             return response
         }
     }
+
+    override val client: OkHttpClient = defaultOkHttpClient.newBuilder()
+        .addInterceptor(CloudflareInterceptor(cloudflareKiller))
+        .build()
 
     private val objectMapper = ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
@@ -173,12 +177,15 @@ class HDFilmCehennemi : MainAPI() {
         }
 
         try {
-            val hdfc: HDFC = objectMapper.readValue(response.text, HDFC::class.java)
+            // FIX: Use parsedSafe instead of tryParseJson
+            val hdfc: HDFC = response.parsedSafe<HDFC>() ?: return newHomePageResponse(request.name, emptyList())
             val document = Jsoup.parse(hdfc.html)
+            
             // Select all relevant link elements
             val results = document.select("a.poster, a.mini-poster").mapNotNull { it.toSearchResult() }
             return newHomePageResponse(request.name, results)
         } catch (e: Exception) {
+            Log.e("HDFC", "Main page parsing failed", e)
             return newHomePageResponse(request.name, emptyList())
         }
     }
@@ -215,6 +222,7 @@ class HDFilmCehennemi : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun search(query: String): List<SearchResponse> {
+        // FIX: Use parsedSafe instead of tryParseJson
         val response = app.get(
             "${mainUrl}/search?q=${query}",
             headers = mapOf("X-Requested-With" to "fetch")
@@ -239,6 +247,9 @@ class HDFilmCehennemi : MainAPI() {
         return searchResults
     }
     
+    // ==========================================
+    // DOWNLOAD LINK EXTRACTION
+    // ==========================================
     private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
         val downloadUrl = "https://hdfilmcehennemi.download/download/$rapidrameId"
         val qualities = mapOf("low" to "Download SD", "high" to "Download HD")
@@ -251,14 +262,16 @@ class HDFilmCehennemi : MainAPI() {
                     .add("selected_quality", qualityData)
                     .build()
                 
+                // FIX: Use parsedSafe instead of tryParseJson
                 val response = app.post(
                     postUrl,
                     requestBody = postBody,
                     headers = mapOf("Referer" to downloadUrl),
                     referer = downloadUrl
-                ).tryParseJson<DownloadResponse>()
+                ).parsedSafe<DownloadResponse>()
 
                 val finalLink = response?.download_link
+                // FIX: The compiler should now understand !finalLink.isNullOrEmpty()
                 if (!finalLink.isNullOrEmpty()) {
                     callback.invoke(
                         newExtractorLink(
@@ -331,6 +344,9 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
     
+    // ==========================================
+    // DECRYPTION LOGIC
+    // ==========================================
     private object HDFCDecrypter {
         
         private fun applyRot13(inputBytes: ByteArray): ByteArray {
@@ -365,7 +381,6 @@ class HDFilmCehennemi : MainAPI() {
             return applyCustomShift(rot13edBytes, seed)
         }
 
-        // Attempt 2: ROT13 on String -> Reverse String -> Base64 Decode -> Custom Shift
         private fun attempt2(encryptedData: String, seed: Int): String {
             val rot13edString = applyRot13(encryptedData.toByteArray()).toString(Charsets.UTF_8)
             val reversedString = rot13edString.reversed()
@@ -373,7 +388,6 @@ class HDFilmCehennemi : MainAPI() {
             return applyCustomShift(decodedBytes, seed)
         }
 
-        // Attempt 3: Reverse String -> ROT13 on String -> Base64 Decode -> Custom Shift
         private fun attempt3(encryptedData: String, seed: Int): String {
             val reversedString = encryptedData.reversed()
             val rot13edString = applyRot13(reversedString.toByteArray()).toString(Charsets.UTF_8)
@@ -381,6 +395,9 @@ class HDFilmCehennemi : MainAPI() {
             return applyCustomShift(decodedBytes, seed)
         }
 
+        /**
+         * Correct working sequence: Base64 Decode -> ROT13 -> Reverse Bytes -> Custom Shift
+         */
         private fun attempt4(encryptedData: String, seed: Int): String {
             return try {
                 val decodedBytes = Base64.decode(encryptedData, Base64.DEFAULT)
@@ -396,29 +413,25 @@ class HDFilmCehennemi : MainAPI() {
         // Main function to try all known orders
         fun dynamicDecrypt(encryptedData: String, seed: Int): String {
             val decryptionAttempts = listOf<() -> String>(
+                { attempt4(encryptedData, seed) }, // Prioritize the known working one
                 { attempt1(encryptedData, seed) },
                 { attempt2(encryptedData, seed) },
-                { attempt3(encryptedData, seed) },
-                { attempt4(encryptedData, seed) }
+                { attempt3(encryptedData, seed) }
             )
 
             for ((index, attempt) in decryptionAttempts.withIndex()) {
                 try {
                     val decryptedUrl = attempt()
-                    // A successful decryption should yield a URL starting with "http"
                     if (decryptedUrl.startsWith("http")) {
                         Log.d("HDFC", "Decryption Success with Attempt ${index + 1}")
                         return decryptedUrl
                     }
                 } catch (e: IllegalArgumentException) {
-                    // This typically means bad Base64 input, which is expected for incorrect orders.
-                    Log.d("HDFC", "Decryption Attempt ${index + 1} failed: Bad Base64")
+                    // Expected for incorrect Base64 decoding attempts
                 } catch (e: Exception) {
                     Log.e("HDFC", "Decryption Attempt ${index + 1} failed: ${e.message}")
                 }
             }
-
-            Log.e("HDFC", "All decryption attempts failed.")
             return ""
         }
     }
@@ -439,7 +452,7 @@ class HDFilmCehennemi : MainAPI() {
 
             val unpacked = JsUnpacker(script).unpack() ?: return
             
-            // --- PART A: DOWNLOAD ID EXTRACTION (Consistent) ---
+            // --- PART A: DOWNLOAD ID EXTRACTION (Consistent for downloads) ---
             try {
                 // ID is in the image path: image: "https://.../aaktqas1ejb1.jpg"
                 val imageRegex = Regex("""image:\s*["'](.*?)["']""")
