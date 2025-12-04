@@ -121,15 +121,15 @@ class AC : MainAPI() {
                         // Add video formats with multiple qualities using new ExtractorLink pattern
                         videoInfo.formatStreams?.forEach { format ->
                             if (!format.url.isNullOrBlank()) {
-                                ExtractorLink(
+                                newExtractorLink(
                                     name = this.name,
                                     url = format.url,
-                                    referer = instance,
-                                ).apply {
-                                    quality = getQualityFromName(format.quality ?: "")
-                                    this.isM3u8 = format.type?.contains("m3u8") == true
-                                    this.extraName = "${format.quality ?: "Unknown"}"
-                                    callback(this)
+                                    source = name,
+                                    
+                                ){
+                                    this.referer = instance
+                                    this.quality = getQualityFromName(format.quality ?: "")
+
                                 }
                             }
                         }
@@ -137,16 +137,15 @@ class AC : MainAPI() {
                         // Add adaptive formats
                         videoInfo.adaptiveFormats?.forEach { format ->
                             if (!format.url.isNullOrBlank()) {
-                                ExtractorLink(
+                                newExtractorLink(
                                     name = this.name,
                                     url = format.url,
                                     source = name,
-                                ).apply {
-                                    referer = instance
-                                    quality = getQualityFromName(format.quality ?: "")
+                                ) {
+                                    this.referer = instance
+                                    this.quality = getQualityFromName(format.quality ?: "")
                                     //this.isM3u8 = format.type?.contains("m3u8") == true
-                                    this.extraName = "${format.quality ?: "Unknown"} (Adaptive)"
-                                    callback(this)
+                                    //this.extraName = "${format.quality ?: "Unknown"} (Adaptive)"
                                 }
                             }
                         }
@@ -203,14 +202,14 @@ class AC : MainAPI() {
             val (qualityValue, container) = pair
             
             // Create ExtractorLink using lambda/apply pattern
-            ExtractorLink(
+            newExtractorLink(
                 name = this.name,
                 url = "https://rr3---sn-4g5e6ns6.googlevideo.com/videoplayback?ip=xxx&id=$videoId&itag=${getItagFromQuality(qualityValue)}&source=youtube",
                 referer = "https://m.youtube.com",
-            ).apply {
-                quality = getQualityFromName(qualityLabel)
-                this.isM3u8 = false
-                this.extraName = "$qualityLabel • $container"
+            ) {
+                this.quality = getQualityFromName(qualityLabel)
+                //this.isM3u8 = false
+                //this.extraName = "$qualityLabel • $container"
                 
                 // Add headers
                 this.headers = mapOf(
@@ -221,7 +220,7 @@ class AC : MainAPI() {
                     "Referer" to "https://m.youtube.com/",
                 )
                 
-                callback(this)
+                //callback(this)
             }
         }
         
@@ -278,9 +277,4 @@ class AC : MainAPI() {
         val label: String? = null,
         val url: String? = null
     )
-}
-
-@Suppress("unused")
-fun getPlugin(): AC {
-    return AC()
 }
