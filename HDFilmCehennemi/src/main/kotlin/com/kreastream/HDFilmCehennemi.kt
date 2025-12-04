@@ -498,6 +498,8 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(data).document
         val rapidrameReferer = "$mainUrl/"
 
+        var rapidrameId: String? = null
+
         // --- 1. Check Alternative Links FIRST (Rapidrame usually here) ---
         // This prioritizes Rapidrame over the default player
         document.select("div.alternative-links").forEach { element ->
@@ -530,7 +532,9 @@ class HDFilmCehennemi : MainAPI() {
                     } else {
                         "$sourceNameRaw $langCode"
                     }
-                    // invokeLocalSource will now also look for downloads inside this iframe's JS
+
+                    rapidrameId = iframe.substringAfter("?rapidrame_id=", "").takeIf { it.isNotEmpty() }
+                    
                     invokeLocalSource(finalSourceName, iframe, rapidrameReferer, callback) 
                 }
             }
