@@ -797,7 +797,7 @@ class TurkTV : MainAPI() {
                             val subtitlesStr = it.groupValues[1]
                             val subtitleRegex = Regex("""["']src["']\s*:\s*["']([^"']+\.vtt[^"']*)["']""")
                             subtitleRegex.findAll(subtitlesStr).forEach { match ->
-                                subtitleCallback.invoke(SubtitleFile("Türkçe", match.groupValues[1]))
+                                subtitleCallback.invoke(newSubtitleFile ("Türkçe", match.groupValues[1]))
                             }
                         }
                     } catch (_: Exception) {}
