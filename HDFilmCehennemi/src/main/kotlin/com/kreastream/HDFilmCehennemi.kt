@@ -336,9 +336,6 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
     
-// ... imports remain the same
-
-    // REPLACE the HDFCDecrypter object with this updated version
     private object HDFCDecrypter {
         
         private fun applyRot13(inputBytes: ByteArray): ByteArray {
@@ -432,7 +429,6 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // REPLACE invokeLocalSource with this one to handle embedded ID extraction
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
@@ -454,10 +450,6 @@ class HDFilmCehennemi : MainAPI() {
             val imageUrl = imageRegex.find(unpacked)?.groupValues?.get(1)
             if (imageUrl != null) {
                 val rapidrameId = imageUrl.substringAfterLast("/").substringBefore(".")
-                if (rapidrameId.isNotEmpty() && rapidrameId.all { it.isLetterOrDigit() }) {
-                    // Trigger download extraction here since we have the ID directly from the source
-                    extractDownloadLinks(rapidrameId, callback)
-                }
             }
             // ----------------------------------------------
             
@@ -574,6 +566,10 @@ class HDFilmCehennemi : MainAPI() {
             // Note: We don't rely on this URL for rapidrame_id downloads anymore, 
             // as invokeLocalSource handles it for every source individually.
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
+        }
+        
+        if (!rapidrameId.isNullOrEmpty()) {
+            extractDownloadLinks(rapidrameId, callback)
         }
 
         return true
