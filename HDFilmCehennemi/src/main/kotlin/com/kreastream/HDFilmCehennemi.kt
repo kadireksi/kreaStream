@@ -421,27 +421,19 @@ class HDFilmCehennemi : MainAPI() {
             seenUrls.add(decryptedUrl)
 
             // 5. Determine if it's HLS 
-           if (decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")) {
-                M3u8Helper.generateM3u8(
-                    source,
-                    decryptedUrl,
-                    referer
-                ).forEach { link ->
-                    callback(link)
+            val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
+            
+            callback.invoke(
+                newExtractorLink(
+                    source  = source,
+                    name    = source,
+                    url     = decryptedUrl
+                ){
+                    this.referer = referer
+                    this.quality = Qualities.Unknown.value
+                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 }
-            } else {
-                callback.invoke(
-                    newExtractorLink(
-                        source  = source,
-                        name    = source,
-                        url     = decryptedUrl
-                    ){
-                        this.referer = referer
-                        this.quality = Qualities.Unknown.value
-                        this.type    = ExtractorLinkType.VIDEO
-                    }
-                )
-            }
+            )
         } catch (e: Exception) {
             Log.e("HDFC", "Error extracting local source", e)
         }
