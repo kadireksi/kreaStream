@@ -496,56 +496,6 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // Update extractDownloadLinks to use the domain from the snippet if necessary
-    // (Optional: switch to hdfilmcehennemi.download if cehennempass fails, 
-    // but keep current logic if it works backend-side. Below is the updated URL base)
-    private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
-        val downloadUrl = "https://hdfilmcehennemi.download/download/$rapidrameId" // Updated domain based on snippet
-        
-        val qualities = mapOf(
-            "low" to "Download SD", 
-            "high" to "Download HD"   
-        )
-
-        qualities.forEach { (qualityData, qualityName) ->
-            // The process URL might also need updating or staying as cehennempass.pw
-            // Trying the new domain for processing as well based on common patterns
-            val postUrl = "https://hdfilmcehennemi.download/process_quality_selection.php" 
-            
-            val postBody = okhttp3.FormBody.Builder()
-                .add("video_id", rapidrameId)
-                .add("selected_quality", qualityData)
-                .build()
-            
-            try {
-                val response = app.post(
-                    postUrl,
-                    requestBody = postBody,
-                    headers = standardHeaders,
-                    referer = downloadUrl 
-                ).parsedSafe<DownloadResponse>()
-
-                val finalLink = response?.download_link
-
-                if (!finalLink.isNullOrEmpty()) {
-                    callback.invoke(
-                        newExtractorLink(
-                            source = name, 
-                            name = qualityName,
-                            url = finalLink
-                        ) {
-                            this.quality = Qualities.Unknown.value
-                            this.type = ExtractorLinkType.VIDEO
-                        }
-                    )
-                }
-            } catch (e: Exception) {
-                // Fallback to old domain if new one fails
-                 Log.e("HDFC", "Download extraction failed", e)
-            }
-        }
-    }
-
     // REPLACE loadLinks with this reordered version
     override suspend fun loadLinks(
         data: String,
