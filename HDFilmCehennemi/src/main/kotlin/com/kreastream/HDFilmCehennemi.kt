@@ -3,33 +3,31 @@ package com.kreastream
 import android.util.Base64
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
+import com.lagradost.cloudstream3.utils.JsUnpacker
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import okhttp3.Interceptor
 import okhttp3.Response
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
 import kotlin.text.Charsets
 
 class HDFilmCehennemi : MainAPI() {
-    override var mainUrl              = "https://www.hdfilmcehennemi.la"
-    override var name                 = "HDFilmCehennemi"
-    override val hasMainPage          = true
-    override var lang                 = "tr"
-    override val hasQuickSearch       = true
-    override var hasDownloadSupport   = true 
-    override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
+    override var mainUrl = "https://www.hdfilmcehennemi.la"
+    override var name = "HDFilmCehennemi"
+    override val hasMainPage = true
+    override var lang = "tr"
+    override val hasQuickSearch = true
+    override var hasDownloadSupport = true
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
+    override var sequentialMainPage = true
+    override var sequentialMainPageDelay = 50L
+    override var sequentialMainPageScrollDelay = 50L
 
-    override var sequentialMainPage             = true
-    override var sequentialMainPageDelay        = 50L
-    override var sequentialMainPageScrollDelay  = 50L
+    private val seenDownloadIds = mutableSetOf<String>()
+    private val seenVideoUrls = mutableSetOf<String>()
+
 
     private val cloudflareKiller by lazy { CloudflareKiller() }
     
@@ -235,53 +233,6 @@ class HDFilmCehennemi : MainAPI() {
         }
         return searchResults
     }
-    
-    // START DOWNLOAD LOGIC FUNCTIONS
-    
-    private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
-        val downloadUrl = "https://cehennempass.pw/download/$rapidrameId"
-        
-        // Map the qualities provided in the script to display names
-        val qualities = mapOf(
-            "low" to "Download SD", 
-            "high" to "Download HD"   
-        )
-
-        qualities.forEach { (qualityData, qualityName) ->
-            val postUrl = "https://cehennempass.pw/process_quality_selection.php"
-            
-            // Build the form data for the POST request
-            val postBody = okhttp3.FormBody.Builder()
-                .add("video_id", rapidrameId)
-                .add("selected_quality", qualityData)
-                .build()
-            
-            // Make the POST request to get the final download link
-            val response = app.post(
-                postUrl,
-                requestBody = postBody,
-                headers = standardHeaders,
-                referer = downloadUrl 
-            ).parsedSafe<DownloadResponse>()
-
-            val finalLink = response?.download_link
-
-            if (finalLink.isNullOrEmpty()) return@forEach
-
-            callback.invoke(
-                newExtractorLink(
-                    source = name, 
-                    name = qualityName,
-                    url = finalLink
-                ) {
-                    this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.VIDEO
-                }
-            )
-        }
-    }
-    
-    // END DOWNLOAD LOGIC FUNCTIONS
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
@@ -335,9 +286,9 @@ class HDFilmCehennemi : MainAPI() {
             }
         }
     }
-    
+
     private object HDFCDecrypter {
-        
+
         private fun applyRot13(inputBytes: ByteArray): ByteArray {
             val rot13edBytes = ByteArray(inputBytes.size)
             for (i in inputBytes.indices) {
@@ -355,7 +306,7 @@ class HDFilmCehennemi : MainAPI() {
         private fun applyCustomShift(inputBytes: ByteArray, seed: Int): String {
             val sb = StringBuilder()
             for (i in inputBytes.indices) {
-                val charCode = inputBytes[i].toInt() and 0xFF // Unsigned conversion
+                val charCode = inputBytes[i].toInt() and 0xFF
                 val shift = seed % (i + 5)
                 val newChar = (charCode - shift + 256) % 256
                 sb.append(newChar.toChar())
@@ -363,69 +314,62 @@ class HDFilmCehennemi : MainAPI() {
             return sb.toString()
         }
 
-        // Attempt 1: Reverse String -> Base64 Decode -> ROT13 on Bytes -> Custom Shift
-        private fun attempt1(encryptedData: String, seed: Int): String {
-            val reversedString = encryptedData.reversed()
-            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
-            val rot13edBytes = applyRot13(decodedBytes)
-            return applyCustomShift(rot13edBytes, seed)
-        }
-
-        // Attempt 2: ROT13 on String -> Reverse String -> Base64 Decode -> Custom Shift
-        private fun attempt2(encryptedData: String, seed: Int): String {
-            val rot13edString = applyRot13(encryptedData.toByteArray()).toString(Charsets.UTF_8)
-            val reversedString = rot13edString.reversed()
-            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
-            return applyCustomShift(decodedBytes, seed)
-        }
-
-        // Attempt 3: Reverse String -> ROT13 on String -> Base64 Decode -> Custom Shift
-        private fun attempt3(encryptedData: String, seed: Int): String {
-            val reversedString = encryptedData.reversed()
-            val rot13edString = applyRot13(reversedString.toByteArray()).toString(Charsets.UTF_8)
-            val decodedBytes = Base64.decode(rot13edString, Base64.DEFAULT)
-            return applyCustomShift(decodedBytes, seed)
-        }
-
-        // Attempt 4: Base64 Decode -> ROT13 on Bytes -> Reverse Bytes -> Custom Shift
-        // Matches JS: atob(x) -> replace(Rot13) -> reverse() -> Shift Loop
+        /**
+         * Correct Decryption Chain (Base64 -> ROT13 -> Reverse -> Custom Shift)
+         */
         private fun attempt4(encryptedData: String, seed: Int): String {
-            try {
-                // 1. Base64 Decode
+            return try {
                 val decodedBytes = Base64.decode(encryptedData, Base64.DEFAULT)
-                // 2. ROT13
                 val rot13edBytes = applyRot13(decodedBytes)
-                // 3. Reverse
                 val reversedBytes = rot13edBytes.reversedArray()
-                // 4. Custom Shift
-                return applyCustomShift(reversedBytes, seed)
+                applyCustomShift(reversedBytes, seed)
             } catch (e: Exception) {
-                return ""
+                Log.e("HDFC", "Decryption Attempt 4 Failed: ${e.message}")
+                ""
             }
         }
 
-        // Main function to try all known orders
         fun dynamicDecrypt(encryptedData: String, seed: Int): String {
-            val decryptionAttempts = listOf<() -> String>(
-                { attempt4(encryptedData, seed) }, // Try the new JS method first
-                { attempt1(encryptedData, seed) },
-                { attempt2(encryptedData, seed) },
-                { attempt3(encryptedData, seed) }
-            )
+            return attempt4(encryptedData, seed).takeIf { it.startsWith("http") } ?: ""
+        }
+    }
 
-            for ((index, attempt) in decryptionAttempts.withIndex()) {
-                try {
-                    val decryptedUrl = attempt()
-                    // A successful decryption should yield a URL starting with "http"
-                    if (decryptedUrl.startsWith("http")) {
-                        Log.d("HDFC", "Decryption Success with Attempt ${index + 1}")
-                        return decryptedUrl
-                    }
-                } catch (e: Exception) {
-                    Log.d("HDFC", "Decryption Attempt ${index + 1} failed")
+    private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
+        val downloadUrl = "https://hdfilmcehennemi.download/download/$rapidrameId"
+        val qualities = mapOf("low" to "Download SD", "high" to "Download HD")
+        val postUrl = "https://hdfilmcehennemi.download/process_quality_selection.php"
+
+        qualities.forEach { (qualityData, qualityName) ->
+            try {
+                val postBody = okhttp3.FormBody.Builder()
+                    .add("video_id", rapidrameId)
+                    .add("selected_quality", qualityData)
+                    .build()
+                
+                // Use the download page as the Referer
+                val response = app.post(
+                    postUrl,
+                    requestBody = postBody,
+                    headers = mapOf("Referer" to downloadUrl),
+                    referer = downloadUrl
+                ).tryParseJson<DownloadResponse>()
+
+                val finalLink = response?.download_link
+                if (!finalLink.isNullOrEmpty()) {
+                    callback.invoke(
+                        newExtractorLink(
+                            source = name, 
+                            name = qualityName,
+                            url = finalLink
+                        ) {
+                            this.quality = Qualities.Unknown.value
+                            this.type = ExtractorLinkType.VIDEO
+                        }
+                    )
                 }
+            } catch (e: Exception) {
+                Log.e("HDFC", "Failed to fetch download: $qualityName", e)
             }
-            return ""
         }
     }
 
@@ -436,59 +380,81 @@ class HDFilmCehennemi : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ) {
         try {
+            // 1. Fetch and Unpack JS
             val response = app.get(url, referer = "$mainUrl/")
             val script = response.document.select("script").find { 
                 it.data().contains("eval(function(p,a,c,k,e,d)") 
             }?.data() ?: return
 
-            // 1. Unpack the javascript
             val unpacked = JsUnpacker(script).unpack() ?: return
             
-            // --- NEW: Extract Rapidrame ID for Download ---
-            // Look for image: "https://.../aaktqas1ejb1.jpg"
-            val imageRegex = Regex("""image:\s*["'](.*?)["']""")
-            val imageUrl = imageRegex.find(unpacked)?.groupValues?.get(1)
-            if (imageUrl != null) {
-                val rapidrameId = imageUrl.substringAfterLast("/").substringBefore(".")
+            // =========================================================================
+            // PART A: DOWNLOAD ID EXTRACTION (Consistent for all players)
+            // =========================================================================
+            try {
+                // The ID is consistently extracted from the image path in the player config
+                val imageRegex = Regex("""image:\s*["'](.*?)["']""")
+                val imageUrl = imageRegex.find(unpacked)?.groupValues?.get(1)
+                
+                if (imageUrl != null) {
+                    val rapidrameId = imageUrl.substringAfterLast("/").substringBefore(".")
+                    
+                    // Prevent duplicate download link fetching
+                    if (rapidrameId.isNotEmpty() && rapidrameId.all { it.isLetterOrDigit() } && !seenDownloadIds.contains(rapidrameId)) {
+                        seenDownloadIds.add(rapidrameId)
+                        extractDownloadLinks(rapidrameId, callback)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HDFC", "Error extracting download ID", e)
             }
-            // ----------------------------------------------
-            
-            // 2. Extract the encrypted array string
+
+            // =========================================================================
+            // PART B: VIDEO DECRYPTION AND QUALITY SPLITTING
+            // =========================================================================
             val callRegex = Regex("""\w+\(\[(.*?)\]\)""")
             val arrayContent = callRegex.find(unpacked)?.groupValues?.get(1) ?: return
             
-            // Clean it up to get the single Base64 string
             val encryptedString = arrayContent.replace("\"", "").replace("'", "").replace(",", "").replace("\\s".toRegex(), "")
-
-            // 3. Extract the math seed
             val seedRegex = Regex("""charCode-\((\d+)%\(i\+5\)\)""")
             val seed = seedRegex.find(unpacked)?.groupValues?.get(1)?.toIntOrNull() ?: 399756995
 
-            // 4. Decrypt dynamically
             val decryptedUrl = HDFCDecrypter.dynamicDecrypt(encryptedString, seed)
             
             if (decryptedUrl.isEmpty()) return
-
-            // 5. Determine if it's HLS 
-            val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
             
-            callback.invoke(
-                newExtractorLink(
-                    source  = source,
-                    name    = source,
-                    url     = decryptedUrl
-                ){
-                    this.referer = referer
-                    this.quality = Qualities.Unknown.value
-                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+            // Prevent duplicate video links
+            if (seenVideoUrls.contains(decryptedUrl)) return
+            seenVideoUrls.add(decryptedUrl)
+
+            // FIX: Use M3u8Helper to split qualities, preventing "2 qualities" overlap
+            if (decryptedUrl.contains(".m3u8")) {
+                M3u8Helper.generateM3u8(
+                    source,
+                    decryptedUrl,
+                    referer
+                ).forEach { link ->
+                    callback(link)
                 }
-            )
+            } else {
+                callback.invoke(
+                    newExtractorLink(
+                        source  = source,
+                        name    = source,
+                        url     = decryptedUrl
+                    ){
+                        this.referer = referer
+                        this.quality = Qualities.Unknown.value
+                        this.type    = ExtractorLinkType.VIDEO
+                    }
+                )
+            }
+
         } catch (e: Exception) {
-            Log.e("HDFC", "Error extracting local source", e)
+            Log.e("HDFC", "Error processing local source", e)
         }
     }
 
-    // REPLACE loadLinks with this reordered version
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -498,25 +464,24 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(data).document
         val rapidrameReferer = "$mainUrl/"
 
-        var rapidrameId: String? = null
+        // Reset trackers for the new page load
+        seenDownloadIds.clear()
+        seenVideoUrls.clear()
 
-        // --- 1. Check Alternative Links FIRST (Rapidrame usually here) ---
-        // This prioritizes Rapidrame over the default player
+        // 1. RAPIDRAME / ALTERNATIVES (Prioritized as requested)
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
                 val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
 
-                // Skip 'Close' here as we handle it separately (or if it appears in list)
-                if (sourceNameRaw.equals("close", ignoreCase = true)) {
-                    return@forEach
-                }
+                // Skip the Close button here
+                if (sourceNameRaw.equals("close", ignoreCase = true)) return@forEach
                 
                 val videoID = button.attr("data-video")
                 
                 val apiGet = app.get(
                     "${mainUrl}/video/$videoID/",
-                    headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
+                    headers = mapOf("X-Requested-With" to "fetch"),
                     referer = data
                 ).text
 
@@ -527,26 +492,20 @@ class HDFilmCehennemi : MainAPI() {
                 }
 
                 if (iframe.isNotEmpty()) {
-                    val finalSourceName = if (sourceNameRaw.contains("rapidrame", ignoreCase = true)) {
-                        "Rapidrame $langCode"
-                    } else {
-                        "$sourceNameRaw $langCode"
-                    }
-
-                    rapidrameId = iframe.substringAfter("?rapidrame_id=", "").takeIf { it.isNotEmpty() }
-                    
+                    val finalSourceName = "Rapidrame $langCode"
                     invokeLocalSource(finalSourceName, iframe, rapidrameReferer, callback) 
                 }
             }
         }
 
-        // --- 2. Handle Default Player (Close/Mobi) ---
-        val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
-
-        if (defaultSourceUrl != null) {
+        // 2. DEFAULT PLAYER (Close)
+        val defaultSourceUrl = document.selectFirst(".close")?.attr("data-src")
+        
+        if (!defaultSourceUrl.isNullOrEmpty()) {
             val sourceName = "Close"
             var referer = "$mainUrl/" 
             
+            // Subtitle Extraction logic for .mobi iframe
             if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
                 try {
                     val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
@@ -554,33 +513,22 @@ class HDFilmCehennemi : MainAPI() {
                     referer = baseUri
                     
                     iframedoc.select("track[kind=captions]").forEach { track ->
-                        val lang = when (track.attr("srclang")) {
-                            "tr" -> "Türkçe"
-                            "en" -> "İngilizce"
-                            else -> track.attr("srclang")
-                        }
+                        val lang = track.attr("srclang").let { if(it=="tr") "Türkçe" else it }
                         val subUrl = track.attr("src").let { if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/") }
                         subtitleCallback(newSubtitleFile(lang, subUrl))
                     }
-                } catch (e: Exception) { 
-                    Log.e("HDFC", "Sub extraction error for default source", e) 
+                } catch (e: Exception) {
+                    Log.e("HDFC", "Subtitle extraction failed for default source", e)
                 }
             }
-
-            // Note: We don't rely on this URL for rapidrame_id downloads anymore, 
-            // as invokeLocalSource handles it for every source individually.
+            
+            // This now handles both video links and download ID extraction
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
-        }
-        
-        if (!rapidrameId.isNullOrEmpty()) {
-            extractDownloadLinks(rapidrameId, callback)
         }
 
         return true
     }
 
-    data class Results(@JsonProperty("results") val results: List<String> = arrayListOf())
-    data class HDFC(@JsonProperty("html") val html: String)
     data class DownloadResponse(
         @JsonProperty("status") val status: String? = null,
         @JsonProperty("download_link") val download_link: String? = null,
