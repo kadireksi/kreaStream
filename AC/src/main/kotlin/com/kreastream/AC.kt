@@ -2,7 +2,7 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import org.jsoup.nodes.Element
 
 class AC : MainAPI() {
@@ -33,11 +33,12 @@ class AC : MainAPI() {
 
             newMovieSearchResponse(title, mainUrl + link, TvType.Movie) {
                 this.posterUrl = thumbnail
-                this.duration = duration?.let { parseDuration(it) }
+                // Use setDuration instead of duration property
+                setDuration(duration?.let { parseDuration(it) })
             }
         }
 
-        return newHomePageResponse(listOf(HomePageList(request.name, items)))
+        return HomePageResponse(listOf(HomePageList(request.name, items)))
     }
 
     private fun parseDuration(duration: String): Int {
@@ -55,7 +56,7 @@ class AC : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         // Since this is a channel-specific plugin, we can search within the channel
-        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${query.encodeURL()}"
+        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${encodeUri(query)}"
         val document = app.get(searchUrl).document
         
         return document.select("ytd-video-renderer").mapNotNull { element ->
@@ -80,9 +81,20 @@ class AC : MainAPI() {
             posterUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
             plot = "Watch content from Abdullah Çiftçi's YouTube channel"
             
-            // Add recommendations
-            recommendations = getMainPage(1, MainPageRequest(channelUrl, "Recommended")).homePageItems
-                .firstOrNull()?.second?.take(10)
+            // Add actor information
+            addActors(listOf(Actor("Abdullah Çiftçi")))
+            
+            // Add recommendations - fix this part
+            val recommendations = try {
+                getMainPage(1, MainPageRequest(channelUrl, "Recommended"))
+                    .homepageItems.firstOrNull()?.second?.take(10)
+            } catch (e: Exception) {
+                emptyList()
+            }
+            
+            if (recommendations != null) {
+                this.recommendations = recommendations
+            }
         }
     }
 
@@ -127,11 +139,10 @@ class AC : MainAPI() {
                                     url = format.url,
                                     source = name,
                                     
-                                ){
+                                ) {
                                     this.referer = instance
                                     this.quality = getQualityFromName(format.quality ?: "")
-
-                                }
+                                }.let(callback)
                             }
                         }
                         
@@ -146,8 +157,7 @@ class AC : MainAPI() {
                                     this.referer = instance
                                     this.quality = getQualityFromName(format.quality ?: "")
                                     //this.isM3u8 = format.type?.contains("m3u8") == true
-                                    //this.extraName = "${format.quality ?: "Unknown"} (Adaptive)"
-                                }
+                                }.let(callback)
                             }
                         }
                         
@@ -222,8 +232,7 @@ class AC : MainAPI() {
                     "Referer" to "https://m.youtube.com/",
                 )
                 
-                //callback(this)
-            }
+            }.let(callback)
         }
         
         return qualityMap.isNotEmpty()
@@ -279,4 +288,9 @@ class AC : MainAPI() {
         val label: String? = null,
         val url: String? = null
     )
+}
+
+@Suppress("unused")
+fun getPlugin(): AC {
+    return AC()
 }
