@@ -33,12 +33,14 @@ class AC : MainAPI() {
 
             newMovieSearchResponse(title, mainUrl + link, TvType.Movie) {
                 this.posterUrl = thumbnail
-                // Use setDuration instead of duration property
-                setDuration(duration?.let { parseDuration(it) })
+                // Duration is set as a property in the builder
+                duration?.let { 
+                    this.duration = parseDuration(it)
+                }
             }
         }
 
-        return HomePageResponse(listOf(HomePageList(request.name, items)))
+        return newHomePageResponse(request.name, items, hasNext = true)
     }
 
     private fun parseDuration(duration: String): Int {
@@ -56,7 +58,7 @@ class AC : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         // Since this is a channel-specific plugin, we can search within the channel
-        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${encodeUri(query)}"
+        val searchUrl = "https://m.youtube.com/@abdullahciftcib/search?query=${query.urlEncoded()}"
         val document = app.get(searchUrl).document
         
         return document.select("ytd-video-renderer").mapNotNull { element ->
@@ -84,17 +86,9 @@ class AC : MainAPI() {
             // Add actor information
             addActors(listOf(Actor("Abdullah Çiftçi")))
             
-            // Add recommendations - fix this part
-            val recommendations = try {
-                getMainPage(1, MainPageRequest(channelUrl, "Recommended"))
-                    .homepageItems.firstOrNull()?.second?.take(10)
-            } catch (e: Exception) {
-                emptyList()
-            }
-            
-            if (recommendations != null) {
-                this.recommendations = recommendations
-            }
+            // Get recommendations
+            val recommendedVideos = getMainPage(1, MainPageRequest(channelUrl, "Recommended"))
+            this.recommendations = recommendedVideos.homepageItems.firstOrNull()?.items?.take(10) ?: emptyList()
         }
     }
 
