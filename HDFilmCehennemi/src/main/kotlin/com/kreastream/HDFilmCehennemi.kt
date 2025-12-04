@@ -36,6 +36,20 @@ class HDFilmCehennemi : MainAPI() {
     private val seenDownloadIds = mutableSetOf<String>()
     private val seenVideoUrls = mutableSetOf<String>()
 
+    private val cloudflareKiller by lazy { CloudflareKiller() }
+    
+    class CloudflareKiller { 
+        fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request()) 
+    }
+    
+    class CloudflareInterceptor(private val cloudflareKiller: CloudflareKiller): Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request  = chain.request()
+            val response = chain.proceed(request)
+            return response
+        }
+    }
+
     private val objectMapper = ObjectMapper().apply {
         registerModule(KotlinModule.Builder().build())
         configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
