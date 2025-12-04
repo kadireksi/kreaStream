@@ -12,8 +12,8 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import okhttp3.Interceptor
 import okhttp3.Response
-import okhttp3.OkHttpClient // FIX: Explicit OkHttpClient import
-import com.lagradost.cloudstream3.utils.AppUtils.defaultOkHttpClient // FIX: Explicit defaultOkHttpClient import
+import okhttp3.OkHttpClient // FIX: Required import
+import com.lagradost.cloudstream3.utils.AppUtils.defaultOkHttpClient // FIX: Required import
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -51,7 +51,7 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // FIX: Correctly override the client using the imported OkHttpClient and defaultOkHttpClient
+    // FIX: Client property now correctly imports OkHttpClient and defaultOkHttpClient
     override val client: OkHttpClient = defaultOkHttpClient.newBuilder()
         .addInterceptor(CloudflareInterceptor(cloudflareKiller))
         .build()
@@ -344,7 +344,7 @@ class HDFilmCehennemi : MainAPI() {
     }
     
     // ==========================================
-    // DECRYPTION LOGIC
+    // DECRYPTION LOGIC (All 4 attempts included for stability)
     // ==========================================
     private object HDFCDecrypter {
         
@@ -373,6 +373,36 @@ class HDFilmCehennemi : MainAPI() {
             return sb.toString()
         }
 
+        // REQUESTED: Attempt 1
+        private fun attempt1(encryptedData: String, seed: Int): String {
+            return try {
+                val reversedString = encryptedData.reversed()
+                val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
+                val rot13edBytes = applyRot13(decodedBytes)
+                applyCustomShift(rot13edBytes, seed)
+            } catch (e: Exception) { "" }
+        }
+
+        // REQUESTED: Attempt 2
+        private fun attempt2(encryptedData: String, seed: Int): String {
+            return try {
+                val rot13edString = applyRot13(encryptedData.toByteArray()).toString(Charsets.UTF_8)
+                val reversedString = rot13edString.reversed()
+                val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
+                applyCustomShift(decodedBytes, seed)
+            } catch (e: Exception) { "" }
+        }
+
+        // REQUESTED: Attempt 3
+        private fun attempt3(encryptedData: String, seed: Int): String {
+            return try {
+                val reversedString = encryptedData.reversed()
+                val rot13edString = applyRot13(reversedString.toByteArray()).toString(Charsets.UTF_8)
+                val decodedBytes = Base64.decode(rot13edString, Base64.DEFAULT)
+                applyCustomShift(decodedBytes, seed)
+            } catch (e: Exception) { "" }
+        }
+
         /**
          * The standard, known working sequence: Base64 Decode -> ROT13 -> Reverse Bytes -> Custom Shift
          */
@@ -383,15 +413,32 @@ class HDFilmCehennemi : MainAPI() {
                 val reversedBytes = rot13edBytes.reversedArray()
                 applyCustomShift(reversedBytes, seed)
             } catch (e: Exception) {
-                // Log the failure to help debug live changes
                 Log.e("HDFC", "Decryption Attempt 4 Failed: ${e.message}")
                 ""
             }
         }
 
-        // Only use the most reliable attempt.
+        // Runs all attempts, prioritizing the most reliable one (attempt4)
         fun dynamicDecrypt(encryptedData: String, seed: Int): String {
-            return attempt4(encryptedData, seed).takeIf { it.startsWith("http") } ?: ""
+            val decryptionAttempts = listOf<() -> String>(
+                { attempt4(encryptedData, seed) }, // Attempt 4 (Most reliable)
+                { attempt1(encryptedData, seed) },
+                { attempt2(encryptedData, seed) },
+                { attempt3(encryptedData, seed) }
+            )
+
+            for ((index, attempt) in decryptionAttempts.withIndex()) {
+                try {
+                    val decryptedUrl = attempt()
+                    if (decryptedUrl.startsWith("http")) {
+                        Log.d("HDFC", "Decryption Success with Attempt ${index + 1}")
+                        return decryptedUrl
+                    }
+                } catch (e: Exception) {
+                    // Log errors only if attempt4 failed, or if debugging others
+                }
+            }
+            return ""
         }
     }
 
