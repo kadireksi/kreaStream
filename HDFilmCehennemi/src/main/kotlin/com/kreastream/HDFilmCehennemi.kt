@@ -379,6 +379,8 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
+    private val seenUrls = mutableSetOf<String>()
+
     private suspend fun invokeLocalSource(
         source: String,
         url: String,
@@ -415,27 +417,38 @@ class HDFilmCehennemi : MainAPI() {
             
             if (decryptedUrl.isEmpty()) return
 
+            if (seenUrls.contains(decryptedUrl)) return
+            seenUrls.add(decryptedUrl)
+
             // 5. Determine if it's HLS 
-            val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
-            
-            callback.invoke(
-                newExtractorLink(
-                    source  = source,
-                    name    = source,
-                    url     = decryptedUrl
-                ){
-                    this.referer = referer
-                    this.quality = Qualities.Unknown.value
-                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+           if (decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")) {
+                M3u8Helper.generateM3u8(
+                    source,
+                    decryptedUrl,
+                    referer
+                ).forEach { link ->
+                    callback(link)
                 }
-            )
+            } else {
+                callback.invoke(
+                    newExtractorLink(
+                        source  = source,
+                        name    = source,
+                        url     = decryptedUrl
+                    ){
+                        this.referer = referer
+                        this.quality = Qualities.Unknown.value
+                        this.type    = ExtractorLinkType.VIDEO
+                    }
+                )
+            }
         } catch (e: Exception) {
             Log.e("HDFC", "Error extracting local source", e)
         }
     }
 
     private suspend fun extractDownloadLinks(rapidrameId: String, callback: (ExtractorLink) -> Unit) {
-        val downloadUrl = "https://hdfilmcehennemi.download/download/$rapidrameId" // Updated domain based on snippet
+        val downloadUrl = "https://cehennempass.pw/download/$rapidrameId" // Updated domain based on snippet
         
         val qualities = mapOf(
             "low" to "Download SD", 
@@ -445,7 +458,7 @@ class HDFilmCehennemi : MainAPI() {
         qualities.forEach { (qualityData, qualityName) ->
             // The process URL might also need updating or staying as cehennempass.pw
             // Trying the new domain for processing as well based on common patterns
-            val postUrl = "https://hdfilmcehennemi.download/process_quality_selection.php" 
+            val postUrl = "https://cehennempass.pw/process_quality_selection.php" 
             
             val postBody = okhttp3.FormBody.Builder()
                 .add("video_id", rapidrameId)
