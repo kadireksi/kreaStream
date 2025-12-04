@@ -12,6 +12,8 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import okhttp3.Interceptor
 import okhttp3.Response
+import okhttp3.OkHttpClient // FIX: Explicit OkHttpClient import
+import com.lagradost.cloudstream3.utils.AppUtils.defaultOkHttpClient // FIX: Explicit defaultOkHttpClient import
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -49,7 +51,7 @@ class HDFilmCehennemi : MainAPI() {
         }
     }
 
-    // FIX: Correctly override the client to apply the interceptor
+    // FIX: Correctly override the client using the imported OkHttpClient and defaultOkHttpClient
     override val client: OkHttpClient = defaultOkHttpClient.newBuilder()
         .addInterceptor(CloudflareInterceptor(cloudflareKiller))
         .build()
@@ -381,14 +383,14 @@ class HDFilmCehennemi : MainAPI() {
                 val reversedBytes = rot13edBytes.reversedArray()
                 applyCustomShift(reversedBytes, seed)
             } catch (e: Exception) {
+                // Log the failure to help debug live changes
                 Log.e("HDFC", "Decryption Attempt 4 Failed: ${e.message}")
                 ""
             }
         }
 
-        // Only use the most reliable attempt. Other attempts are kept for context but disabled.
+        // Only use the most reliable attempt.
         fun dynamicDecrypt(encryptedData: String, seed: Int): String {
-            // We rely on attempt4 as it's the known working method
             return attempt4(encryptedData, seed).takeIf { it.startsWith("http") } ?: ""
         }
     }
@@ -541,7 +543,6 @@ class HDFilmCehennemi : MainAPI() {
                 }
             }
             
-            // This now handles video links and download ID extraction
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
