@@ -2,12 +2,13 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.LoadResponse.*
 import org.jsoup.nodes.Element
 
 class AC : MainAPI() {
     override var mainUrl = "https://m.youtube.com"
     override var name = "Abdullah Çiftçi"
-    override val supportedTypes = setOf(TvType.Movie, TvType.LiveStream)
+    override val supportedTypes = setOf(TvType.Movie, TvType.Live)
     override val hasMainPage = true
 
     private val channelUrl = "https://m.youtube.com/@abdullahciftcib/videos"
@@ -36,7 +37,7 @@ class AC : MainAPI() {
             }
         }
 
-        return HomePageResponse(listOf(HomePageList(request.name, items)))
+        return newHomePageResponse(listOf(HomePageList(request.name, items)))
     }
 
     private fun parseDuration(duration: String): Int {
@@ -71,7 +72,7 @@ class AC : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val videoId = url.substringAfter("v=").substringBefore("&")
         return newMovieLoadResponse(
-            "Abdullah Çiftçi Video",
+            "Abdullah Çiftçi",
             url,
             TvType.Movie,
             "https://m.youtube.com/watch?v=$videoId"
@@ -205,8 +206,9 @@ class AC : MainAPI() {
             newExtractorLink(
                 name = this.name,
                 url = "https://rr3---sn-4g5e6ns6.googlevideo.com/videoplayback?ip=xxx&id=$videoId&itag=${getItagFromQuality(qualityValue)}&source=youtube",
-                referer = "https://m.youtube.com",
+                source = this.name,
             ) {
+                this.referer = "https://m.youtube.com"
                 this.quality = getQualityFromName(qualityLabel)
                 //this.isM3u8 = false
                 //this.extraName = "$qualityLabel • $container"
