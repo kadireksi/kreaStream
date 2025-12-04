@@ -138,7 +138,6 @@ class HDFilmCehennemi : MainAPI() {
         return PosterData(title, newTitle, href, posterUrl, lang, year, score, tvType, hasDub, hasSub)
     }
 
-    // START: Main Page Tidy Up and Pagination Support
     override val mainPage = mainPageOf(
         "${mainUrl}/load/page/1/home/"                                      to "Yeni Filmler",
         "${mainUrl}/load/page/1/languages/turkce-dublajli-film-izleyin-3/"   to "Türkçe Dublaj Filmler",
@@ -180,7 +179,6 @@ class HDFilmCehennemi : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        // Handle "Yeni Bölümler" which use the mini-poster format
         if (this.hasClass("mini-poster")) {
             val seriesTitle = this.selectFirst(".mini-poster-title")?.text()?.trim() ?: return null
 
@@ -207,7 +205,6 @@ class HDFilmCehennemi : MainAPI() {
             this.score = Score.from10(data.score)
         }
     }
-    // END: Main Page Tidy Up and Pagination Support
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
@@ -401,16 +398,8 @@ class HDFilmCehennemi : MainAPI() {
             // Look for image: "https://.../aaktqas1ejb1.jpg"
             val imageRegex = Regex("""image:\s*["'](.*?)["']""")
             val imageUrl = imageRegex.find(unpacked)?.groupValues?.get(1)
-            if (imageUrl != null) {
-                val rapidrameId = imageUrl.substringAfterLast("/").substringBefore(".")
-                if (rapidrameId.isNotEmpty() && rapidrameId.all { it.isLetterOrDigit() }) {
-                    // Trigger download extraction here since we have the ID directly from the source
-                    extractDownloadLinks(rapidrameId, callback)
-                }
-            }
-            // ----------------------------------------------
+
             
-            // 2. Extract the encrypted array string
             val callRegex = Regex("""\w+\(\[(.*?)\]\)""")
             val arrayContent = callRegex.find(unpacked)?.groupValues?.get(1) ?: return
             
@@ -500,9 +489,8 @@ class HDFilmCehennemi : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         val rapidrameReferer = "$mainUrl/"
+        var rapidrameId: String? = null
 
-        // --- 1. Check Alternative Links FIRST (Rapidrame usually here) ---
-        // This prioritizes Rapidrame over the default player
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
@@ -533,13 +521,14 @@ class HDFilmCehennemi : MainAPI() {
                     } else {
                         "$sourceNameRaw $langCode"
                     }
-                    // invokeLocalSource will now also look for downloads inside this iframe's JS
+
+                    rapidrameId = iframe.substringAfter("?rapidrame_id=").takeIf { it.isNotEmpty() }
+
                     invokeLocalSource(finalSourceName, iframe, rapidrameReferer, callback) 
                 }
             }
         }
 
-        // --- 2. Handle Default Player (Close/Mobi) ---
         val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
 
         if (defaultSourceUrl != null) {
@@ -566,9 +555,13 @@ class HDFilmCehennemi : MainAPI() {
                 }
             }
 
-            // Note: We don't rely on this URL for rapidrame_id downloads anymore, 
-            // as invokeLocalSource handles it for every source individually.
+            rapidrameId = defaultSourceUrl.substringAfter("?rapidrame_id=").takeIf { it.isNotEmpty() }
+
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
+        }
+
+        if (!rapidrameId.isNullOrEmpty()) {
+            extractDownloadLinks(rapidrameId, callback)
         }
 
         return true
