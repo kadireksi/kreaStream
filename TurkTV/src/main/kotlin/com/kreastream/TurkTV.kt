@@ -5,12 +5,13 @@ import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.SubtitleFile // <-- ADDED MISSING IMPORT
 import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://www.atv.com.tr"
+    override var mainUrl = "https://TurkTV.local"
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
@@ -23,9 +24,9 @@ class TurkTV : MainAPI() {
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
 
-        // Near the top of the TurkTV class (or in getMainPage)
-    private val liveChannelsUrl = "turktv://livechannels" // Existing TV hub
-    private val radioChannelsUrl = "turktv://radiochannels" // <-- NEW Radio hub
+    // Synthetic URLs for TV and Radio Hubs
+    private val liveChannelsUrl = "turktv://livechannels"
+    private val radioChannelsUrl = "turktv://radiochannels"
 
     // ------------------- DATA CLASSES -------------------
     data class SelectorBlock(
@@ -51,14 +52,13 @@ class TurkTV : MainAPI() {
         val stream: StreamConfig
     )
 
-    // In TurkTV.kt
     data class LiveStreamConfig(
         val key: String,
         val title: String,
         val poster: String?,
         val url: String,
         val requiresReferer: Boolean = false,
-        val streamType: String = "tv" // <-- ADDED: Defaulting to "tv" for existing entries
+        val streamType: String = "tv"
     )
 
     // ------------------- JSON LOADING -------------------
@@ -88,7 +88,7 @@ class TurkTV : MainAPI() {
         // --- 1. LIVE TV HUB ---
         val liveTvSearchResponse = newTvSeriesSearchResponse(
             "Canlı TV Kanalları",
-            liveChannelsUrl, // turktv://livechannels
+            liveChannelsUrl,
             TvType.TvSeries
         )
         lists += HomePageList("Canlı TV", listOf(liveTvSearchResponse))
@@ -96,12 +96,12 @@ class TurkTV : MainAPI() {
         // --- 2. LIVE RADIO HUB ---
         val liveRadioSearchResponse = newTvSeriesSearchResponse(
             "Radyo Kanalları",
-            radioChannelsUrl, // turktv://radiochannels
+            radioChannelsUrl,
             TvType.TvSeries
         )
         lists += HomePageList("Radyo", listOf(liveRadioSearchResponse))
         
-        // --- 3. SERIES SECTIONS ---
+        // --- 3. SERIES SECTIONS (Debugging enabled) ---
         channels?.forEach { cfg ->
             val series = fetchSeries(cfg)
             lists += HomePageList("${cfg.name} Diziler", series)
@@ -113,28 +113,7 @@ class TurkTV : MainAPI() {
     // ------------------- FETCH SERIES -------------------
     private suspend fun fetchSeries(cfg: ChannelConfig): List<SearchResponse> {
         // ── TEMPORARY MODIFICATION FOR DEBUGGING ──
-        // This function will now always return an empty list.
-        // This allows the channel name to be used for the HomePageList title
-        // even if the scraping fails.
-        
-        // COMMENT OUT or DELETE the original scraping logic:
-        /*
-        val doc = app.get(cfg.series.url).document
-        val block = cfg.series
-
-        return doc.select(block.container).mapNotNull { el ->
-            val title = el.select(block.title).text().takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val href = el.select(block.link).attr("href").takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val url = full(cfg.baseUrl, href) ?: return@mapNotNull null
-            val poster = block.poster?.let { full(cfg.baseUrl, el.select(it).attr("src")) }
-
-            newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
-                this.posterUrl = poster
-            }
-        }
-        */
-        
-        // ── RETURN EMPTY LIST ──
+        // Returns empty list to show channel headers, ignoring scraping errors.
         return emptyList()
     }
 
@@ -151,7 +130,7 @@ class TurkTV : MainAPI() {
             val title = if (isLiveTv) "Canlı TV Kanalları" else "Radyo Kanalları"
             
             val episodes = streams
-                ?.filter { it.streamType == typeToFilter } // <-- FILTERING HAPPENS HERE
+                ?.filter { it.streamType == typeToFilter }
                 ?.mapNotNull { live ->
                     newEpisode(live.url) { 
                         this.name = live.title
@@ -159,21 +138,19 @@ class TurkTV : MainAPI() {
                     }
                 } ?: emptyList()
 
-            // Use TvType.Live for both since they are continuous streams
-            return newTvSeriesLoadResponse(title, url, TvType.Live, episodes) {
-                // Optional: Add a general poster for the hub
-            }
+            // TvType.Live is used for the continuous stream concept
+            return newTvSeriesLoadResponse(title, url, TvType.Live, episodes) {}
         }
 
 
-        // 2. Original Series Logic
+        // 2. Original Series Logic (Main Series Page)
         val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
             ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
 
-        // ... rest of your existing load function for series
         val episodes = fetchEpisodes(cfg, url)
 
         return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, episodes) {
+            // Find series poster/description here if needed.
             posterUrl = null
         }
     }
@@ -201,7 +178,7 @@ class TurkTV : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        // ── Live streams ──
+        // ── Live streams (TV/Radio) ──
         streams?.firstOrNull { it.url == data }?.let { live ->
             callback(
                 newExtractorLink(
@@ -210,7 +187,8 @@ class TurkTV : MainAPI() {
                     url = live.url
                 ){
                     this.referer = if (live.requiresReferer) mainUrl else ""
-                    this.quality = Qualities.Unknown.value
+                    // Keep quality as Unknown for generic M3U8/Live links
+                    this.quality = Qualities.Unknown.value 
                     this.type = ExtractorLinkType.M3U8
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
@@ -232,7 +210,8 @@ class TurkTV : MainAPI() {
             if (!streamUrl.isNullOrBlank()) {
                 val finalUrl = full(cfg.baseUrl, streamUrl)!!
                 val linkType = if (finalUrl.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                val quality = if (cfg.stream.prefer == "m3u8") Qualities.Unknown.value else Qualities.Unknown.value
+                // Quality setting is fine here
+                val quality = Qualities.Unknown.value
 
                 callback(
                     newExtractorLink(
