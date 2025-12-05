@@ -16,9 +16,9 @@ class TurkTV : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
     private val channelsJsonUrl =
-        "https://raw.githubusercontent.com/kadireksi/kreaStream/blob/builds/channels.json"
+        "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
     private val streamsJsonUrl =
-        "https://raw.githubusercontent.com/kadireksi/kreaStream/blob/builds/streams.json"
+        "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
 
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
