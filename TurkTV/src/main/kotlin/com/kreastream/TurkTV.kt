@@ -60,7 +60,6 @@ class TurkTV : MainAPI() {
             try {
                 channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
             } catch (e: Exception) {
-                logError("Failed to load channels: ${e.message}")
                 channels = emptyList()
             }
         }
@@ -68,7 +67,6 @@ class TurkTV : MainAPI() {
             try {
                 streams = parseJson<List<LiveStreamConfig>>(app.get(streamsJsonUrl).text)
             } catch (e: Exception) {
-                logError("Failed to load streams: ${e.message}")
                 streams = emptyList()
             }
         }
@@ -105,7 +103,6 @@ class TurkTV : MainAPI() {
 
         val elements = doc.select(block.container)
         if (elements.isEmpty()) {
-            logError("No series elements found with selector: ${block.container} on ${cfg.baseUrl}")
         }
 
         return elements.mapNotNull { el ->
@@ -140,7 +137,6 @@ class TurkTV : MainAPI() {
 
         val elements = doc.select(ep.container)
         if (elements.isEmpty()) {
-            logError("No episode elements found with selector: ${ep.container} on $url")
         }
 
         return elements.mapNotNull { el ->
@@ -165,15 +161,16 @@ class TurkTV : MainAPI() {
         streams?.find { data == it.url }?.let { live ->
             callback(
                 newExtractorLink(
-                source = name,
-                name = live.title,
-                url = live.url
+                    source = name,
+                    name = live.title,
+                    url = live.url
                 ){
-                this.referer = if (live.requiresReferer) mainUrl else null
-                this.quality = Qualities.Unknown.value
-                this.type = ExtractorLinkType.M3U8   
-                this.headers = mapOf("User-Agent" to "Mozilla/5.0")
-            })
+                    this.referer = if (live.requiresReferer) mainUrl else null
+                    this.quality = Qualities.Unknown.value
+                    this.type = ExtractorLinkType.M3U8   
+                    this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+                }
+            )
             return true
         }
 
@@ -206,8 +203,6 @@ class TurkTV : MainAPI() {
                     }
                 )
                 return true
-            } else {
-                logError("No stream URL found on $data")
             }
         }
         return false
