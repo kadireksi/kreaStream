@@ -32,45 +32,31 @@ class TurkTV : MainAPI() {
         val baseUrl: String,
         val currentPath: String,
         val archivePath: String? = null,
-        val liveStream: String? = null,
-        val isTrt: Boolean = false
+        val livePath: String? = null,
+        val liveStream: String? = null
     )
 
     private val channels = listOf(
-        Channel("atv", "ATV", atvUrl, "/diziler", "/eski-diziler",
-            null),
-        Channel("kanald", "Kanal D", kanaldUrl, "/diziler/tum-diziler", "/diziler/arsiv-diziler",
-            "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3&ppid=c1bfdca3b54034e7be9660071f17d132"),
-        Channel("show", "Show TV", showTvUrl, "/diziler", null,
-            null),
-        Channel("star", "Star TV", starTvUrl, "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler",
-            "https://startv-live.ercdn.net/startv/startv.m3u8"),
-        Channel("now", "NOW", nowTvUrl, "/dizi-izle", "/dizi-arsivi",
-            "https://nowtv-live.ercdn.net/nowtv/nowtv.m3u8"),
-        Channel("trt1", "TRT 1", trt1Url, "/diziler?archive=false", "/diziler?archive=true",
-            null, isTrt = true)
+        Channel("trt1", "TRT 1", trt1Url, "/diziler?archive=false", "/diziler?archive=true",null,null),
+        Channel("atv", "ATV", atvUrl, "/diziler", "/eski-diziler","canli-yayin",null),
+        Channel("kanald", "Kanal D", kanaldUrl, "/diziler/tum-diziler", "/diziler/arsiv-diziler","canli-yayin",null),
+        Channel("show", "Show TV", showTvUrl, "/diziler", "canli-yayin",null),
+        Channel("star", "Star TV", starTvUrl, "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler","canli-yayin",null),
+        Channel("now", "NOW", nowTvUrl, "/dizi-izle", "/dizi-arsivi","canli-yayin",null)
     )
 
     override val mainPage = mainPageOf(
-        "trt_series" to "TRT - Güncel Diziler",   
-        "atv_current" to "ATV - Güncel Diziler",
-        "show_current" to "Show TV - Diziler",
-        "kanald_current" to "Kanal D - Güncel Diziler",
-        "star_current" to "Star TV - Güncel Diziler",
-        "now_current" to "NOW - Güncel Diziler",
-
-        "trt_archive_series" to "TRT - Arşiv Diziler",
-        "atv_archive" to "ATV - Arşiv Diziler",
-        "kanald_archive" to "Kanal D - Arşiv Diziler",
-        "star_archive" to "Star TV - Arşiv Diziler",
-        "now_archive" to "NOW - Arşiv Diziler",
-
-        "trt_programs" to "TRT - Programlar",
-        "trt_archive_programs" to "TRT - Arşiv Programlar",
-
+        channels.forEach {
+            it.key + "_current" to it.displayName + " Güncel Diziler",
+        }
+        channels.forEach {
+            it.key + "_archive" to it.displayName + " Arşiv Diziler",
+        }
+        channels.forEach {
+            it.key + "_live" to it.displayName + " Canlı Yayın",
+        }
         "live_tv" to "TRT Canlı TV",
-        "live_radio" to "TRT Canlı Radyo",
-        "other_live" to "Diğer TV Kanalları"
+        "live_radio" to "TRT Canlı Radyo"
     )
 
     // === TRT Data Structures ===
