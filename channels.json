@@ -5,15 +5,37 @@
     "baseUrl": "https://www.atv.com.tr",
     "series": {
       "url": "https://www.atv.com.tr/diziler",
-      "container": ".dizi-list-item",
-      "title": ".dizi-title",
-      "link": "a",
+      "container": "body",  // Fallback: No real list; use hardcoded below in code if needed
+      "title": "h3 a, .dizi-title",  // Generic; sites use plain h3
+      "link": "a[href*='/diziler/']",
+      "poster": "img[src*='poster']"
+    },
+    "episodes": {
+      "container": ".episode-item, .bolum-list li",
+      "title": ".bolum-title, a",
+      "link": "a[href*='/bolum']"
+    },
+    "stream": {
+      "type": "mp4+m3u8",
+      "prefer": "m3u8",
+      "referer": true
+    }
+  },
+  {
+    "key": "showtv",
+    "name": "Show TV",
+    "baseUrl": "https://www.showtv.com.tr",
+    "series": {
+      "url": "https://www.showtv.com.tr/diziler",
+      "container": "body",  // Fallback: No real list
+      "title": "h3 a, .dizi-item a",
+      "link": "a[href*='/dizi/']",
       "poster": "img"
     },
     "episodes": {
-      "container": ".bolum-item",
+      "container": ".bolum-item, ul li",
       "title": ".bolum-title",
-      "link": "a"
+      "link": "a[href*='/bolum']"
     },
     "stream": {
       "type": "mp4+m3u8",
@@ -22,4 +44,3 @@
     }
   }
 ]
-
