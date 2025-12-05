@@ -117,10 +117,18 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // ------------------- LOAD (series page) -------------------
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
 
+        // 1. Check if it's a Live Stream URL and return MovieLoadResponse (or Live)
+        val liveCfg = streams?.firstOrNull { it.url == url }
+        if (liveCfg != null) {
+            return newMovieLoadResponse(liveCfg.title, url, TvType.Live, liveCfg.url) {
+                posterUrl = liveCfg.poster
+            }
+        }
+        
+        // 2. Original Series Logic
         val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
             ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
 
