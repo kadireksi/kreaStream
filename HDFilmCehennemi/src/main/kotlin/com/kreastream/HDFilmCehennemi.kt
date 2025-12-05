@@ -582,7 +582,7 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        if (rapidrameId.isNotEmpty() && rapidrameId.all { it.isLetterOrDigit() } && !seenDownloadIds.contains(rapidrameId)) {
+        if (rapidrameId.isNotEmpty()) {
             seenDownloadIds.add(rapidrameId)
             extractDownloadLinks(rapidrameId, callback)
         }
