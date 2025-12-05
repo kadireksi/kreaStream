@@ -2,27 +2,27 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
-import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import kotlinx.coroutines.runBlocking
 
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://www.atv.com.tr"  // Real default base
+    override var mainUrl = "https://www.atv.com.tr"
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
-    private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
-    private val streamsJsonUrl  = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
+    private val channelsJsonUrl =
+        "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
+    private val streamsJsonUrl =
+        "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
 
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
 
-    // -------- DATA MODELS --------
+    // ------------------- DATA CLASSES -------------------
     data class SelectorBlock(
         val url: String,
         val container: String,
@@ -54,7 +54,7 @@ class TurkTV : MainAPI() {
         val requiresReferer: Boolean = false
     )
 
-    // ---------- JSON LOADING ----------
+    // ------------------- JSON LOADING -------------------
     private suspend fun ensureLoaded() {
         if (channels == null) {
             try {
@@ -72,20 +72,23 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // ---------- MAIN PAGE ----------
+    // ------------------- MAIN PAGE -------------------
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         ensureLoaded()
 
         val lists = mutableListOf<HomePageList>()
 
         channels?.forEach { cfg ->
-            lists += HomePageList("${cfg.name} Diziler", fetchSeries(cfg))
+            val series = fetchSeries(cfg)
+            if (series.isNotEmpty()) {
+                lists += HomePageList("${cfg.name} Diziler", series)
+            }
         }
 
-        streams?.let {
+        streams?.takeIf { it.isNotEmpty() }?.let { liveList ->
             lists += HomePageList(
                 "Canlı Yayınlar",
-                it.map { live ->
+                liveList.map { live ->
                     newTvSeriesSearchResponse(live.title, live.url, TvType.Live) {
                         posterUrl = live.poster
                     }
@@ -96,37 +99,33 @@ class TurkTV : MainAPI() {
         return newHomePageResponse(lists)
     }
 
-    // ---------- FETCH SERIES ----------
+    // ------------------- FETCH SERIES -------------------
     private suspend fun fetchSeries(cfg: ChannelConfig): List<SearchResponse> {
         val doc = app.get(cfg.series.url).document
         val block = cfg.series
 
-        val elements = doc.select(block.container)
-        if (elements.isEmpty()) {
-        }
-
-        return elements.mapNotNull { el ->
-            val title = el.select(block.title).text().ifBlank { return@mapNotNull null }
-            val href = el.select(block.link).attr("href").ifBlank { return@mapNotNull null }
-            val url = full(cfg.baseUrl, href)
+        return doc.select(block.container).mapNotNull { el ->
+            val title = el.select(block.title).text().takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val href = el.select(block.link).attr("href").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val url = full(cfg.baseUrl, href) ?: return@mapNotNull null
             val poster = block.poster?.let { full(cfg.baseUrl, el.select(it).attr("src")) }
 
-            newTvSeriesSearchResponse(title, url!!, TvType.TvSeries) {
-                posterUrl = poster
+            newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
+                this.posterUrl = poster
             }
         }
     }
 
-    // ---------- LOAD SERIES ----------
+    // ------------------- LOAD (series page) -------------------
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
 
-        val cfg = channels?.find { url.contains(it.baseUrl, true) }
+        val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
             ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
 
-        val eps = fetchEpisodes(cfg, url)
+        val episodes = fetchEpisodes(cfg, url)
 
-        return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, eps) {
+        return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, episodes) {
             posterUrl = null
         }
     }
@@ -135,67 +134,66 @@ class TurkTV : MainAPI() {
         val doc = app.get(url).document
         val ep = cfg.episodes
 
-        val elements = doc.select(ep.container)
-        if (elements.isEmpty()) {
-        }
-
-        return elements.mapNotNull { el ->
+        return doc.select(ep.container).mapNotNull { el ->
             val title = el.select(ep.title).text().ifBlank { "Bölüm" }
-            val href = full(cfg.baseUrl, el.select(ep.link).attr("href")) ?: return@mapNotNull null
+            val href = el.select(ep.link).attr("href")
+            val episodeUrl = full(cfg.baseUrl, href) ?: return@mapNotNull null
 
-            newEpisode {
+            newEpisode(episodeUrl) {
                 this.name = title
-                this.data = href
             }
         }
     }
 
-    // ---------- LOAD LINKS ----------
+    // ------------------- LOAD LINKS -------------------
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Handle live streams (data == live.url)
-        streams?.find { data == it.url }?.let { live ->
+
+        // ── Live streams ──
+        streams?.firstOrNull { it.url == data }?.let { live ->
             callback(
                 newExtractorLink(
                     source = name,
                     name = live.title,
                     url = live.url
                 ){
-                    this.referer = if (live.requiresReferer) mainUrl else null
+                    this.referer = if (live.requiresReferer) mainUrl else ""
                     this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.M3U8   
+                    this.type = ExtractorLinkType.M3U8
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
             )
             return true
         }
 
-        // Handle series episodes
-        channels?.find { data.contains(it.baseUrl) }?.let { cfg ->
+        // ── Series episodes ──
+        channels?.firstOrNull { data.contains(it.baseUrl, ignoreCase = true) }?.let { cfg ->
             val doc = app.get(data).document
-            // Robust extraction: Prefer M3U8/MP4 from video tags or regex
-            var streamUrl = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']").attr("src")
+
+            var streamUrl: String? = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']")
+                .attr("src")
                 .ifBlank { doc.select("video source[src$='.mp4']").attr("src") }
-                .ifBlank { 
-                    // Regex fallback for embedded URLs
-                    doc.html().find("""https?://[^\s"]+\.(?:mp4|m3u8)""") ?: ""
+                .ifBlank {
+                    Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value
                 }
-            if (streamUrl.isNotBlank()) {
-                val fullUrl = full(cfg.baseUrl, streamUrl)
-                val linkType = if (fullUrl!!.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+
+            if (!streamUrl.isNullOrBlank()) {
+                val finalUrl = full(cfg.baseUrl, streamUrl)!!
+                val linkType = if (finalUrl.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 val quality = if (cfg.stream.prefer == "m3u8") Qualities.HD.value else Qualities.SD.value
+
                 callback(
                     newExtractorLink(
-                    source = name,
-                    name = "Episode Stream",
-                    url = fullUrl
+                        source = name,
+                        name = "Stream",
+                        url = finalUrl
                     ){
-                        this.referer = if (cfg.stream.referer) cfg.baseUrl else null
-                        this.quality = quality
+                        this.referer = if (cfg.stream.referer) cfg.baseUrl else "",
+                        this.quality = quality,
                         this.type = linkType
                         if (cfg.stream.prefer.isNotBlank()) {
                             this.headers = mapOf("Accept" to cfg.stream.prefer)
@@ -205,13 +203,13 @@ class TurkTV : MainAPI() {
                 return true
             }
         }
+
         return false
     }
 
-    // ---------- HELPERS ----------
-    private fun full(base: String, url: String?): String? =
-        url?.let { 
-            if (it.startsWith("http")) it 
-            else (base.removeSuffix("/") + "/" + it.trimStart('/').trimStart('/')) 
-        }
+    // ------------------- HELPER -------------------
+    private fun full(base: String, url: String?): String? = url?.let {
+        if (it.startsWith("http")) it
+        else "${base.removeSuffix("/")}/${it.trimStart('/')}"
+    }
 }
