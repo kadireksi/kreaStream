@@ -1,23 +1,8 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addEpisodes
-import com.lagradost.cloudstream3.LoadResponse.Companion.addLinks
-import com.lagradost.cloudstream3.LoadResponse.Companion.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.utils.AppUtils.json
-import android.util.Base64
-import android.util.Log
-import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import okhttp3.Interceptor
-import okhttp3.Response
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
-import kotlin.text.Charsets
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 class TurkTV : MainAPI() {
 
@@ -25,20 +10,16 @@ class TurkTV : MainAPI() {
     override var name = "Türk TV"
     override var lang = "tr"
     override val hasMainPage = true
-    override val hasQuickSearch = true
-    override val hasDownloadSupport = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
-    // 🔧 Replace later with real URLs
     private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/builds/channels.json"
     private val streamsJsonUrl = "https://raw.githubusercontent.com/kadireksi/builds/streams.json"
 
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
 
-    // -------------------------
-    // JSON MODELS
-    // -------------------------
+    // ---------- MODELS ----------
+    @kotlinx.serialization.Serializable
     data class SelectorBlock(
         val url: String,
         val container: String,
@@ -47,12 +28,14 @@ class TurkTV : MainAPI() {
         val poster: String? = null
     )
 
+    @kotlinx.serialization.Serializable
     data class StreamConfig(
         val type: String,
         val prefer: String,
         val referer: Boolean = false
     )
 
+    @kotlinx.serialization.Serializable
     data class ChannelConfig(
         val key: String,
         val name: String,
@@ -62,6 +45,7 @@ class TurkTV : MainAPI() {
         val stream: StreamConfig
     )
 
+    @kotlinx.serialization.Serializable
     data class LiveStreamConfig(
         val key: String,
         val title: String,
@@ -70,12 +54,10 @@ class TurkTV : MainAPI() {
         val requiresReferer: Boolean = false
     )
 
-    // -------------------------
-    // JSON FETCHING
-    // -------------------------
+    // ---------- JSON FETCH ----------
     private suspend inline fun <reified T> fetchJson(url: String): T {
         val txt = app.get(url).text
-        return json.decodeFromString(txt)
+        return Json.decodeFromString(txt)
     }
 
     private suspend fun ensureLoaded() {
@@ -83,117 +65,72 @@ class TurkTV : MainAPI() {
         if (streams == null) streams = fetchJson(streamsJsonUrl)
     }
 
-    // -------------------------
-    // MAIN PAGE
-    // -------------------------
+    // ---------- MAIN PAGE ----------
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-
         ensureLoaded()
-        val result = mutableListOf<HomePageList>()
+
+        val lists = mutableListOf<HomePageList>()
 
         channels?.forEach { cfg ->
             val series = fetchSeries(cfg)
-            result += HomePageList("${cfg.name} Diziler", series)
+            lists += HomePageList("${cfg.name} Diziler", series)
         }
 
-        streams?.let { list ->
-            if (list.isNotEmpty()) {
-                result += HomePageList("Canlı Yayınlar", list.map {
-                    newTvSeriesSearchResponse(
-                        title = it.title,
-                        url = it.url,
-                        type = TvType.Live,
-                    ) { posterUrl = it.poster }
-                })
-            }
+        streams?.let {
+            lists += HomePageList("Canlı Yayınlar",
+                it.map { s -> TvSeriesSearchResponse(s.title, s.url, name, TvType.Live, posterUrl = s.poster) }
+            )
         }
 
-        return newHomePageResponse(result)
+        return HomePageResponse(lists, false)
     }
 
-    // -------------------------
-    // FETCH SERIES
-    // -------------------------
+    // ---------- FETCH SERIES ----------
     private suspend fun fetchSeries(config: ChannelConfig): List<SearchResponse> {
         val doc = app.get(config.series.url).document
         val sel = config.series
 
         return doc.select(sel.container).mapNotNull { el ->
             val title = el.select(sel.title).text().ifBlank { return@mapNotNull null }
+            val href = el.select(sel.link).attr("href").ifBlank { return@mapNotNull null }
+            val url = fixUrl(config.baseUrl, href)
+            val poster = sel.poster?.let { fixUrl(config.baseUrl, el.select(it).attr("src")) }
 
-            val href = el.select(sel.link).attr("href")
-                .ifBlank { return@mapNotNull null }
-
-            val fixedUrl = fixUrl(config.baseUrl, href)
-
-            val poster = sel.poster?.let { el.select(it).attr("src") }
-
-            newTvSeriesSearchResponse(title, fixedUrl, TvType.TvSeries) {
-                posterUrl = fixUrl(config.baseUrl, poster)
-            }
+            TvSeriesSearchResponse(title, url!!, name, TvType.TvSeries, posterUrl = poster)
         }
     }
 
-    // -------------------------
-    // LOAD (EPISODES + STREAMS)
-    // -------------------------
+    // ---------- LOAD ----------
     override suspend fun load(url: String): LoadResponse {
-
         ensureLoaded()
 
-        val config = channels?.find { url.contains(it.baseUrl) }
-            ?: return newTvSeriesLoadResponse("Unknown Source", url, TvType.TvSeries) {}
+        val cfg = channels?.find { url.contains(it.baseUrl, true) }
+            ?: return TvSeriesLoadResponse("Unknown Source", url, name, TvType.TvSeries)
 
-        val episodes = fetchEpisodes(config, url)
+        val eps = fetchEpisodes(cfg, url).toMutableList()
 
-        return newTvSeriesLoadResponse("Bölümler", url, TvType.TvSeries) {
+        return TvSeriesLoadResponse(cfg.name, url, name, TvType.TvSeries).apply {
+            episodes = eps
             posterUrl = null
-            addEpisodes(
-                episodes.map {
-                    newEpisode(it.name, it.url)
-                }
-            )
-            addLinks { callback ->
-                resolveStream(config, url).forEach(callback)
-            }
+            plot = null
         }
     }
 
-    // -------------------------
-    // FETCH EPISODES
-    // -------------------------
-    private suspend fun fetchEpisodes(config: ChannelConfig, url: String): List<Episode> {
+    private suspend fun fetchEpisodes(cfg: ChannelConfig, url: String): List<Episode> {
         val doc = app.get(url).document
-        val ep = config.episodes
+        val ep = cfg.episodes
 
         return doc.select(ep.container).mapNotNull { el ->
             val title = el.select(ep.title).text().ifBlank { "Bölüm" }
-            val href = el.select(ep.link).attr("href").ifBlank { return@mapNotNull null }
-            Episode(title, fixUrl(config.baseUrl, href))
+            val href = fixUrl(cfg.baseUrl, el.select(ep.link).attr("href")) ?: return@mapNotNull null
+            Episode(data = href, name = title)
         }
     }
 
-    // -------------------------
-    // STREAM RESOLUTION (TEMP ATV)
-    // -------------------------
-    private suspend fun resolveStream(cfg: ChannelConfig, url: String): List<ExtractorLink> {
-        val html = app.get(url).text
-        val links = mutableListOf<ExtractorLink>()
-
-        val match = Regex("""https.*?\.mp4""").find(html)?.value
-
-        if (match != null) {
-            links += newExtractorLink("ATV", "ATV • MP4", match) {
-                if (cfg.stream.referer) referer = cfg.baseUrl
-            }
-        }
-
-        return links
-    }
-
+    // FIX URL
     private fun fixUrl(base: String, url: String?): String? =
-        if (url == null) null else if (url.startsWith("http")) url else base + url.trimStart('/')
+        url?.let { if (it.startsWith("http")) it else base + it.trimStart('/') }
 }
