@@ -829,19 +829,39 @@ class TurkTV : MainAPI() {
         }
     }
 
+    private fun convertAtvMp4ToM3u8(url: String): String? {
+        val regex = Regex("""(.+?)/([^/]+?)(?:_\d+)?\.mp4$""")
+        val match = regex.find(url) ?: return null
+        
+        val basePath = match.groupValues[1]
+        val filename = match.groupValues[2]
+        
+        return "$basePath/$filename.hb.smil/playlist.m3u8"
+    }
+
     private suspend fun extractAtvLinks(data: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
             val response = app.get(data, timeout = 10)
             val html = response.text
             
             val jsonLdUrl = extractAtvVideoUrl(html)
-            if (jsonLdUrl != null) {
-                if (jsonLdUrl.contains(".m3u8")) {
-                    M3u8Helper.generateM3u8(source = "ATV", streamUrl = jsonLdUrl, referer = atvUrl, headers = mapOf("Referer" to atvUrl)).forEach(callback)
+            if (jsonLdUrl.contains(".mp4")) {
+                val m3u8Converted = convertAtvMp4ToM3u8(jsonLdUrl)
+
+                if (m3u8Converted != null) {
+                    M3u8Helper.generateM3u8(
+                        source = "ATV",
+                        streamUrl = m3u8Converted,
+                        referer = atvUrl
+                    ).forEach(callback)
+
+                    return true
                 } else {
-                    callback(newExtractorLink("ATV", "ATV - MP4", jsonLdUrl) { this.referer = atvUrl })
+                    callback(newExtractorLink("ATV", "ATV - MP4", jsonLdUrl) {
+                        referer = atvUrl
+                    })
+                    return true
                 }
-                return true
             }
             
             val pageM3u8 = extractAtvM3u8FromPage(html)
