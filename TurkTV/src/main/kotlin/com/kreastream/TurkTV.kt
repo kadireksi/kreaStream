@@ -46,14 +46,15 @@ class TurkTV : MainAPI() {
     )
 
     private val dynamicMainPageItems = buildList {
-        channels.forEach {
-            add("${it.key}_current" to "${it.displayName} Güncel Diziler")
+        channels.forEach { channel ->
 
-            it.archivePath?.let { 
-                add("${it.key}_archive" to "${it.displayName} Arşiv Diziler") 
+            add("${channel.key}_current" to "${channel.displayName} Güncel Diziler")
+
+            channel.archivePath?.let {
+                add("${channel.key}_archive" to "${channel.displayName} Arşiv Diziler")
             }
 
-            add("${it.key}_live" to "${it.displayName} Canlı Yayın")
+            add("${channel.key}_live" to "${channel.displayName} Canlı Yayın")
         }
 
         add("live_tv" to "TRT Canlı TV")
@@ -994,7 +995,7 @@ class TurkTV : MainAPI() {
                     })
                 }
                 
-                channels.filterNot { it.isTrt || it.key == "atv" || it.key == "show" }.forEach { ch ->
+                channels.filterNot { it.key == "atv" || it.key == "show" }.forEach { ch ->
                     ch.liveStream?.let {
                         liveItems.add(newLiveSearchResponse("${ch.displayName} Canlı", it, TvType.Live) {
                             this.posterUrl = "${ch.baseUrl}/favicon.ico"
@@ -1275,7 +1276,7 @@ class TurkTV : MainAPI() {
         } catch (_: Exception) {}
 
         // Other channels (including NOW Live if configured in channels list)
-        channels.filterNot { it.isTrt || it.key == "atv" || it.key == "show" }.forEach { ch ->
+        channels.filterNot {it.key == "atv" || it.key == "show" }.forEach { ch ->
             ch.liveStream?.let {
                 if (ch.displayName.contains(query, ignoreCase = true)) {
                     out += newLiveSearchResponse("${ch.displayName} Canlı", it, TvType.Live) { posterUrl = "${ch.baseUrl}/favicon.ico" }
@@ -1352,7 +1353,7 @@ class TurkTV : MainAPI() {
         } catch (_: Exception) {}
 
         // Generic Channel Search
-        for (channel in channels.filterNot { it.isTrt || it.key == "atv" || it.key == "show" || it.key == "now" }) {
+        for (channel in channels.filterNot {it.key == "atv" || it.key == "show" || it.key == "now" }) {
             try {
                 val searchUrl = "${channel.baseUrl}/search?q=${query}"
                 val doc = app.get(searchUrl, timeout = 10).document
