@@ -6,6 +6,7 @@ import org.jsoup.nodes.Element
 import kotlin.text.RegexOption
 import org.json.JSONObject
 import org.json.JSONArray
+import org.json.*
 import kotlinx.coroutines.delay
 import android.util.Log
 
@@ -848,20 +849,21 @@ class TurkTV : MainAPI() {
 
         return atvMp4Qualities.mapNotNull { (kbps, label) ->
             if (kbps <= maxBitrate) {
-                ExtractorLink(
+                newExtractorLink(
                     name = "ATV • $label",
                     source = "ATV",
-                    url = "${baseUrl}_${kbps}.mp4",
-                    referer = atvUrl,
-                    quality = when (kbps) {
+                    url = "${baseUrl}_${kbps}.mp4"
+                ){
+                    this.referer = atvUrl
+                    this.quality = when (kbps) {
                         in 1500..2500 -> Qualities.P1080.value
                         in 1000..1499 -> Qualities.P720.value
                         in 700..999 -> Qualities.P480.value
                         in 350..699 -> Qualities.P360.value
                         else -> Qualities.Unknown.value
-                    },
-                    isM3u8 = false
-                )
+                    }
+                    this.type = ExtractorLinkType.VIDEO
+                }
             } else null
         }
     }
