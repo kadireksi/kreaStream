@@ -424,7 +424,10 @@ class HDFilmCehennemi : MainAPI() {
             seenVideoUrls.add(decryptedUrl)
 
             // 5. Determine if it's HLS 
-            if (decryptedUrl.contains(".m3u8")) {
+            val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
+
+            //if (decryptedUrl.contains(".m3u8")) {
+            if(isHls){
                 M3u8Helper.generateM3u8(
                     source,
                     decryptedUrl,
@@ -441,7 +444,7 @@ class HDFilmCehennemi : MainAPI() {
                     ){
                         this.referer = referer
                         this.quality = Qualities.Unknown.value
-                        this.type    = ExtractorLinkType.VIDEO
+                        this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                     }
                 )
             }
