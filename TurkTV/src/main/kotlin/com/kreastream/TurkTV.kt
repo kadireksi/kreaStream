@@ -81,9 +81,9 @@ class TurkTV : MainAPI() {
 
         channels?.forEach { cfg ->
             val series = fetchSeries(cfg)
-            if (series.isNotEmpty()) {
+            
                 lists += HomePageList("${cfg.name} Diziler", series, true)
-            }
+            
         }
 
         streams?.takeIf { it.isNotEmpty() }?.let { liveList ->
@@ -102,6 +102,13 @@ class TurkTV : MainAPI() {
 
     // ------------------- FETCH SERIES -------------------
     private suspend fun fetchSeries(cfg: ChannelConfig): List<SearchResponse> {
+        // ── TEMPORARY MODIFICATION FOR DEBUGGING ──
+        // This function will now always return an empty list.
+        // This allows the channel name to be used for the HomePageList title
+        // even if the scraping fails.
+        
+        // COMMENT OUT or DELETE the original scraping logic:
+        /*
         val doc = app.get(cfg.series.url).document
         val block = cfg.series
 
@@ -115,6 +122,10 @@ class TurkTV : MainAPI() {
                 this.posterUrl = poster
             }
         }
+        */
+        
+        // ── RETURN EMPTY LIST ──
+        return emptyList()
     }
 
     override suspend fun load(url: String): LoadResponse {
