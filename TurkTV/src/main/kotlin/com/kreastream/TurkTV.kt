@@ -46,17 +46,17 @@ class TurkTV : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        channels.forEach {
+        ${channels}.forEach {
             if(it.currentPath != null) {
                 "${it.key}_current" to "${it.displayName} Güncel Diziler";
             }
         }
-        channels.forEach {
+        ${channels}.forEach {
             if(it.archivePath != null) {
                 "${it.key}_archive" to "${it.displayName} Arşiv Diziler";
             }
         }
-        channels.forEach {
+        ${channels}.forEach {
             "${it.key}_live" to "${it.displayName} Canlı Yayın";
         }
         "live_tv" to "TRT Canlı TV",
