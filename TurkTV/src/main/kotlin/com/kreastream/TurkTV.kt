@@ -74,11 +74,12 @@ class TurkTV : MainAPI() {
                 liveList.map {
                     newTvSeriesSearchResponse(
                         name = it.title,
-                        url = it.url,
+                        url = it.url
+                    ){
                         apiName = this.name,
                         type = TvType.Live,
                         posterUrl = it.poster
-                    )
+                    }
                 }
             )
         }
@@ -101,11 +102,12 @@ class TurkTV : MainAPI() {
 
             newTvSeriesSearchResponse(
                 name = title,
-                url = fullUrl!!,
+                url = fullUrl!!
+            ){
                 apiName = name,
                 type = TvType.TvSeries,
                 posterUrl = poster
-            )
+            }
         }
     }
 
