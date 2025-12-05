@@ -2,16 +2,20 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.runBlocking
 
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://turktv.local"
+    override var mainUrl = "https://www.atv.com.tr"  // Real default base
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
-    // Update these later
     private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
     private val streamsJsonUrl  = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
 
@@ -52,8 +56,22 @@ class TurkTV : MainAPI() {
 
     // ---------- JSON LOADING ----------
     private suspend fun ensureLoaded() {
-        if (channels == null) channels = parseJson(app.get(channelsJsonUrl).text)
-        if (streams == null) streams = parseJson(app.get(streamsJsonUrl).text)
+        if (channels == null) {
+            try {
+                channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
+            } catch (e: Exception) {
+                logError("Failed to load channels: ${e.message}")
+                channels = emptyList()
+            }
+        }
+        if (streams == null) {
+            try {
+                streams = parseJson<List<LiveStreamConfig>>(app.get(streamsJsonUrl).text)
+            } catch (e: Exception) {
+                logError("Failed to load streams: ${e.message}")
+                streams = emptyList()
+            }
+        }
     }
 
     // ---------- MAIN PAGE ----------
@@ -85,7 +103,12 @@ class TurkTV : MainAPI() {
         val doc = app.get(cfg.series.url).document
         val block = cfg.series
 
-        return doc.select(block.container).mapNotNull { el ->
+        val elements = doc.select(block.container)
+        if (elements.isEmpty()) {
+            logError("No series elements found with selector: ${block.container} on ${cfg.baseUrl}")
+        }
+
+        return elements.mapNotNull { el ->
             val title = el.select(block.title).text().ifBlank { return@mapNotNull null }
             val href = el.select(block.link).attr("href").ifBlank { return@mapNotNull null }
             val url = full(cfg.baseUrl, href)
@@ -97,59 +120,30 @@ class TurkTV : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        // Quick live stream check (from getMainPage)
-        streams?.find { data == it.url }?.let { live ->
-            callback(newExtractorLink(
-                source = name,
-                name = live.title,
-                url = live.url,
-                referer = if (live.requiresReferer) mainUrl else null,
-                quality = Qualities.Unknown.value,
-                type = ExtractorLinkType.VIDEO  // Assume VIDEO; use M3U8 if HLS
-            ) {
-                // Lambda for additional config if needed, e.g., headers
-                this.headers = mapOf("User-Agent" to "Mozilla/5.0")  // Example
-            })
-            return true
-        }
+    // ---------- LOAD SERIES ----------
+    override suspend fun load(url: String): LoadResponse {
+        ensureLoaded()
 
-        // For series episodes: Find config and extract
-        channels?.find { data.contains(it.baseUrl) }?.let { cfg ->
-            // Example: Fetch episode page and extract via cfg.stream
-            val doc = app.get(data).document
-            val streamUrl = doc.select(cfg.stream.type /* e.g., "source" */).attr("src")  // Customize selector
-            if (streamUrl.isNotBlank()) {
-                val fullUrl = full(cfg.baseUrl, streamUrl)
-                callback(newExtractorLink(
-                    source = name,
-                    name = "Episode Stream",
-                    url = fullUrl!!,
-                    referer = if (cfg.stream.referer) cfg.baseUrl else null,
-                    quality = Qualities.HD.value,  // Assume or parse
-                    type = ExtractorLinkType.VIDEO  // Or M3U8/DASH based on URL
-                ) {
-                    // Lambda for extra props, e.g., if prefer is set
-                    if (cfg.stream.prefer.isNotBlank()) {
-                        this.headers = mapOf("Prefer" to cfg.stream.prefer)
-                    }
-                })
-                return true
-            }
+        val cfg = channels?.find { url.contains(it.baseUrl, true) }
+            ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
+
+        val eps = fetchEpisodes(cfg, url)
+
+        return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, eps) {
+            posterUrl = null
         }
-        return false
     }
 
     private suspend fun fetchEpisodes(cfg: ChannelConfig, url: String): List<Episode> {
         val doc = app.get(url).document
         val ep = cfg.episodes
 
-        return doc.select(ep.container).mapNotNull { el ->
+        val elements = doc.select(ep.container)
+        if (elements.isEmpty()) {
+            logError("No episode elements found with selector: ${ep.container} on $url")
+        }
+
+        return elements.mapNotNull { el ->
             val title = el.select(ep.title).text().ifBlank { "Bölüm" }
             val href = full(cfg.baseUrl, el.select(ep.link).attr("href")) ?: return@mapNotNull null
 
@@ -160,7 +154,69 @@ class TurkTV : MainAPI() {
         }
     }
 
+    // ---------- LOAD LINKS ----------
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // Handle live streams (data == live.url)
+        streams?.find { data == it.url }?.let { live ->
+            callback(
+                newExtractorLink(
+                source = name,
+                name = live.title,
+                url = live.url
+                ){
+                this.referer = if (live.requiresReferer) mainUrl else null
+                this.quality = Qualities.Unknown.value
+                this.type = ExtractorLinkType.M3U8   
+                this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+            })
+            return true
+        }
+
+        // Handle series episodes
+        channels?.find { data.contains(it.baseUrl) }?.let { cfg ->
+            val doc = app.get(data).document
+            // Robust extraction: Prefer M3U8/MP4 from video tags or regex
+            var streamUrl = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']").attr("src")
+                .ifBlank { doc.select("video source[src$='.mp4']").attr("src") }
+                .ifBlank { 
+                    // Regex fallback for embedded URLs
+                    doc.html().find("""https?://[^\s"]+\.(?:mp4|m3u8)""") ?: ""
+                }
+            if (streamUrl.isNotBlank()) {
+                val fullUrl = full(cfg.baseUrl, streamUrl)
+                val linkType = if (fullUrl!!.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                val quality = if (cfg.stream.prefer == "m3u8") Qualities.HD.value else Qualities.SD.value
+                callback(
+                    newExtractorLink(
+                    source = name,
+                    name = "Episode Stream",
+                    url = fullUrl
+                    ){
+                        this.referer = if (cfg.stream.referer) cfg.baseUrl else null
+                        this.quality = quality
+                        this.type = linkType
+                        if (cfg.stream.prefer.isNotBlank()) {
+                            this.headers = mapOf("Accept" to cfg.stream.prefer)
+                        }
+                    }
+                )
+                return true
+            } else {
+                logError("No stream URL found on $data")
+            }
+        }
+        return false
+    }
+
     // ---------- HELPERS ----------
     private fun full(base: String, url: String?): String? =
-        url?.let { if (it.startsWith("http")) it else base + it.trimStart('/') }
+        url?.let { 
+            if (it.startsWith("http")) it 
+            else (base.removeSuffix("/") + "/" + it.trimStart('/').trimStart('/')) 
+        }
 }
