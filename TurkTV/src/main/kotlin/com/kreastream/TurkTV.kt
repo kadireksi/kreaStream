@@ -5,13 +5,13 @@ import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
-//import com.lagradost.cloudstream3.utils.SubtitleFile // <-- ADDED MISSING IMPORT
+import com.lagradost.cloudstream3.SubtitleFile // <-- CRITICAL FIX: Corrected import location
 import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://TurkTV.local"
+    override var mainUrl = "https://TurkTV.local" // Note: Check referer if streams fail
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
@@ -67,7 +67,8 @@ class TurkTV : MainAPI() {
             try {
                 channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
             } catch (e: Exception) {
-                channels = emptyList()
+                // If this fails, channels becomes emptyList(), which skips the series section loop
+                channels = emptyList() 
             }
         }
         if (streams == null) {
@@ -102,7 +103,6 @@ class TurkTV : MainAPI() {
             TvType.TvSeries
         )
         
-        // Add the combined list to the main page sections
         lists += HomePageList("Canlı Yayınlar", liveItems)
         
         // --- 2. SERIES SECTIONS ---
@@ -175,7 +175,7 @@ class TurkTV : MainAPI() {
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
+        subtitleCallback: (SubtitleFile) -> Unit, // This now has a resolved type
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
