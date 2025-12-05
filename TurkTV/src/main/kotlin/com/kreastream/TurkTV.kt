@@ -289,12 +289,8 @@ override suspend fun loadLinks(
         var streamUrl: String? = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']")
             .attr("src")
             .ifBlank { doc.select("video source[src$='.mp4']").attr("src") }
-            .ifBlank {
-                Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value
-            }
-            .ifBlank {
-    doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").firstOrNull()?.attr("src") ?: ""
-}
+            .ifBlank { Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value }
+            .ifBlank { doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").firstOrNull()?.attr("src") ?: ""}
 
         if (!streamUrl.isNullOrBlank()) {
             val finalUrl = full(cfg.baseUrl, streamUrl) ?: streamUrl
