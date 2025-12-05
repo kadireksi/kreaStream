@@ -82,7 +82,7 @@ class TurkTV : MainAPI() {
         channels?.forEach { cfg ->
             val series = fetchSeries(cfg)
             if (series.isNotEmpty()) {
-                lists += HomePageList("${cfg.name} Diziler", series)
+                lists += HomePageList("${cfg.name} Diziler", series, true)
             }
         }
 
