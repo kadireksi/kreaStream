@@ -5,8 +5,8 @@
     "baseUrl": "https://www.atv.com.tr",
     "series": {
       "url": "https://www.atv.com.tr/diziler",
-      "container": "body",  // Fallback: No real list; use hardcoded below in code if needed
-      "title": "h3 a, .dizi-title",  // Generic; sites use plain h3
+      "container": "body",
+      "title": "h3 a, .dizi-title",
       "link": "a[href*='/diziler/']",
       "poster": "img[src*='poster']"
     },
