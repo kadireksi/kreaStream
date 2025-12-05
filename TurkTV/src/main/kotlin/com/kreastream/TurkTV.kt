@@ -2,7 +2,11 @@ package com.kreastream
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
-import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+//import com.lagradost.cloudstream3.utils.SubtitleFile // <-- ADDED MISSING IMPORT
+import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class TurkTV : MainAPI() {
 
@@ -81,23 +85,27 @@ class TurkTV : MainAPI() {
 
         val lists = mutableListOf<HomePageList>()
         
-        // --- 1. LIVE TV HUB ---
-        val liveTvSearchResponse = newTvSeriesSearchResponse(
-            "Canlı TV Kanalları",
-            liveChannelsUrl,
-            TvType.TvSeries
-        )
-        lists += HomePageList("Canlı TV", listOf(liveTvSearchResponse))
-
-        // --- 2. LIVE RADIO HUB ---
-        val liveRadioSearchResponse = newTvSeriesSearchResponse(
-            "Radyo Kanalları",
-            radioChannelsUrl,
-            TvType.TvSeries
-        )
-        lists += HomePageList("Radyo", listOf(liveRadioSearchResponse))
+        // --- 1. LIVE STREAMS SECTION (Combined TV and Radio) ---
+        val liveItems = mutableListOf<SearchResponse>()
         
-        // --- 3. SERIES SECTIONS (Debugging enabled) ---
+        // Live TV Item
+        liveItems += newTvSeriesSearchResponse(
+            "Canlı TV", 
+            liveChannelsUrl, 
+            TvType.TvSeries
+        )
+
+        // Live Radio Item
+        liveItems += newTvSeriesSearchResponse(
+            "Radyo", 
+            radioChannelsUrl, 
+            TvType.TvSeries
+        )
+        
+        // Add the combined list to the main page sections
+        lists += HomePageList("Canlı Yayınlar", liveItems)
+        
+        // --- 2. SERIES SECTIONS ---
         channels?.forEach { cfg ->
             val series = fetchSeries(cfg)
             lists += HomePageList("${cfg.name} Diziler", series)
@@ -109,7 +117,6 @@ class TurkTV : MainAPI() {
     // ------------------- FETCH SERIES -------------------
     private suspend fun fetchSeries(cfg: ChannelConfig): List<SearchResponse> {
         // ── TEMPORARY MODIFICATION FOR DEBUGGING ──
-        // Returns empty list to show channel headers, ignoring scraping errors.
         return emptyList()
     }
 
@@ -134,7 +141,6 @@ class TurkTV : MainAPI() {
                     }
                 } ?: emptyList()
 
-            // TvType.Live is used for the continuous stream concept
             return newTvSeriesLoadResponse(title, url, TvType.Live, episodes) {}
         }
 
@@ -146,7 +152,6 @@ class TurkTV : MainAPI() {
         val episodes = fetchEpisodes(cfg, url)
 
         return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, episodes) {
-            // Find series poster/description here if needed.
             posterUrl = null
         }
     }
@@ -174,7 +179,7 @@ class TurkTV : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        // ── Live streams (TV/Radio) ──
+        // ── Live streams ──
         streams?.firstOrNull { it.url == data }?.let { live ->
             callback(
                 newExtractorLink(
@@ -183,8 +188,7 @@ class TurkTV : MainAPI() {
                     url = live.url
                 ){
                     this.referer = if (live.requiresReferer) mainUrl else ""
-                    // Keep quality as Unknown for generic M3U8/Live links
-                    this.quality = Qualities.Unknown.value 
+                    this.quality = Qualities.Unknown.value
                     this.type = ExtractorLinkType.M3U8
                     this.headers = mapOf("User-Agent" to "Mozilla/5.0")
                 }
@@ -206,8 +210,7 @@ class TurkTV : MainAPI() {
             if (!streamUrl.isNullOrBlank()) {
                 val finalUrl = full(cfg.baseUrl, streamUrl)!!
                 val linkType = if (finalUrl.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                // Quality setting is fine here
-                val quality = Qualities.Unknown.value
+                val quality = if (cfg.stream.prefer == "m3u8") Qualities.Unknown.value else Qualities.Unknown.value
 
                 callback(
                     newExtractorLink(
