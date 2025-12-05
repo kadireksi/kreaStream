@@ -41,19 +41,23 @@ class TurkTV : MainAPI() {
         Channel("atv", "ATV", atvUrl, "/diziler", "/eski-diziler","canli-yayin",null),
         Channel("kanald", "Kanal D", kanaldUrl, "/diziler/tum-diziler", "/diziler/arsiv-diziler","canli-yayin",null),
         Channel("show", "Show TV", showTvUrl, "/diziler", "canli-yayin",null),
-        Channel("star", "Star TV", starTvUrl, "/diziler/yayinda-olanlar", "/diziler/arsiv-diziler","canli-yayin",null),
-        Channel("now", "NOW", nowTvUrl, "/dizi-izle", "/dizi-arsivi","canli-yayin",null)
+        Channel("star", "Star TV", starTvUrl, "/dizi", null,"canli-yayin",null),
+        Channel("now", "NOW", nowTvUrl, "/dizi-izle", null,"canli-yayin",null)
     )
 
     override val mainPage = mainPageOf(
         channels.forEach {
-            it.key + "_current" to it.displayName + " Güncel Diziler",
+            if(it.currentPath != null) {
+                "${it.key}" + "_current" to "${it.displayName}" + " Güncel Diziler",
+            }
         }
         channels.forEach {
-            it.key + "_archive" to it.displayName + " Arşiv Diziler",
+            if(it.archivePath != null) {
+                "${it.key}" + "_archive" to "${it.displayName}" + " Arşiv Diziler",
+            }
         }
         channels.forEach {
-            it.key + "_live" to it.displayName + " Canlı Yayın",
+            "${it.key}" + "_live" to "${it.displayName}" + " Canlı Yayın",
         }
         "live_tv" to "TRT Canlı TV",
         "live_radio" to "TRT Canlı Radyo"
