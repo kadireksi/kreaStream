@@ -284,37 +284,43 @@ class TurkTV : MainAPI() {
         channels?.firstOrNull { data.contains(it.baseUrl, ignoreCase = true) }?.let { cfg ->
             val doc = app.get(data).document
 
-            val streamUrl = doc.select("video source[src\$='.m3u8'], source[type='application/x-mpegURL']")
-                .attr("src")
-                .ifBlank { doc.select("video source[src\$='.mp4']").attr("src") }
-                .ifBlank {
-                    Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value
-                }
-                .ifBlank {
-                    // Try alternative selectors - FIXED: Use firstOrNull with safe call
-                    doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").firstOrNull()?.attr("src") ?: ""
-                }
-                .takeIf { !it.isNullOrBlank() }
+            // Build the stream URL step by step to avoid nullable chain issues
+            val source1 = doc.select("video source[src\$='.m3u8'], source[type='application/x-mpegURL']").attr("src")
+            val streamUrl1 = if (source1.isNotBlank()) source1 else ""
+            
+            val streamUrl2 = if (streamUrl1.isBlank()) {
+                doc.select("video source[src\$='.mp4']").attr("src")
+            } else streamUrl1
+            
+            val streamUrl3 = if (streamUrl2.isBlank()) {
+                Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value ?: ""
+            } else streamUrl2
+            
+            val streamUrl4 = if (streamUrl3.isBlank()) {
+                // Try alternative selectors
+                val iframeSrc = doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src")
+                iframeSrc
+            } else streamUrl3
 
-            streamUrl?.let { url ->
-                val finalUrl = full(cfg.baseUrl, url) ?: url
-                finalUrl?.let { safeFinalUrl ->
-                    // FIXED: No null safety issue here because safeFinalUrl is not null
-                    val linkType = if (safeFinalUrl.endsWith(".m3u8")) {
+            if (streamUrl4.isNotBlank()) {
+                val finalUrl = full(cfg.baseUrl, streamUrl4) ?: streamUrl4
+                
+                // Ensure finalUrl is not null
+                if (finalUrl != null) {
+                    val linkType = if (finalUrl.endsWith(".m3u8")) {
                         ExtractorLinkType.M3U8
                     } else {
                         ExtractorLinkType.VIDEO
                     }
-                    val quality = Qualities.Unknown.value
-
+                    
                     callback(
                         newExtractorLink(
                             source = name,
                             name = "Stream",
-                            url = safeFinalUrl
+                            url = finalUrl
                         ) {
                             this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
-                            this.quality = quality
+                            this.quality = Qualities.Unknown.value
                             this.type = linkType
                             val headers = mutableMapOf(
                                 "User-Agent" to "Mozilla/5.0",
