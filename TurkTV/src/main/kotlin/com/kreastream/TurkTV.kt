@@ -65,15 +65,27 @@ class TurkTV : MainAPI() {
     private suspend fun ensureLoaded() {
         if (channels == null) {
             try {
-                channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
+                println("DEBUG: Loading channels from $channelsJsonUrl")
+                val channelsText = app.get(channelsJsonUrl).text
+                println("DEBUG: Channels JSON received: ${channelsText.length} characters")
+                channels = parseJson<List<ChannelConfig>>(channelsText)
+                println("DEBUG: Channels parsed successfully: ${channels?.size} channels")
             } catch (e: Exception) {
+                println("DEBUG: Failed to load channels: ${e.message}")
+                e.printStackTrace()
                 channels = emptyList() 
             }
         }
         if (streams == null) {
             try {
-                streams = parseJson<List<LiveStreamConfig>>(app.get(streamsJsonUrl).text)
+                println("DEBUG: Loading streams from $streamsJsonUrl")
+                val streamsText = app.get(streamsJsonUrl).text
+                println("DEBUG: Streams JSON received: ${streamsText.length} characters")
+                streams = parseJson<List<LiveStreamConfig>>(streamsText)
+                println("DEBUG: Streams parsed successfully: ${streams?.size} streams")
             } catch (e: Exception) {
+                println("DEBUG: Failed to load streams: ${e.message}")
+                e.printStackTrace()
                 streams = emptyList()
             }
         }
@@ -88,44 +100,85 @@ class TurkTV : MainAPI() {
         // --- 1. LIVE STREAMS SECTION (Combined TV and Radio) ---
         val liveItems = mutableListOf<SearchResponse>()
         
-        // Live TV Item
-        liveItems += newTvSeriesSearchResponse(
-            "Canlı TV", 
-            liveChannelsUrl, 
-            TvType.TvSeries
-        ).apply {
-            posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
-        }
+        // Check if we have streams loaded
+        if (streams.isNullOrEmpty()) {
+            println("DEBUG: No streams loaded, showing placeholder")
+            // Live TV Item (placeholder)
+            liveItems += newTvSeriesSearchResponse(
+                "Canlı TV (Yakında)", 
+                liveChannelsUrl, 
+                TvType.TvSeries
+            ).apply {
+                posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+            }
 
-        // Live Radio Item
-        liveItems += newTvSeriesSearchResponse(
-            "Radyo", 
-            radioChannelsUrl, 
-            TvType.TvSeries
-        ).apply {
-            posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+            // Live Radio Item (placeholder)
+            liveItems += newTvSeriesSearchResponse(
+                "Radyo (Yakında)", 
+                radioChannelsUrl, 
+                TvType.TvSeries
+            ).apply {
+                posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+            }
+        } else {
+            println("DEBUG: Streams loaded, showing real items")
+            // Live TV Item (real)
+            liveItems += newTvSeriesSearchResponse(
+                "Canlı TV", 
+                liveChannelsUrl, 
+                TvType.TvSeries
+            ).apply {
+                posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+            }
+
+            // Live Radio Item (real)
+            liveItems += newTvSeriesSearchResponse(
+                "Radyo", 
+                radioChannelsUrl, 
+                TvType.TvSeries
+            ).apply {
+                posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+            }
         }
         
         lists += HomePageList("Canlı Yayınlar", liveItems)
         
         // --- 2. SERIES SECTIONS ---
-        channels?.let { channelList ->
-            if (channelList.isNotEmpty()) {
-                channelList.forEach { cfg ->
-                    try {
-                        val series = fetchSeries(cfg)
-                        if (series.isNotEmpty()) {
-                            lists += HomePageList("${cfg.name} Diziler", series)
-                        }
-                    } catch (e: Exception) {
-                        // Log error but continue with other channels
-                    }
+        if (channels.isNullOrEmpty()) {
+            println("DEBUG: No channels loaded, showing error")
+            // Add a placeholder if no channels loaded
+            lists += HomePageList("Diziler", listOf(
+                newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries).apply {
+                    posterUrl = "https://cdn-icons-png.flaticon.com/512/157/157933.png"
                 }
-            } else {
-                // Add a placeholder if no channels loaded
-                lists += HomePageList("Diziler", listOf(
-                    newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries)
-                ))
+            ))
+        } else {
+            println("DEBUG: Channels loaded: ${channels!!.size} channels")
+            channels!!.forEach { cfg ->
+                try {
+                    println("DEBUG: Fetching series for ${cfg.name}")
+                    val series = fetchSeries(cfg)
+                    println("DEBUG: Fetched ${series.size} series for ${cfg.name}")
+                    if (series.isNotEmpty()) {
+                        lists += HomePageList("${cfg.name} Diziler", series)
+                    } else {
+                        // Add placeholder if no series found
+                        lists += HomePageList("${cfg.name} Diziler", listOf(
+                            newTvSeriesSearchResponse("Dizi Bulunamadı", "", TvType.TvSeries).apply {
+                                posterUrl = "https://cdn-icons-png.flaticon.com/512/157/157933.png"
+                            }
+                        ))
+                    }
+                } catch (e: Exception) {
+                    println("DEBUG: Error fetching series for ${cfg.name}: ${e.message}")
+                    e.printStackTrace()
+                    // Add error placeholder
+                    lists += HomePageList("${cfg.name} Diziler", listOf(
+                        newTvSeriesSearchResponse("Hata: ${e.message}", "", TvType.TvSeries).apply {
+                            posterUrl = "https://cdn-icons-png.flaticon.com/512/157/157933.png"
+                        }
+                    ))
+                }
             }
         }
 
@@ -137,19 +190,27 @@ class TurkTV : MainAPI() {
         val seriesList = mutableListOf<SearchResponse>()
         
         try {
+            println("DEBUG: Fetching series from URL: ${cfg.series.url}")
             val doc = app.get(cfg.series.url).document
             val container = cfg.series.container
             val titleSelector = cfg.series.title
             val linkSelector = cfg.series.link
             val posterSelector = cfg.series.poster
             
-            doc.select(container).forEach { element ->
+            println("DEBUG: Using selectors - Container: $container, Title: $titleSelector, Link: $linkSelector")
+            
+            val elements = doc.select(container)
+            println("DEBUG: Found ${elements.size} elements with container selector")
+            
+            elements.forEachIndexed { index, element ->
                 try {
                     val title = element.select(titleSelector).text().trim()
                     val link = element.select(linkSelector).attr("href")
                     val poster = if (posterSelector != null) {
                         element.select(posterSelector).attr("src")
                     } else null
+                    
+                    println("DEBUG: Element $index - Title: '$title', Link: '$link', Poster: '$poster'")
                     
                     if (title.isNotBlank() && link.isNotBlank()) {
                         val fullLink = full(cfg.baseUrl, link)
@@ -159,16 +220,19 @@ class TurkTV : MainAPI() {
                                     this.posterUrl = full(cfg.baseUrl, poster)
                                 }
                             )
+                            println("DEBUG: Added series: $title")
                         }
                     }
                 } catch (e: Exception) {
-                    // Skip this element if there's an error
+                    println("DEBUG: Error processing element $index: ${e.message}")
                 }
             }
         } catch (e: Exception) {
-            // Return empty list if there's an error fetching
+            println("DEBUG: Error fetching series: ${e.message}")
+            e.printStackTrace()
         }
         
+        println("DEBUG: Total series fetched: ${seriesList.size}")
         return seriesList
     }
 
@@ -188,12 +252,28 @@ class TurkTV : MainAPI() {
                 ?.filter { it.streamType == typeToFilter }
                 ?: emptyList()
             
+            println("DEBUG: Loading $title with ${filteredStreams.size} streams")
+            
+            if (filteredStreams.isEmpty()) {
+                // Return "Coming Soon" if no streams
+                return newTvSeriesLoadResponse("$title (Yakında)", url, TvType.Live, emptyList()) {
+                    posterUrl = if (isLiveTv) {
+                        "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+                    } else {
+                        "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+                    }
+                }
+            }
+            
             // Create episodes for live streams
             val episodes = filteredStreams.map { live ->
                 newEpisode(live.url) { 
                     this.name = live.title
-                    this.posterUrl = live.poster
-                    // Add additional metadata for live streams
+                    this.posterUrl = live.poster ?: if (isLiveTv) {
+                        "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+                    } else {
+                        "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+                    }
                     this.description = "Canlı yayın"
                 }
             }
