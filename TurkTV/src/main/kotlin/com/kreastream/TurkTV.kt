@@ -119,7 +119,7 @@ class TurkTV : MainAPI() {
             val title = el.select(ep.title).text().ifBlank { "Bölüm" }
             val href = full(cfg.baseUrl, el.select(ep.link).attr("href")) ?: return@mapNotNull null
 
-            Episode(
+            newEpisode(
                 data = href,
                 name = title
             )
