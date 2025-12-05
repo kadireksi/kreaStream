@@ -287,128 +287,143 @@ class HDFilmCehennemi : MainAPI() {
     }
     
     private object HDFCDecrypter {
-        
-        private fun applyRot13(inputBytes: ByteArray): ByteArray {
-            val rot13edBytes = ByteArray(inputBytes.size)
-            for (i in inputBytes.indices) {
-                val charCode = inputBytes[i].toInt()
-                val char = charCode.toChar()
-                rot13edBytes[i] = when (char) {
-                    in 'a'..'z' -> (((charCode - 'a'.code + 13) % 26 + 'a'.code).toChar()).code.toByte()
-                    in 'A'..'Z' -> (((charCode - 'A'.code + 13) % 26 + 'A'.code).toChar()).code.toByte()
-                    else -> inputBytes[i]
-                }
-            }
-            return rot13edBytes
-        }
 
-        private fun applyCustomShift(inputBytes: ByteArray, seed: Int): String {
+        /* ---------------------------------------------------------
+        *  ROT13 for String
+        * --------------------------------------------------------- */
+        private fun rot13String(s: String): String =
+            s.map {
+                when (it) {
+                    in 'a'..'z' -> 'a' + (it - 'a' + 13) % 26
+                    in 'A'..'Z' -> 'A' + (it - 'A' + 13) % 26
+                    else -> it
+                }
+            }.joinToString("")
+
+        /* ---------------------------------------------------------
+        * ROT13 for ByteArray (JS variant sometimes used)
+        * --------------------------------------------------------- */
+        private fun rot13Bytes(b: ByteArray): ByteArray =
+            b.map {
+                val c = it.toInt()
+                when (val ch = c.toChar()) {
+                    in 'a'..'z' -> ((('a'.code + (c - 'a'.code + 13) % 26)).toByte())
+                    in 'A'..'Z' -> ((('A'.code + (c - 'A'.code + 13) % 26)).toByte())
+                    else -> it
+                }
+            }.toByteArray()
+
+        /* ---------------------------------------------------------
+        * JS unmix (char shift)
+        * --------------------------------------------------------- */
+        private fun unmix(decoded: ByteArray, seed: Int): String {
             val sb = StringBuilder()
-            for (i in inputBytes.indices) {
-                val charCode = inputBytes[i].toInt() and 0xFF // Unsigned conversion
+            for (i in decoded.indices) {
+                val cc = decoded[i].toInt() and 0xFF
                 val shift = seed % (i + 5)
-                val newChar = (charCode - shift + 256) % 256
-                sb.append(newChar.toChar())
+                val finalChar = (cc - shift + 256) % 256
+                sb.append(finalChar.toChar())
             }
             return sb.toString()
         }
 
-        // Attempt 1: Reverse String -> Base64 Decode -> ROT13 on Bytes -> Custom Shift
-        private fun attempt1(encryptedData: String, seed: Int): String {
-            val reversedString = encryptedData.reversed()
-            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
-            val rot13edBytes = applyRot13(decodedBytes)
-            return applyCustomShift(rot13edBytes, seed)
-        }
+        /* ---------------------------------------------------------
+        * Heuristic to detect correct URL
+        * --------------------------------------------------------- */
+        private fun looksValid(out: String): Boolean {
+            if (out.isBlank()) return false
+            if (out.length < 10) return false
 
-        // Attempt 2: ROT13 on String -> Reverse String -> Base64 Decode -> Custom Shift
-        private fun attempt2(encryptedData: String, seed: Int): String {
-            val rot13edString = applyRot13(encryptedData.toByteArray()).toString(Charsets.UTF_8)
-            val reversedString = rot13edString.reversed()
-            val decodedBytes = Base64.decode(reversedString, Base64.DEFAULT)
-            return applyCustomShift(decodedBytes, seed)
-        }
+            // URL patterns
+            if (out.startsWith("http://") || out.startsWith("https://"))
+                return true
 
-        // Attempt 3: Reverse String -> ROT13 on String -> Base64 Decode -> Custom Shift
-        private fun attempt3(encryptedData: String, seed: Int): String {
-            val reversedString = encryptedData.reversed()
-            val rot13edString = applyRot13(reversedString.toByteArray()).toString(Charsets.UTF_8)
-            val decodedBytes = Base64.decode(rot13edString, Base64.DEFAULT)
-            return applyCustomShift(decodedBytes, seed)
-        }
+            if ("http" in out) return true
+            if (".m3u8" in out || ".mp4" in out) return true
 
-        // Attempt 4: Base64 Decode -> ROT13 on Bytes -> Reverse Bytes -> Custom Shift
-        // Matches JS: atob(x) -> replace(Rot13) -> reverse() -> Shift Loop
-        private fun attempt4(encryptedData: String, seed: Int): String {
-            try {
-                // 1. Base64 Decode
-                val decodedBytes = Base64.decode(encryptedData, Base64.DEFAULT)
-                // 2. ROT13
-                val rot13edBytes = applyRot13(decodedBytes)
-                // 3. Reverse
-                val reversedBytes = rot13edBytes.reversedArray()
-                // 4. Custom Shift
-                return applyCustomShift(reversedBytes, seed)
-            } catch (e: Exception) {
-                return ""
-            }
-        }
-
-        private fun isValidDecryption(output: String): Boolean {
-            if (output.isBlank()) return false
-            if (output.length < 10) return false
-
-            // Stage 1: starts with known URL schemes
-            if (output.startsWith("http://") || output.startsWith("https://")) return true
-
-            // Stage 2: check if inside contains urls even if prefix is shifted
-            if (output.contains("http")) return true
-            if (output.contains(".m3u8") || output.contains(".mp4")) return true
-
-            // Stage 3: must be printable ASCII mostly
-            val printable = output.count { it.code in 32..126 }
-            if (printable.toDouble() / output.length > 0.85) return true
+            // Mostly printable ASCII → Good sign
+            val pr = out.count { it.code in 32..126 }
+            if (pr.toDouble() / out.length > 0.80)
+                return true
 
             return false
         }
 
-        private fun attemptNew(encrypted: String, seed: Int): String {
-            return try {
-                val reversed = encrypted.reversed()
-                val decoded = Base64.decode(reversed, Base64.DEFAULT)
+        /* ---------------------------------------------------------
+        *  Base64-safe decode
+        * --------------------------------------------------------- */
+        private fun b64(s: String): ByteArray? =
+            try { Base64.decode(s, Base64.DEFAULT) } catch (_: Throwable) { null }
 
-                val sb = StringBuilder()
-                for (i in decoded.indices) {
-                    val charCode = decoded[i].toInt() and 0xFF
-                    val shift = seed % (i + 5)
-                    sb.append(((charCode - shift + 256) % 256).toChar())
-                }
-                sb.toString()
-            } catch (e: Exception) { "" }
+        /* ---------------------------------------------------------
+        * Universal attempt generator
+        * --------------------------------------------------------- */
+        private fun attempt(
+            encrypted: String,
+            seed: Int,
+            rotBefore: Boolean,
+            rotAfter: Boolean,
+            rotBytes: Boolean,
+            reverseBefore: Boolean,
+            reverseAfter: Boolean
+        ): String {
+
+            return try {
+                var s = encrypted
+
+                if (rotBefore) s = rot13String(s)
+                if (reverseBefore) s = s.reversed()
+
+                val decodedRaw = b64(s) ?: return ""
+                var decoded = decodedRaw
+
+                if (rotBytes) decoded = rot13Bytes(decoded)
+
+                if (reverseAfter) decoded = decoded.reversedArray()
+
+                var out = unmix(decoded, seed)
+
+                if (rotAfter) out = rot13String(out)
+
+                out
+
+            } catch (_: Exception) {
+                ""
+            }
         }
 
-        // Main function to try all known orders
+        /* ---------------------------------------------------------
+        *  Master function: tries ALL combinations
+        * --------------------------------------------------------- */
         fun dynamicDecrypt(encrypted: String, seed: Int): String {
-            val attempts = listOf(
-                { attemptNew(encrypted, seed) },   // NEW (today’s working)
-                { attempt4(encrypted, seed) },     // Old working
-                { attempt1(encrypted, seed) },
-                { attempt2(encrypted, seed) },
-                { attempt3(encrypted, seed) }
-            )
 
-            for (attempt in attempts) {
-                try {
-                    val result = attempt()
-                    if (isValidDecryption(result)) {
-                        return result
-                    }
-                } catch (_: Exception) {}
-            }
+            val boolean = listOf(false, true)
+
+            for (rotBefore in boolean)
+                for (rotBytes in boolean)
+                    for (reverseBefore in boolean)
+                        for (reverseAfter in boolean)
+                            for (rotAfter in boolean) {
+
+                                val result = attempt(
+                                    encrypted,
+                                    seed,
+                                    rotBefore,
+                                    rotAfter,
+                                    rotBytes,
+                                    reverseBefore,
+                                    reverseAfter
+                                )
+
+                                if (looksValid(result)) {
+                                    Log.d("HDFC", "Decrypt combination: " +
+                                            "rotBefore=$rotBefore rotBytes=$rotBytes reverseBefore=$reverseBefore reverseAfter=$reverseAfter rotAfter=$rotAfter")
+                                    return result
+                                }
+                            }
 
             return ""
         }
-
     }
 
     private val seenUrls = mutableSetOf<String>()
