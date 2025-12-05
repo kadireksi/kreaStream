@@ -72,7 +72,7 @@ class TurkTV : MainAPI() {
             result += HomePageList(
                 "Canlı Yayınlar",
                 liveList.map {
-                    TvSeriesSearchResponse(
+                    newTvSeriesSearchResponse(
                         name = it.title,
                         url = it.url,
                         apiName = this.name,
@@ -99,7 +99,7 @@ class TurkTV : MainAPI() {
             val fullUrl = normalize(config.baseUrl, href)
             val poster = sel.poster?.let { normalize(config.baseUrl, el.select(it).attr("src")) }
 
-            TvSeriesSearchResponse(
+            newTvSeriesSearchResponse(
                 name = title,
                 url = fullUrl!!,
                 apiName = name,
@@ -115,11 +115,11 @@ class TurkTV : MainAPI() {
         ensureLoaded()
 
         val config = channels?.find { url.contains(it.baseUrl, true) }
-            ?: return TvSeriesLoadResponse("HATA", url, name, TvType.TvSeries, emptyList())
+            ?: return newTvSeriesLoadResponse("HATA", url, name, TvType.TvSeries, emptyList())
 
         val episodes = fetchEpisodes(config, url)
 
-        return TvSeriesLoadResponse(
+        return newTvSeriesLoadResponse(
             name = config.name,
             url = url,
             apiName = name,
@@ -138,10 +138,10 @@ class TurkTV : MainAPI() {
             val title = el.select(sel.title).text().ifBlank { "Bölüm" }
             val href = normalize(config.baseUrl, el.select(sel.link).attr("href")) ?: return@mapNotNull null
 
-            Episode(
-                name = title,
-                data = href,
-            )
+            newEpisode {
+                name = title
+                data = href
+            }
         }
     }
 
