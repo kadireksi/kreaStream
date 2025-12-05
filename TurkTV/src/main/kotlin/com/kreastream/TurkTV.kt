@@ -5,20 +5,20 @@ import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 
 class TurkTV : MainAPI() {
 
-    override var name = "Türk TV"
     override var mainUrl = "https://turktv.local"
+    override var name = "Türk TV"
     override var lang = "tr"
-    override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
+    override val hasMainPage = true
 
-    // Update these later
+    // TEMP — replace with your GitHub links later:
     private val channelsJsonUrl = "https://YOUR_URL/channels.json"
-    private val streamsJsonUrl  = "https://YOUR_URL/streams.json"
+    private val streamsJsonUrl = "https://YOUR_URL/streams.json"
 
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
 
-    // -------- DATA MODELS --------
+    // ---- DATA MODELS ----
     data class SelectorBlock(
         val url: String,
         val container: String,
@@ -50,83 +50,105 @@ class TurkTV : MainAPI() {
         val requiresReferer: Boolean = false
     )
 
-    // ---------- JSON LOADING ----------
+
+    // ---- JSON LOADING ----
     private suspend fun ensureLoaded() {
         if (channels == null) channels = parseJson(app.get(channelsJsonUrl).text)
         if (streams == null) streams = parseJson(app.get(streamsJsonUrl).text)
     }
 
-    // ---------- MAIN PAGE ----------
+
+    // ---- MAIN PAGE ----
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         ensureLoaded()
 
-        val lists = mutableListOf<HomePageList>()
+        val result = mutableListOf<HomePageList>()
 
-        channels?.forEach { cfg ->
-            lists += HomePageList("${cfg.name} Diziler", fetchSeries(cfg))
+        channels?.forEach { config ->
+            result += HomePageList("${config.name} Diziler", fetchSeries(config))
         }
 
-        streams?.let {
-            lists += HomePageList(
+        streams?.let { liveList ->
+            result += HomePageList(
                 "Canlı Yayınlar",
-                it.map { live ->
-                    newTvSeriesSearchResponse(live.title, live.url, TvType.Live) {
-                        posterUrl = live.poster
-                    }
+                liveList.map {
+                    TvSeriesSearchResponse(
+                        name = it.title,
+                        url = it.url,
+                        apiName = this.name,
+                        type = TvType.Live,
+                        posterUrl = it.poster
+                    )
                 }
             )
         }
 
-        return newHomePageResponse(lists)
+        return HomePageResponse(result, false)
     }
 
-    // ---------- FETCH SERIES ----------
-    private suspend fun fetchSeries(cfg: ChannelConfig): List<SearchResponse> {
-        val doc = app.get(cfg.series.url).document
-        val block = cfg.series
 
-        return doc.select(block.container).mapNotNull { el ->
-            val title = el.select(block.title).text().ifBlank { return@mapNotNull null }
-            val href = el.select(block.link).attr("href").ifBlank { return@mapNotNull null }
-            val url = full(cfg.baseUrl, href)
-            val poster = block.poster?.let { full(cfg.baseUrl, el.select(it).attr("src")) }
+    // ---- FETCH SERIES LIST ----
+    private suspend fun fetchSeries(config: ChannelConfig): List<SearchResponse> {
+        val doc = app.get(config.series.url).document
+        val sel = config.series
 
-            newTvSeriesSearchResponse(title, url!!, TvType.TvSeries) {
+        return doc.select(sel.container).mapNotNull { el ->
+            val title = el.select(sel.title).text().ifBlank { return@mapNotNull null }
+            val href = el.select(sel.link).attr("href").ifBlank { return@mapNotNull null }
+
+            val fullUrl = normalize(config.baseUrl, href)
+            val poster = sel.poster?.let { normalize(config.baseUrl, el.select(it).attr("src")) }
+
+            TvSeriesSearchResponse(
+                name = title,
+                url = fullUrl!!,
+                apiName = name,
+                type = TvType.TvSeries,
                 posterUrl = poster
-            }
-        }
-    }
-
-    // ---------- LOAD SERIES ----------
-    override suspend fun load(url: String): LoadResponse {
-        ensureLoaded()
-
-        val cfg = channels?.find { url.contains(it.baseUrl, true) }
-            ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
-
-        val eps = fetchEpisodes(cfg, url)
-
-        return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, eps) {
-            posterUrl = null
-        }
-    }
-
-    private suspend fun fetchEpisodes(cfg: ChannelConfig, url: String): List<Episode> {
-        val doc = app.get(url).document
-        val ep = cfg.episodes
-
-        return doc.select(ep.container).mapNotNull { el ->
-            val title = el.select(ep.title).text().ifBlank { "Bölüm" }
-            val href = full(cfg.baseUrl, el.select(ep.link).attr("href")) ?: return@mapNotNull null
-
-            newEpisode(
-                data = href,
-                name = title
             )
         }
     }
 
-    // ---------- HELPERS ----------
-    private fun full(base: String, url: String?): String? =
-        url?.let { if (it.startsWith("http")) it else base + it.trimStart('/') }
+
+    // ---- LOAD SERIES PAGE ----
+    override suspend fun load(url: String): LoadResponse {
+        ensureLoaded()
+
+        val config = channels?.find { url.contains(it.baseUrl, true) }
+            ?: return TvSeriesLoadResponse("HATA", url, name, TvType.TvSeries, emptyList())
+
+        val episodes = fetchEpisodes(config, url)
+
+        return TvSeriesLoadResponse(
+            name = config.name,
+            url = url,
+            apiName = name,
+            type = TvType.TvSeries,
+            episodes = episodes,
+        )
+    }
+
+
+    // ---- FETCH EPISODES ----
+    private suspend fun fetchEpisodes(config: ChannelConfig, url: String): List<Episode> {
+        val doc = app.get(url).document
+        val sel = config.episodes
+
+        return doc.select(sel.container).mapNotNull { el ->
+            val title = el.select(sel.title).text().ifBlank { "Bölüm" }
+            val href = normalize(config.baseUrl, el.select(sel.link).attr("href")) ?: return@mapNotNull null
+
+            Episode(
+                name = title,
+                data = href,
+            )
+        }
+    }
+
+
+    // ---- HELPERS ----
+    private fun normalize(base: String, url: String?): String? {
+        if (url == null) return null
+        return if (url.startsWith("http")) url else base.trimEnd('/') + "/" + url.trimStart('/')
+    }
 }
