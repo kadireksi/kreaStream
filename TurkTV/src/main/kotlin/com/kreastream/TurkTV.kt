@@ -97,18 +97,17 @@ class TurkTV : MainAPI() {
         }
     }
 
-        // ---------- LOAD SERIES ----------
+    // ---------- LOAD SERIES ----------
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
 
         val cfg = channels?.find { url.contains(it.baseUrl, true) }
-            ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries) {}
+            ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
 
         val eps = fetchEpisodes(cfg, url)
 
-        return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries) {
+        return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, eps) {
             posterUrl = null
-            addEpisodes(eps)
         }
     }
 
@@ -120,10 +119,10 @@ class TurkTV : MainAPI() {
             val title = el.select(ep.title).text().ifBlank { "Bölüm" }
             val href = full(cfg.baseUrl, el.select(ep.link).attr("href")) ?: return@mapNotNull null
 
-            newEpisode {
+            Episode(
+                data = href,
                 name = title
-                data = href
-            }
+            )
         }
     }
 
