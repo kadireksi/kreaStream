@@ -27,7 +27,7 @@
     "baseUrl": "https://www.showtv.com.tr",
     "series": {
       "url": "https://www.showtv.com.tr/diziler",
-      "container": "body",  // Fallback: No real list
+      "container": "body",
       "title": "h3 a, .dizi-item a",
       "link": "a[href*='/dizi/']",
       "poster": "img"
