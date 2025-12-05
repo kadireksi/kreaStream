@@ -31,9 +31,6 @@ class HDFilmCehennemi : MainAPI() {
     override var sequentialMainPageDelay        = 50L
     override var sequentialMainPageScrollDelay  = 50L
 
-    private val seenDownloadIds = mutableSetOf<String>()
-    private val seenVideoUrls = mutableSetOf<String>()
-
     private val cloudflareKiller by lazy { CloudflareKiller() }
     
     class CloudflareKiller { 
@@ -420,34 +417,23 @@ class HDFilmCehennemi : MainAPI() {
             
             if (decryptedUrl.isEmpty()) return
 
-            if (seenVideoUrls.contains(decryptedUrl)) return
-            seenVideoUrls.add(decryptedUrl)
+            if (seenUrls.contains(decryptedUrl)) return
+            seenUrls.add(decryptedUrl)
 
             // 5. Determine if it's HLS 
             val isHls = decryptedUrl.contains(".m3u8") || decryptedUrl.endsWith(".txt")
-
-            //if (decryptedUrl.contains(".m3u8")) {
-            if(isHls){
-                M3u8Helper.generateM3u8(
-                    source,
-                    decryptedUrl,
-                    referer
-                ).forEach { link ->
-                    callback(link)
+            
+            callback.invoke(
+                newExtractorLink(
+                    source  = source,
+                    name    = source,
+                    url     = decryptedUrl
+                ){
+                    this.referer = referer
+                    this.quality = Qualities.Unknown.value
+                    this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 }
-            } else {
-                callback.invoke(
-                    newExtractorLink(
-                        source  = source,
-                        name    = source,
-                        url     = decryptedUrl
-                    ){
-                        this.referer = referer
-                        this.quality = Qualities.Unknown.value
-                        this.type    = if(isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                    }
-                )
-            }
+            )
         } catch (e: Exception) {
             Log.e("HDFC", "Error extracting local source", e)
         }
@@ -509,9 +495,6 @@ class HDFilmCehennemi : MainAPI() {
         val document = app.get(data).document
         val rapidrameReferer = "$mainUrl/"
         var rapidrameId: String? = null
-
-        seenDownloadIds.clear()
-        seenVideoUrls.clear()
 
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
@@ -582,8 +565,7 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        if (rapidrameId.isNotEmpty()) {
-            seenDownloadIds.add(rapidrameId)
+        if (!rapidrameId.isNullOrEmpty()) {
             extractDownloadLinks(rapidrameId, callback)
         }
 
