@@ -252,88 +252,93 @@ class TurkTV : MainAPI() {
     }
 
     // ------------------- LOAD LINKS -------------------
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
+override suspend fun loadLinks(
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
 
-        // ── Live streams ──
-        streams?.firstOrNull { it.url == data }?.let { live ->
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = live.title,
-                    url = live.url
-                ){
-                    this.referer = if (live.requiresReferer) mainUrl else ""
-                    this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.M3U8
-                    this.headers = mapOf(
-                        "User-Agent" to "Mozilla/5.0",
-                        "Accept" to "*/*",
-                        "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-                        "Origin" to mainUrl,
-                        "Referer" to mainUrl + "/"
-                    )
-                }
-            )
-            return true
-        }
-
-        // ── Series episodes ──
-channels?.firstOrNull { data.contains(it.baseUrl, ignoreCase = true) }?.let { cfg ->
-    val doc = app.get(data).document
-
-    val streamUrl = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']")
-        .attr("src")
-        .ifBlank { doc.select("video source[src$='.mp4']").attr("src") }
-        .ifBlank {
-            Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value
-        }
-        .ifBlank {
-            doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src")
-        }
-        .takeIf { !it.isNullOrBlank() }
-
-    streamUrl?.let { url ->
-        val finalUrl = full(cfg.baseUrl, url) ?: url
-        // Check if finalUrl is not null before using endsWith
-        finalUrl?.let { safeFinalUrl ->
-            val linkType = if (safeFinalUrl.endsWith(".m3u8")) {
-                ExtractorLinkType.M3U8
-            } else {
-                ExtractorLinkType.VIDEO
+    // ── Live streams ──
+    streams?.firstOrNull { it.url == data }?.let { live ->
+        callback(
+            newExtractorLink(
+                source = name,
+                name = live.title,
+                url = live.url
+            ){
+                this.referer = if (live.requiresReferer) mainUrl else ""
+                this.quality = Qualities.Unknown.value
+                this.type = ExtractorLinkType.M3U8
+                this.headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0",
+                    "Accept" to "*/*",
+                    "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Origin" to mainUrl,
+                    "Referer" to mainUrl + "/"
+                )
             }
-            val quality = Qualities.Unknown.value
+        )
+        return true
+    }
 
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = "Stream",
-                    url = safeFinalUrl
-                ) {
-                    this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
-                    this.quality = quality
-                    this.type = linkType
-                    val headers = mutableMapOf(
-                        "User-Agent" to "Mozilla/5.0",
-                        "Referer" to cfg.baseUrl
-                    )
-                    if (cfg.stream.prefer.isNotBlank()) {
-                        headers["Accept"] = cfg.stream.prefer
-                    }
-                    this.headers = headers
+    // ── Series episodes ──
+    channels?.firstOrNull { data.contains(it.baseUrl, ignoreCase = true) }?.let { cfg ->
+        val doc = app.get(data).document
+
+        var streamUrl: String? = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']")
+            .attr("src")
+            .ifBlank { doc.select("video source[src$='.mp4']").attr("src") }
+            .ifBlank {
+                Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value
+            }
+            .ifBlank {
+                // Try alternative selectors
+                doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src")
+            }
+
+        if (!streamUrl.isNullOrBlank()) {
+            val finalUrl = full(cfg.baseUrl, streamUrl) ?: streamUrl
+            
+            // FIX: Check if finalUrl is not null before using it
+            if (finalUrl != null) {
+                val linkType = if (finalUrl.endsWith(".m3u8")) {
+                    ExtractorLinkType.M3U8
+                } else {
+                    ExtractorLinkType.VIDEO
                 }
-            )
-            return true
+                val quality = Qualities.Unknown.value
+
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "Stream",
+                        url = finalUrl
+                    ){
+                        this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
+                        this.quality = quality
+                        this.type = linkType
+                        if (cfg.stream.prefer.isNotBlank()) {
+                            this.headers = mapOf(
+                                "Accept" to cfg.stream.prefer,
+                                "User-Agent" to "Mozilla/5.0",
+                                "Referer" to cfg.baseUrl
+                            )
+                        } else {
+                            this.headers = mapOf(
+                                "User-Agent" to "Mozilla/5.0",
+                                "Referer" to cfg.baseUrl
+                            )
+                        }
+                    }
+                )
+                return true
+            }
         }
     }
-}
 
-        return false
-    }
+    return false
+}
 
     // ------------------- HELPER -------------------
     private fun full(base: String, url: String?): String? = url?.let {
