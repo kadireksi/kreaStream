@@ -78,24 +78,30 @@ class TurkTV : MainAPI() {
         ensureLoaded()
 
         val lists = mutableListOf<HomePageList>()
+        val liveChannelsUrl = "turktv://livechannels" // <-- A unique, synthetic URL
 
+        // 1. Add the "Live Channels" entry as a single search result
+        val liveChannelsSearchResponse = newTvSeriesSearchResponse(
+            "Canlı Yayınlar", // Name of the entry
+            liveChannelsUrl,  // Use the synthetic URL
+            TvType.TvSeries
+        ) {
+            // You can set a default poster here if desired
+             posterUrl = "https://example.com/live_icon.png"
+        }
+
+        // 2. Add the Live Channels entry list
+        lists += HomePageList("Canlı Yayınlar", listOf(liveChannelsSearchResponse))
+
+
+        // 3. Keep the series sections (if you are still debugging the selectors)
+        // NOTE: If you revert the fetchSeries debugging, you need to re-add the 'if (series.isNotEmpty())'
         channels?.forEach { cfg ->
             val series = fetchSeries(cfg)
-            
-                lists += HomePageList("${cfg.name} Diziler", series, true)
-            
+            lists += HomePageList("${cfg.name} Diziler", series)
         }
-
-        streams?.takeIf { it.isNotEmpty() }?.let { liveList ->
-            lists += HomePageList(
-                "Canlı Yayınlar",
-                liveList.map { live ->
-                    newTvSeriesSearchResponse(live.title, live.url, TvType.Live) {
-                        posterUrl = live.poster
-                    }
-                }
-            )
-        }
+        
+        // 4. REMOVE THE OLD STREAMS LOOP (was here previously)
 
         return newHomePageResponse(lists)
     }
@@ -128,25 +134,35 @@ class TurkTV : MainAPI() {
         return emptyList()
     }
 
+    // ------------------- LOAD (Series Page) -------------------
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
+        
+        // 1. Check for the synthetic Live Channels URL
+        if (url == "turktv://livechannels") {
+            val episodes = streams?.mapNotNull { live ->
+                // Map each LiveStreamConfig into an Episode
+                newEpisode(live.url) { // Use the actual stream URL as the episode data
+                    this.name = live.title
+                    this.posterUrl = live.poster
+                }
+            } ?: emptyList()
 
-        // 1. Check if it's a Live Stream URL and return MovieLoadResponse (or Live)
-        val liveCfg = streams?.firstOrNull { it.url == url }
-        if (liveCfg != null) {
-            return newMovieLoadResponse(liveCfg.title, url, TvType.Live, liveCfg.url) {
-                posterUrl = liveCfg.poster
+            return newTvSeriesLoadResponse("Canlı Yayınlar", url, TvType.Live, episodes) {
+                // Optional: Add a general poster for the Live Channels main entry
+                // posterUrl = "https://example.com/live_icon.png" 
             }
         }
-        
-        // 2. Original Series Logic
+
+
+        // 2. Original Series Logic (If it's not the live channels hub)
         val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
             ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
 
         val episodes = fetchEpisodes(cfg, url)
 
         return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, episodes) {
-            posterUrl = null
+            posterUrl = null // or find a real poster
         }
     }
 
