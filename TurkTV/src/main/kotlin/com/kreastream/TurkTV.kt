@@ -45,23 +45,22 @@ class TurkTV : MainAPI() {
         Channel("now", "NOW", nowTvUrl, "/dizi-izle", null,"canli-yayin",null)
     )
 
-    override val mainPage = mainPageOf(
-        ${channels}.forEach {
-            if(it.currentPath != null) {
-                "${it.key}_current" to "${it.displayName} Güncel Diziler";
+    private val dynamicMainPageItems = buildList {
+        channels.forEach {
+            add("${it.key}_current" to "${it.displayName} Güncel Diziler")
+
+            it.archivePath?.let { 
+                add("${it.key}_archive" to "${it.displayName} Arşiv Diziler") 
             }
+
+            add("${it.key}_live" to "${it.displayName} Canlı Yayın")
         }
-        ${channels}.forEach {
-            if(it.archivePath != null) {
-                "${it.key}_archive" to "${it.displayName} Arşiv Diziler";
-            }
-        }
-        ${channels}.forEach {
-            "${it.key}_live" to "${it.displayName} Canlı Yayın";
-        }
-        "live_tv" to "TRT Canlı TV",
-        "live_radio" to "TRT Canlı Radyo"
-    )
+
+        add("live_tv" to "TRT Canlı TV")
+        add("live_radio" to "TRT Canlı Radyo")
+    }
+
+    override val mainPage = mainPageOf(*dynamicMainPageItems.toTypedArray())
 
     // === TRT Data Structures ===
     data class TvChannel(
