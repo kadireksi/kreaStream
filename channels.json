@@ -5,18 +5,40 @@
     "baseUrl": "https://www.atv.com.tr",
     "series": {
       "url": "https://www.atv.com.tr/diziler",
-      "container": "body",
-      "title": "h3 a, .dizi-title",
-      "link": "a[href*='/diziler/']",
-      "poster": "img[src*='poster']"
+      "container": ".series-list a.series-card",
+      "title": ".series-title, h3",
+      "link": "a",
+      "poster": "img"
     },
     "episodes": {
-      "container": ".episode-item, .bolum-list li",
-      "title": ".bolum-title, a",
-      "link": "a[href*='/bolum']"
+      "container": ".episode-list .episode-item, .episodes a",
+      "title": ".episode-title, .title",
+      "link": "a"
     },
     "stream": {
-      "type": "mp4+m3u8",
+      "type": "m3u8",
+      "prefer": "m3u8",
+      "referer": true
+    }
+  },
+  {
+    "key": "startv",
+    "name": "Star TV",
+    "baseUrl": "https://www.startv.com.tr",
+    "series": {
+      "url": "https://www.startv.com.tr/diziler",
+      "container": ".series-grid .series-item a",
+      "title": ".title, h3",
+      "link": "a",
+      "poster": "img"
+    },
+    "episodes": {
+      "container": ".episode-list .episode, .episodes a",
+      "title": ".episode-title, span",
+      "link": "a"
+    },
+    "stream": {
+      "type": "m3u8",
       "prefer": "m3u8",
       "referer": true
     }
@@ -27,20 +49,86 @@
     "baseUrl": "https://www.showtv.com.tr",
     "series": {
       "url": "https://www.showtv.com.tr/diziler",
-      "container": "body",
-      "title": "h3 a, .dizi-item a",
-      "link": "a[href*='/dizi/']",
+      "container": ".dizi-list .dizi-item a",
+      "title": ".dizi-title, h3",
+      "link": "a",
       "poster": "img"
     },
     "episodes": {
-      "container": ".bolum-item, ul li",
-      "title": ".bolum-title",
-      "link": "a[href*='/bolum']"
+      "container": ".bolum-list .bolum-item a",
+      "title": ".bolum-title, .title",
+      "link": "a"
     },
     "stream": {
-      "type": "mp4+m3u8",
+      "type": "m3u8",
       "prefer": "m3u8",
       "referer": true
+    }
+  },
+  {
+    "key": "nowtv",
+    "name": "NOW (FOX)",
+    "baseUrl": "https://www.nowtv.com.tr",
+    "series": {
+      "url": "https://www.nowtv.com.tr/diziler",
+      "container": ".series-list .series-card a",
+      "title": ".title, h3",
+      "link": "a",
+      "poster": "img"
+    },
+    "episodes": {
+      "container": ".episodes .episode-item a",
+      "title": ".episode-title",
+      "link": "a"
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "m3u8",
+      "referer": true
+    }
+  },
+  {
+    "key": "kanald",
+    "name": "Kanal D",
+    "baseUrl": "https://www.kanald.com.tr",
+    "series": {
+      "url": "https://www.kanald.com.tr/diziler",
+      "container": ".series-list .series a",
+      "title": ".title, h3",
+      "link": "a",
+      "poster": "img"
+    },
+    "episodes": {
+      "container": ".episode-list .episode a",
+      "title": ".title",
+      "link": "a"
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "m3u8",
+      "referer": true
+    }
+  },
+  {
+    "key": "trt1",
+    "name": "TRT 1",
+    "baseUrl": "https://www.trt1.com.tr",
+    "series": {
+      "url": "https://www.trt1.com.tr/archive=false&order=title_asc",
+      "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
+      "title": "div.card_card-title__IJ9af",
+      "link": "a",
+      "poster": "img"
+    },
+    "episodes": {
+      "container": ".episodes .episode a",
+      "title": ".title",
+      "link": "a"
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "m3u8",
+      "referer": false
     }
   }
 ]
