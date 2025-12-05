@@ -355,28 +355,27 @@ class HDFilmCehennemi : MainAPI() {
         }
 
         // Main function to try all known orders
-        fun dynamicDecrypt(encryptedData: String, seed: Int): String {
-            val decryptionAttempts = listOf<() -> String>(
-                { attempt4(encryptedData, seed) }, // Try the new JS method first
-                { attempt1(encryptedData, seed) },
-                { attempt2(encryptedData, seed) },
-                { attempt3(encryptedData, seed) }
+        fun dynamicDecrypt(encrypted: String, seed: Int): String {
+            val attempts = listOf(
+                { attemptNew(encrypted, seed) },   // NEW (today’s working)
+                { attempt4(encrypted, seed) },     // Old working
+                { attempt1(encrypted, seed) },
+                { attempt2(encrypted, seed) },
+                { attempt3(encrypted, seed) }
             )
 
-            for ((index, attempt) in decryptionAttempts.withIndex()) {
+            for (attempt in attempts) {
                 try {
-                    val decryptedUrl = attempt()
-                    // A successful decryption should yield a URL starting with "http"
-                    if (decryptedUrl.startsWith("http")) {
-                        Log.d("HDFC", "Decryption Success with Attempt ${index + 1}")
-                        return decryptedUrl
+                    val result = attempt()
+                    if (isValidDecryption(result)) {
+                        return result
                     }
-                } catch (e: Exception) {
-                    Log.d("HDFC", "Decryption Attempt ${index + 1} failed")
-                }
+                } catch (_: Exception) {}
             }
+
             return ""
         }
+
     }
 
     private val seenUrls = mutableSetOf<String>()
@@ -571,6 +570,41 @@ class HDFilmCehennemi : MainAPI() {
 
         return true
     }
+
+    private fun isValidDecryption(output: String): Boolean {
+        if (output.isBlank()) return false
+        if (output.length < 10) return false
+
+        // Stage 1: starts with known URL schemes
+        if (output.startsWith("http://") || output.startsWith("https://")) return true
+
+        // Stage 2: check if inside contains urls even if prefix is shifted
+        if (output.contains("http")) return true
+        if (output.contains(".m3u8") || output.contains(".mp4")) return true
+
+        // Stage 3: must be printable ASCII mostly
+        val printable = output.count { it.code in 32..126 }
+        if (printable.toDouble() / output.length > 0.85) return true
+
+        return false
+    }
+
+    private fun attemptNew(encrypted: String, seed: Int): String {
+        return try {
+            val reversed = encrypted.reversed()
+            val decoded = Base64.decode(reversed, Base64.DEFAULT)
+
+            val sb = StringBuilder()
+            for (i in decoded.indices) {
+                val charCode = decoded[i].toInt() and 0xFF
+                val shift = seed % (i + 5)
+                sb.append(((charCode - shift + 256) % 256).toChar())
+            }
+            sb.toString()
+        } catch (e: Exception) { "" }
+    }
+
+
 
     data class Results(@JsonProperty("results") val results: List<String> = arrayListOf())
     data class HDFC(@JsonProperty("html") val html: String)
