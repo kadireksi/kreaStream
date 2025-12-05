@@ -5,5 +5,12 @@
     "poster": "https://upload.wikimedia.org/wikipedia/commons/8/85/ATV_logo.png",
     "url": "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=CapDjfW8Jghn5iL3qb8o8A&e=1765001592&ppid=21d804be91b8e91f11bb3789ff83f0b4",
     "requiresReferer": true
+  },
+   {
+    "key": "showtv_live",
+    "title": "Show TV Canlı Yayın",
+    "poster": "https://upload.wikimedia.org/wikipedia/commons/8/85/ATV_logo.png",
+    "url": "https://ciner.daioncdn.net/showtv/showtv.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558&st=RBzhSuGauna0OGld-DJUVA&e=1664766175&tv=1&ppid=8582634a455f4cf72d132c75dc389bdb",
+    "requiresReferer": true
   }
 ]
