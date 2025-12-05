@@ -15,6 +15,7 @@ class TurkTV : MainAPI() {
     override var lang = "tr"
     override val hasMainPage = true
     override val hasQuickSearch = true
+    override val hasDownloadSupport = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
     
     private val tabiiUrl = "https://www.tabii.com/tr"
