@@ -194,16 +194,17 @@ class TurkTV : MainAPI() {
 
     private suspend fun getNowTvSeries(isArchive: Boolean, page: Int = 1): List<SearchResponse> {
         return try {
-            // & 
             if (isArchive) {
                 // Archive Logic
                 if (page == 1) {
                     val url = "$nowTvUrl/dizi-arsivi?filter=date"
                     val doc = app.get(url, timeout = 15).document
-                    // Parsing .list-item
+                    
+                    // Parse .list-item elements
                     return doc.select("div.list-item").mapNotNull { item ->
                         val a = item.selectFirst("a[href]") ?: return@mapNotNull null
                         val href = a.attr("href")
+                        
                         // Title extraction
                         val title = item.selectFirst(".program-name strong")?.text()?.trim() 
                             ?: a.attr("title").takeIf { it.isNotBlank() }
@@ -221,7 +222,7 @@ class TurkTV : MainAPI() {
                 } else {
                     // AJAX Logic for paging
                     val url = "$nowTvUrl/ajax/archive"
-                    // Typically AJAX requires form data. Based on  data attributes.
+                    
                     val formData = mapOf(
                         "filter" to "archive",
                         "page" to page.toString(),
@@ -231,23 +232,33 @@ class TurkTV : MainAPI() {
                         "sorting" to "desc"
                     )
                     
-                    val response = app.post(url, data = formData, headers = mapOf("X-Requested-With" to "XMLHttpRequest"))
-                    val json = JSONObject(response.text)
-                    val html = json.optString("data")
+                    val response = app.post(url, data = formData, headers = mapOf(
+                        "X-Requested-With" to "XMLHttpRequest",
+                        "Referer" to "$nowTvUrl/dizi-arsivi",
+                        "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"
+                    ))
                     
-                    if (html.isNotBlank()) {
-                         val doc = org.jsoup.Jsoup.parse(html)
-                         return doc.select("div.list-item").mapNotNull { item ->
-                            val a = item.selectFirst("a[href]") ?: return@mapNotNull null
-                            val href = a.attr("href")
-                            val title = item.selectFirst(".program-name strong")?.text()?.trim() ?: return@mapNotNull null
+                    if (response.statusCode == 200) {
+                        val json = JSONObject(response.text)
+                        if (json.getInt("code") == 200) {
+                            val html = json.optString("data", "")
                             
-                            val img = item.selectFirst("img")?.attr("src")?.let {
-                                if (it.startsWith("http")) it else nowTvUrl + it
-                            }
-                            
-                            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
-                                this.posterUrl = img
+                            if (html.isNotBlank()) {
+                                val doc = org.jsoup.Jsoup.parse(html)
+                                return doc.select("div.list-item").mapNotNull { item ->
+                                    val a = item.selectFirst("a[href]") ?: return@mapNotNull null
+                                    val href = a.attr("href")
+                                    val title = item.selectFirst(".program-name strong")?.text()?.trim() 
+                                        ?: return@mapNotNull null
+                                    
+                                    val img = item.selectFirst("img")?.attr("src")?.let {
+                                        if (it.startsWith("http")) it else nowTvUrl + it
+                                    }
+                                    
+                                    newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                                        this.posterUrl = img
+                                    }
+                                }
                             }
                         }
                     }
@@ -257,7 +268,7 @@ class TurkTV : MainAPI() {
                 val url = "$nowTvUrl/dizi-izle"
                 val doc = app.get(url, timeout = 15).document
                 
-                // Parsing owl-item posters
+                // Parse owl-item posters
                 return doc.select(".owl-item .poster").mapNotNull { item ->
                     val a = item.selectFirst("a[href]") ?: return@mapNotNull null
                     val href = a.attr("href")
@@ -282,48 +293,81 @@ class TurkTV : MainAPI() {
 
     private suspend fun getNowTvEpisodes(seriesUrl: String): List<Episode> {
         return try {
-            // Episodes are at /bolumler
-            val episodesUrl = if (seriesUrl.endsWith("/")) "${seriesUrl}bolumler" else "$seriesUrl/bolumler"
+            // Construct episodes URL
+            val baseUrl = seriesUrl.removeSuffix("/")
+            val episodesUrl = if (baseUrl.endsWith("/bolumler")) baseUrl else "$baseUrl/bolumler"
+            
             val doc = app.get(episodesUrl, timeout = 15).document
 
-            // Parsing the select option list
-            val select = doc.selectFirst("select#video-finder-changer")
+            // Get season selector
+            val seasonSelect = doc.selectFirst("select#video-filter-changer")
+            val episodesSelect = doc.selectFirst("select#video-finder-changer")
             
-            if (select != null) {
-                 return select.select("option[data-target]").mapNotNull { option ->
+            val episodes = mutableListOf<Episode>()
+            
+            if (episodesSelect != null) {
+                // Extract episodes from the select options
+                episodesSelect.select("option[data-target][value]").forEach { option ->
                     val href = option.attr("data-target")
-                    val epVal = option.attr("value")
+                    val epValue = option.attr("value")
                     
-                    if (href.isBlank() || epVal.isBlank()) return@mapNotNull null
-                    
-                    val title = option.text().trim()
-                    // Extract number from value="8" or title "8. Bölüm"
-                    val epNum = epVal.toIntOrNull() ?: extractEpisodeNumber(title) ?: 0
-                    
-                    newEpisode(href) {
-                        name = title
-                        episode = epNum
+                    if (href.isNotBlank() && epValue.isNotBlank()) {
+                        val title = option.text().trim()
+                        val epNum = epValue.toIntOrNull() ?: extractEpisodeNumber(title) ?: 0
+                        
+                        // Try to extract season number from season selector
+                        var seasonNum = 1
+                        seasonSelect?.select("option[selected]")?.firstOrNull()?.let { seasonOption ->
+                            val seasonText = seasonOption.text()
+                            val seasonMatch = Regex("""(\d+)""").find(seasonText)
+                            seasonMatch?.let {
+                                seasonNum = it.groupValues[1].toIntOrNull() ?: 1
+                            }
+                        }
+                        
+                        episodes.add(newEpisode(href) {
+                            this.name = title
+                            this.episode = epNum
+                            this.season = seasonNum
+                        })
                     }
-                }.reversed()
+                }
+            } else {
+                // Fallback: Look for episode links directly
+                doc.select("a[href*='/bolum/']").forEach { a ->
+                    val href = a.attr("href")
+                    if (href.isNotBlank() && href.contains("/bolum/")) {
+                        val title = a.text().trim().ifBlank { "Bölüm" }
+                        val epNum = extractEpisodeNumber(title) ?: 0
+                        
+                        episodes.add(newEpisode(href) {
+                            this.name = title
+                            this.episode = epNum
+                            this.season = 1
+                        })
+                    }
+                }
             }
-            emptyList()
+            
+            // Return episodes in reverse order (newest first)
+            episodes.reversed()
         } catch (e: Exception) {
-             Log.e("TurkTV", "Error loading NOW episodes: ${e.message}")
+            Log.e("TurkTV", "Error loading NOW episodes: ${e.message}")
             emptyList()
         }
     }
     
     private suspend fun extractNowTvLinks(data: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
-            val response = app.get(data, timeout = 10)
+            val response = app.get(data, timeout = 15)
             val html = response.text
             
-            // Extract source property from JS
-            val regex = Regex("""source\s*:\s*['"]([^'"]+\.m3u8[^'"]*)['"]""")
-            val match = regex.find(html)
+            // Try to extract m3u8 URL from JavaScript
+            val sourceRegex = Regex("""source\s*:\s*['"]([^'"]+\.m3u8[^'"]*)['"]""")
+            val sourceMatch = sourceRegex.find(html)
             
-            if (match != null) {
-                val streamUrl = match.groupValues[1]
+            if (sourceMatch != null) {
+                val streamUrl = sourceMatch.groupValues[1]
                 M3u8Helper.generateM3u8(
                     source = "NOW",
                     streamUrl = streamUrl,
@@ -332,6 +376,47 @@ class TurkTV : MainAPI() {
                 ).forEach(callback)
                 return true
             }
+            
+            // Try alternative regex patterns
+            val patterns = listOf(
+                Regex("""["']src["']\s*:\s*['"]([^'"]+\.m3u8[^'"]*)['"]"""),
+                Regex("""["']file["']\s*:\s*['"]([^'"]+\.m3u8[^'"]*)['"]"""),
+                Regex("""playlist\.m3u8[^"']*""")
+            )
+            
+            for (pattern in patterns) {
+                val match = pattern.find(html)
+                if (match != null) {
+                    var streamUrl = match.value
+                    if (!streamUrl.startsWith("http")) {
+                        streamUrl = "https:$streamUrl"
+                    }
+                    
+                    M3u8Helper.generateM3u8(
+                        source = "NOW",
+                        streamUrl = streamUrl,
+                        referer = nowTvUrl,
+                        headers = mapOf("Referer" to nowTvUrl, "Origin" to nowTvUrl)
+                    ).forEach(callback)
+                    return true
+                }
+            }
+            
+            // Try to find any m3u8 URL in the page
+            val m3u8Regex = Regex("""https?://[^"'\s]+\.m3u8[^"'\s]*""")
+            val m3u8Matches = m3u8Regex.findAll(html).toList()
+            
+            val ercdnMatch = m3u8Matches.find { it.value.contains("nowtv-vod.ercdn.net", ignoreCase = true) }
+            ercdnMatch?.let {
+                M3u8Helper.generateM3u8(
+                    source = "NOW",
+                    streamUrl = it.value,
+                    referer = nowTvUrl,
+                    headers = mapOf("Referer" to nowTvUrl, "Origin" to nowTvUrl)
+                ).forEach(callback)
+                return true
+            }
+            
             false
         } catch (e: Exception) {
             Log.e("TurkTV", "Error extracting NOW links: ${e.message}")
@@ -685,7 +770,6 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // === Modular Helper Functions for LoadLinks ===
     private suspend fun extractVideoPlayerScripts(data: String, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
             val doc = app.get(data, timeout = 10).document
@@ -753,8 +837,6 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // === Channel-Specific Modular Functions ===
-
     private suspend fun extractAtvLinks(data: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
         return try {
             val response = app.get(data, timeout = 10)
@@ -797,7 +879,7 @@ class TurkTV : MainAPI() {
                             val subtitlesStr = it.groupValues[1]
                             val subtitleRegex = Regex("""["']src["']\s*:\s*["']([^"']+\.vtt[^"']*)["']""")
                             subtitleRegex.findAll(subtitlesStr).forEach { match ->
-                                subtitleCallback.invoke(newSubtitleFile ("Türkçe", match.groupValues[1]))
+                                subtitleCallback.invoke(SubtitleFile("Türkçe", match.groupValues[1]))
                             }
                         }
                     } catch (_: Exception) {}
@@ -955,6 +1037,7 @@ class TurkTV : MainAPI() {
                 url.contains("atv", ignoreCase = true) -> "ATV"
                 url.contains("showtv", ignoreCase = true) -> "Show TV"
                 url.contains("showturk", ignoreCase = true) -> "Show Türk"
+                url.contains("nowtv", ignoreCase = true) -> "NOW"
                 else -> "Canlı Yayın"
             }
             return newMovieLoadResponse(name, url, TvType.Live, url) {
@@ -1009,17 +1092,24 @@ class TurkTV : MainAPI() {
             }
         }
 
-        // Handle NOW TV Content (New Logic)
+        // Handle NOW TV Content
         if (url.contains(nowTvUrl)) {
-             try {
+            try {
                 val doc = app.get(url, timeout = 15).document
                 
                 val title = doc.selectFirst("h1")?.text()?.trim() 
                     ?: doc.selectFirst("meta[property='og:title']")?.attr("content")
                     ?: "NOW Dizi"
                     
-                val plot = doc.selectFirst("meta[name='description']")?.attr("content") ?: ""
+                val plot = doc.selectFirst("meta[name='description']")?.attr("content") 
+                    ?: doc.selectFirst(".program-desc")?.text()?.trim()
+                    ?: ""
+                    
                 val poster = doc.selectFirst("meta[property='og:image']")?.attr("content")
+                    ?: doc.selectFirst("img[src*='poster']")?.attr("src")
+                    ?: doc.selectFirst("img[src*='thumbnail']")?.attr("src")?.let {
+                        if (it.startsWith("http")) it else nowTvUrl + it
+                    }
                 
                 val episodes = getNowTvEpisodes(url)
                 
@@ -1240,8 +1330,39 @@ class TurkTV : MainAPI() {
             }
         } catch (_: Exception) {}
 
-        // Generic Channel Search (Covers NOW TV via generic search path if available)
-        for (channel in channels.filterNot { it.isTrt || it.key == "atv" || it.key == "show" }) {
+        // NOW TV Content Search
+        try {
+            // Search in current series
+            val currentUrl = "$nowTvUrl/dizi-izle"
+            val currentDoc = app.get(currentUrl, timeout = 10).document
+            currentDoc.select(".owl-item .poster a[href]").forEach { el ->
+                val href = el.attr("href")
+                val title = el.selectFirst("img")?.attr("alt")?.trim() ?: return@forEach
+                if (title.contains(query, ignoreCase = true)) {
+                    val poster = el.selectFirst("img")?.attr("data-src")?.let {
+                        if (it.startsWith("http")) it else nowTvUrl + it
+                    }
+                    out += newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = poster }
+                }
+            }
+            
+            // Search in archive series (first page only for performance)
+            val archiveUrl = "$nowTvUrl/dizi-arsivi?filter=date"
+            val archiveDoc = app.get(archiveUrl, timeout = 10).document
+            archiveDoc.select("div.list-item a[href]").forEach { el ->
+                val href = el.attr("href")
+                val title = el.selectFirst(".program-name strong")?.text()?.trim() ?: return@forEach
+                if (title.contains(query, ignoreCase = true)) {
+                    val poster = el.selectFirst("img")?.attr("src")?.let {
+                        if (it.startsWith("http")) it else nowTvUrl + it
+                    }
+                    out += newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = poster }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Generic Channel Search
+        for (channel in channels.filterNot { it.isTrt || it.key == "atv" || it.key == "show" || it.key == "now" }) {
             try {
                 val searchUrl = "${channel.baseUrl}/search?q=${query}"
                 val doc = app.get(searchUrl, timeout = 10).document
