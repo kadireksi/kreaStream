@@ -12,8 +12,8 @@ class TurkTV : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
 
     // Update these later
-    private val channelsJsonUrl = "https://YOUR_URL/channels.json"
-    private val streamsJsonUrl  = "https://YOUR_URL/streams.json"
+    private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
+    private val streamsJsonUrl  = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
 
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
@@ -97,18 +97,52 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // ---------- LOAD SERIES ----------
-    override suspend fun load(url: String): LoadResponse {
-        ensureLoaded()
-
-        val cfg = channels?.find { url.contains(it.baseUrl, true) }
-            ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
-
-        val eps = fetchEpisodes(cfg, url)
-
-        return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, eps) {
-            posterUrl = null
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // Quick live stream check (from getMainPage)
+        streams?.find { data == it.url }?.let { live ->
+            callback(newExtractorLink(
+                source = name,
+                name = live.title,
+                url = live.url,
+                referer = if (live.requiresReferer) mainUrl else null,
+                quality = Qualities.Unknown.value,
+                type = ExtractorLinkType.VIDEO  // Assume VIDEO; use M3U8 if HLS
+            ) {
+                // Lambda for additional config if needed, e.g., headers
+                this.headers = mapOf("User-Agent" to "Mozilla/5.0")  // Example
+            })
+            return true
         }
+
+        // For series episodes: Find config and extract
+        channels?.find { data.contains(it.baseUrl) }?.let { cfg ->
+            // Example: Fetch episode page and extract via cfg.stream
+            val doc = app.get(data).document
+            val streamUrl = doc.select(cfg.stream.type /* e.g., "source" */).attr("src")  // Customize selector
+            if (streamUrl.isNotBlank()) {
+                val fullUrl = full(cfg.baseUrl, streamUrl)
+                callback(newExtractorLink(
+                    source = name,
+                    name = "Episode Stream",
+                    url = fullUrl!!,
+                    referer = if (cfg.stream.referer) cfg.baseUrl else null,
+                    quality = Qualities.HD.value,  // Assume or parse
+                    type = ExtractorLinkType.VIDEO  // Or M3U8/DASH based on URL
+                ) {
+                    // Lambda for extra props, e.g., if prefer is set
+                    if (cfg.stream.prefer.isNotBlank()) {
+                        this.headers = mapOf("Prefer" to cfg.stream.prefer)
+                    }
+                })
+                return true
+            }
+        }
+        return false
     }
 
     private suspend fun fetchEpisodes(cfg: ChannelConfig, url: String): List<Episode> {
@@ -124,18 +158,6 @@ class TurkTV : MainAPI() {
                 this.data = href
             }
         }
-    }
-
-    // ---------- LOAD EPISODES (for Live Streams) ----------
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        // This is where you would handle loading the actual stream
-        // For now, we'll return false to indicate no links were loaded
-        return false
     }
 
     // ---------- HELPERS ----------
