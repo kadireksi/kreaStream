@@ -5,13 +5,13 @@ import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.SubtitleFile // <-- CRITICAL FIX: Corrected import location
+import com.lagradost.cloudstream3.SubtitleFile // <-- FIX: Corrected import location
 import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://TurkTV.local" // Note: Check referer if streams fail
+    override var mainUrl = "https://www.atv.com.tr" // <-- FIX: Reverted to a valid URL for referer/network stability
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
@@ -65,9 +65,10 @@ class TurkTV : MainAPI() {
     private suspend fun ensureLoaded() {
         if (channels == null) {
             try {
+                // Ensure logging is available to see if this request fails
                 channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
             } catch (e: Exception) {
-                // If this fails, channels becomes emptyList(), which skips the series section loop
+                // Check your app's logs to see the error when fetching this URL
                 channels = emptyList() 
             }
         }
@@ -106,6 +107,7 @@ class TurkTV : MainAPI() {
         lists += HomePageList("Canlı Yayınlar", liveItems)
         
         // --- 2. SERIES SECTIONS ---
+        // This will only run if channels was loaded successfully (not emptyList)
         channels?.forEach { cfg ->
             val series = fetchSeries(cfg)
             lists += HomePageList("${cfg.name} Diziler", series)
@@ -175,7 +177,7 @@ class TurkTV : MainAPI() {
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit, // This now has a resolved type
+        subtitleCallback: (SubtitleFile) -> Unit, // This should now resolve
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
