@@ -1,1 +1,25 @@
+[
+  {
+    "key": "atv",
+    "name": "ATV",
+    "baseUrl": "https://www.atv.com.tr",
+    "series": {
+      "url": "https://www.atv.com.tr/diziler",
+      "container": ".dizi-list-item",
+      "title": ".dizi-title",
+      "link": "a",
+      "poster": "img"
+    },
+    "episodes": {
+      "container": ".bolum-item",
+      "title": ".bolum-title",
+      "link": "a"
+    },
+    "stream": {
+      "type": "mp4+m3u8",
+      "prefer": "m3u8",
+      "referer": true
+    }
+  }
+]
 
