@@ -97,7 +97,7 @@ class TurkTV : MainAPI() {
         }
     }
 
-    // ---------- LOAD SERIES ----------
+        // ---------- LOAD SERIES ----------
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
 
@@ -108,11 +108,10 @@ class TurkTV : MainAPI() {
 
         return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries) {
             posterUrl = null
-            episodes = eps
+            addEpisodes(eps)
         }
     }
 
-    // ---------- FETCH EPISODES ----------
     private suspend fun fetchEpisodes(cfg: ChannelConfig, url: String): List<Episode> {
         val doc = app.get(url).document
         val ep = cfg.episodes
@@ -121,7 +120,10 @@ class TurkTV : MainAPI() {
             val title = el.select(ep.title).text().ifBlank { "Bölüm" }
             val href = full(cfg.baseUrl, el.select(ep.link).attr("href")) ?: return@mapNotNull null
 
-            newEpisode(title, href)
+            newEpisode {
+                name = title
+                data = href
+            }
         }
     }
 
