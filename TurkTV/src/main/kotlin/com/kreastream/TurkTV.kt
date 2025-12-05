@@ -5,13 +5,14 @@ import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.SubtitleFile // <-- FIX: Corrected import location
+import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import org.jsoup.nodes.Element
 
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://www.atv.com.tr" // <-- FIX: Reverted to a valid URL for referer/network stability
+    override var mainUrl = "https://www.atv.com.tr"
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
@@ -65,10 +66,8 @@ class TurkTV : MainAPI() {
     private suspend fun ensureLoaded() {
         if (channels == null) {
             try {
-                // Ensure logging is available to see if this request fails
                 channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
             } catch (e: Exception) {
-                // Check your app's logs to see the error when fetching this URL
                 channels = emptyList() 
             }
         }
@@ -95,22 +94,41 @@ class TurkTV : MainAPI() {
             "Canlı TV", 
             liveChannelsUrl, 
             TvType.TvSeries
-        )
+        ).apply {
+            posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+        }
 
         // Live Radio Item
         liveItems += newTvSeriesSearchResponse(
             "Radyo", 
             radioChannelsUrl, 
             TvType.TvSeries
-        )
+        ).apply {
+            posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+        }
         
         lists += HomePageList("Canlı Yayınlar", liveItems)
         
         // --- 2. SERIES SECTIONS ---
-        // This will only run if channels was loaded successfully (not emptyList)
-        channels?.forEach { cfg ->
-            val series = fetchSeries(cfg)
-            lists += HomePageList("${cfg.name} Diziler", series)
+        channels?.let { channelList ->
+            if (channelList.isNotEmpty()) {
+                channelList.forEach { cfg ->
+                    try {
+                        val series = fetchSeries(cfg)
+                        if (series.isNotEmpty()) {
+                            lists += HomePageList("${cfg.name} Diziler", series)
+                        }
+                    } catch (e: Exception) {
+                        // Log error but continue with other channels
+                        e.printStackTrace()
+                    }
+                }
+            } else {
+                // Add a placeholder if no channels loaded
+                lists += HomePageList("Diziler", listOf(
+                    newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries)
+                ))
+            }
         }
 
         return newHomePageResponse(lists)
@@ -118,11 +136,45 @@ class TurkTV : MainAPI() {
 
     // ------------------- FETCH SERIES -------------------
     private suspend fun fetchSeries(cfg: ChannelConfig): List<SearchResponse> {
-        // ── TEMPORARY MODIFICATION FOR DEBUGGING ──
-        return emptyList()
+        val seriesList = mutableListOf<SearchResponse>()
+        
+        try {
+            val doc = app.get(cfg.series.url).document
+            val container = cfg.series.container
+            val titleSelector = cfg.series.title
+            val linkSelector = cfg.series.link
+            val posterSelector = cfg.series.poster
+            
+            doc.select(container).forEach { element ->
+                try {
+                    val title = element.select(titleSelector).text().trim()
+                    val link = element.select(linkSelector).attr("href")
+                    val poster = if (posterSelector != null) {
+                        element.select(posterSelector).attr("src")
+                    } else null
+                    
+                    if (title.isNotBlank() && link.isNotBlank()) {
+                        val fullLink = full(cfg.baseUrl, link)
+                        if (fullLink != null) {
+                            seriesList.add(
+                                newTvSeriesSearchResponse(title, fullLink, TvType.TvSeries) {
+                                    this.posterUrl = full(cfg.baseUrl, poster)
+                                }
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Skip this element if there's an error
+                }
+            }
+        } catch (e: Exception) {
+            // Return empty list if there's an error fetching
+        }
+        
+        return seriesList
     }
 
-   // ------------------- LOAD (Series Page) -------------------
+    // ------------------- LOAD (Series Page) -------------------
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
         
@@ -134,18 +186,28 @@ class TurkTV : MainAPI() {
             val typeToFilter = if (isLiveTv) "tv" else "radio"
             val title = if (isLiveTv) "Canlı TV Kanalları" else "Radyo Kanalları"
             
-            val episodes = streams
+            val filteredStreams = streams
                 ?.filter { it.streamType == typeToFilter }
-                ?.mapNotNull { live ->
-                    newEpisode(live.url) { 
-                        this.name = live.title
-                        this.posterUrl = live.poster
-                    }
-                } ?: emptyList()
+                ?: emptyList()
+            
+            // Create episodes for live streams
+            val episodes = filteredStreams.map { live ->
+                newEpisode(live.url) { 
+                    this.name = live.title
+                    this.posterUrl = live.poster
+                    // Add additional metadata for live streams
+                    this.description = "Canlı yayın"
+                }
+            }
 
-            return newTvSeriesLoadResponse(title, url, TvType.Live, episodes) {}
+            return newTvSeriesLoadResponse(title, url, TvType.Live, episodes) {
+                posterUrl = if (isLiveTv) {
+                    "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+                } else {
+                    "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+                }
+            }
         }
-
 
         // 2. Original Series Logic (Main Series Page)
         val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
@@ -155,29 +217,45 @@ class TurkTV : MainAPI() {
 
         return newTvSeriesLoadResponse(cfg.name, url, TvType.TvSeries, episodes) {
             posterUrl = null
+            plot = "${cfg.name} kanalına ait diziler"
         }
     }
 
     private suspend fun fetchEpisodes(cfg: ChannelConfig, url: String): List<Episode> {
-        val doc = app.get(url).document
-        val ep = cfg.episodes
+        val episodes = mutableListOf<Episode>()
+        
+        try {
+            val doc = app.get(url).document
+            val ep = cfg.episodes
 
-        return doc.select(ep.container).mapNotNull { el ->
-            val title = el.select(ep.title).text().ifBlank { "Bölüm" }
-            val href = el.select(ep.link).attr("href")
-            val episodeUrl = full(cfg.baseUrl, href) ?: return@mapNotNull null
+            doc.select(ep.container).forEachIndexed { index, el ->
+                try {
+                    val title = el.select(ep.title).text().ifBlank { "Bölüm ${index + 1}" }
+                    val href = el.select(ep.link).attr("href")
+                    val episodeUrl = full(cfg.baseUrl, href) ?: return@forEachIndexed
 
-            newEpisode(episodeUrl) {
-                this.name = title
+                    episodes.add(
+                        newEpisode(episodeUrl) {
+                            this.name = title
+                            this.episode = index + 1
+                        }
+                    )
+                } catch (e: Exception) {
+                    // Skip this episode if there's an error
+                }
             }
+        } catch (e: Exception) {
+            // Return empty list if there's an error
         }
+        
+        return episodes
     }
 
     // ------------------- LOAD LINKS -------------------
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit, // This should now resolve
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
@@ -192,7 +270,13 @@ class TurkTV : MainAPI() {
                     this.referer = if (live.requiresReferer) mainUrl else ""
                     this.quality = Qualities.Unknown.value
                     this.type = ExtractorLinkType.M3U8
-                    this.headers = mapOf("User-Agent" to "Mozilla/5.0")
+                    this.headers = mapOf(
+                        "User-Agent" to "Mozilla/5.0",
+                        "Accept" to "*/*",
+                        "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+                        "Origin" to mainUrl,
+                        "Referer" to mainUrl + "/"
+                    )
                 }
             )
             return true
@@ -208,11 +292,15 @@ class TurkTV : MainAPI() {
                 .ifBlank {
                     Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value
                 }
+                .ifBlank {
+                    // Try alternative selectors
+                    doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src")
+                }
 
             if (!streamUrl.isNullOrBlank()) {
-                val finalUrl = full(cfg.baseUrl, streamUrl)!!
+                val finalUrl = full(cfg.baseUrl, streamUrl) ?: streamUrl
                 val linkType = if (finalUrl.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                val quality = if (cfg.stream.prefer == "m3u8") Qualities.Unknown.value else Qualities.Unknown.value
+                val quality = Qualities.Unknown.value
 
                 callback(
                     newExtractorLink(
@@ -220,11 +308,20 @@ class TurkTV : MainAPI() {
                         name = "Stream",
                         url = finalUrl
                     ){
-                        this.referer = if (cfg.stream.referer) cfg.baseUrl else ""
+                        this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
                         this.quality = quality
                         this.type = linkType
                         if (cfg.stream.prefer.isNotBlank()) {
-                            this.headers = mapOf("Accept" to cfg.stream.prefer)
+                            this.headers = mapOf(
+                                "Accept" to cfg.stream.prefer,
+                                "User-Agent" to "Mozilla/5.0",
+                                "Referer" to cfg.baseUrl
+                            )
+                        } else {
+                            this.headers = mapOf(
+                                "User-Agent" to "Mozilla/5.0",
+                                "Referer" to cfg.baseUrl
+                            )
                         }
                     }
                 )
@@ -238,6 +335,10 @@ class TurkTV : MainAPI() {
     // ------------------- HELPER -------------------
     private fun full(base: String, url: String?): String? = url?.let {
         if (it.startsWith("http")) it
-        else "${base.removeSuffix("/")}/${it.trimStart('/')}"
+        else {
+            val baseUrl = base.removeSuffix("/")
+            val trimmedUrl = it.trimStart('/')
+            "$baseUrl/$trimmedUrl"
+        }
     }
 }
