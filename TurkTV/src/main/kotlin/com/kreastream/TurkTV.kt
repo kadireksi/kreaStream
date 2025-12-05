@@ -9,6 +9,7 @@ import org.json.JSONArray
 import kotlinx.coroutines.delay
 import android.util.Log
 
+
 class TurkTV : MainAPI() {
     override var name = "Türk TV"
     override var lang = "tr"
@@ -232,13 +233,13 @@ class TurkTV : MainAPI() {
                         "sorting" to "desc"
                     )
                     
-                    val response = app.post(url, data = formData, headers = mapOf(
+                                        val response = app.post(url, data = formData, headers = mapOf(
                         "X-Requested-With" to "XMLHttpRequest",
                         "Referer" to "$nowTvUrl/dizi-arsivi",
                         "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"
                     ))
                     
-                    if (response.statusCode == 200) {
+                    if (response.code == 200) {
                         val json = JSONObject(response.text)
                         if (json.getInt("code") == 200) {
                             val html = json.optString("data", "")
