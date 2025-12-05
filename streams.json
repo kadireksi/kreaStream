@@ -3,7 +3,7 @@
     "key": "atv_live",
     "title": "ATV Canlı Yayın",
     "poster": "https://upload.wikimedia.org/wikipedia/commons/8/85/ATV_logo.png",
-    "url": "https://trt-live.atv.com/live.m3u8",
+    "url": "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=CapDjfW8Jghn5iL3qb8o8A&e=1765001592&ppid=21d804be91b8e91f11bb3789ff83f0b4",
     "requiresReferer": true
   }
 ]
