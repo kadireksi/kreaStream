@@ -829,51 +829,118 @@ class TurkTV : MainAPI() {
         }
     }
 
+    private val atvMp4Qualities = listOf(
+        1800 to "1080p",
+        1200 to "720p",
+        750 to "480p",
+        400 to "360p"
+    )
+
+    private fun extractAtvMp4Base(url: String): Pair<String, Int>? {
+        val regex = Regex("""(.+?)_(\d+)\.mp4$""")
+        val match = regex.find(url) ?: return null
+        return match.groupValues[1] to match.groupValues[2].toInt()
+    }
+
+    private fun generateAtvMp4Links(url: String): List<ExtractorLink> {
+        val base = extractAtvMp4Base(url) ?: return emptyList()
+        val (baseUrl, maxBitrate) = base
+
+        return atvMp4Qualities.mapNotNull { (kbps, label) ->
+            if (kbps <= maxBitrate) {
+                ExtractorLink(
+                    name = "ATV • $label",
+                    source = "ATV",
+                    url = "${baseUrl}_${kbps}.mp4",
+                    referer = atvUrl,
+                    quality = when (kbps) {
+                        in 1500..2500 -> Qualities.P1080.value
+                        in 1000..1499 -> Qualities.P720.value
+                        in 700..999 -> Qualities.P480.value
+                        in 350..699 -> Qualities.P360.value
+                        else -> Qualities.Unknown.value
+                    },
+                    isM3u8 = false
+                )
+            } else null
+        }
+    }
+
     private fun convertAtvMp4ToM3u8(url: String): String? {
         val regex = Regex("""(.+?)/([^/]+?)(?:_\d+)?\.mp4$""")
         val match = regex.find(url) ?: return null
-        
+
         val basePath = match.groupValues[1]
         val filename = match.groupValues[2]
-        
+
         return "$basePath/$filename.hb.smil/playlist.m3u8"
     }
 
-    private suspend fun extractAtvLinks(data: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
-        return try {
-            val response = app.get(data, timeout = 10)
-            val html = response.text
-            
+    private suspend fun extractAtvLinks(
+        data: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+
+        val results = mutableListOf<ExtractorLink>()
+
+        try {
+            val html = app.get(data, timeout = 10).text
+
             val jsonLdUrl = extractAtvVideoUrl(html)
-            if (jsonLdUrl.contains(".mp4")) {
-                val m3u8Converted = convertAtvMp4ToM3u8(jsonLdUrl)
 
-                if (m3u8Converted != null) {
-                    M3u8Helper.generateM3u8(
+            if (jsonLdUrl != null && jsonLdUrl.contains(".mp4")) {
+
+                // Try M3U8 conversion first
+                convertAtvMp4ToM3u8(jsonLdUrl)?.let { m3u8 ->
+                    results += M3u8Helper.generateM3u8(
                         source = "ATV",
-                        streamUrl = m3u8Converted,
+                        streamUrl = m3u8,
                         referer = atvUrl
-                    ).forEach(callback)
-
-                    return true
-                } else {
-                    callback(newExtractorLink("ATV", "ATV - MP4", jsonLdUrl) {
-                        referer = atvUrl
-                    })
-                    return true
+                    ).map { link ->
+                        val qualityName = when (link.quality) {
+                            in 2000..3000 -> "1080p"
+                            in 1200..1999 -> "720p"
+                            in 800..1199 -> "480p"
+                            in 400..799 -> "360p"
+                            else -> "SD"
+                        }
+                        link.copy(name = "ATV • $qualityName")
+                    }
                 }
+
+                // Add fallback MP4 quality list
+                results += generateAtvMp4Links(jsonLdUrl)
+
+                // No need to continue scanning page now
             }
-            
-            val pageM3u8 = extractAtvM3u8FromPage(html)
-            if (pageM3u8 != null) {
-                M3u8Helper.generateM3u8(source = "ATV", streamUrl = pageM3u8, referer = atvUrl).forEach(callback)
-                return true
+
+            // Try raw m3u8 on page
+            extractAtvM3u8FromPage(html)?.let { m3u8 ->
+                results += M3u8Helper.generateM3u8("ATV", m3u8, atvUrl)
             }
-            if (extractVideoPlayerScripts(data, callback)) return true
-            return extractGeneralIframe(data, atvUrl, subtitleCallback, callback)
-        } catch (e: Exception) {
-            false
+
+            // Fallback extractors
+            if (results.isEmpty() && extractVideoPlayerScripts(data) { results += it }) {}
+            if (results.isEmpty()) extractGeneralIframe(data, atvUrl, subtitleCallback) { results += it }
+
+        } catch (_: Exception) {
         }
+
+        if (results.isEmpty()) return false
+
+        // --- CLEANUP, SORT, PRIORITY LOGIC ---
+
+        val finalResults = results
+            .distinctBy { it.url }                         // remove duplicates
+            .sortedWith(
+                compareByDescending<ExtractorLink> { it.isM3u8 } // M3U8 first
+                    .thenByDescending { it.quality }            // Highest quality first
+            )
+
+        finalResults.forEach(callback)
+
+        return true
     }
     
     private suspend fun extractShowTvLinks(data: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
