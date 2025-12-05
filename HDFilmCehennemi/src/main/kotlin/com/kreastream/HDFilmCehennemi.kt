@@ -354,6 +354,39 @@ class HDFilmCehennemi : MainAPI() {
             }
         }
 
+        private fun isValidDecryption(output: String): Boolean {
+            if (output.isBlank()) return false
+            if (output.length < 10) return false
+
+            // Stage 1: starts with known URL schemes
+            if (output.startsWith("http://") || output.startsWith("https://")) return true
+
+            // Stage 2: check if inside contains urls even if prefix is shifted
+            if (output.contains("http")) return true
+            if (output.contains(".m3u8") || output.contains(".mp4")) return true
+
+            // Stage 3: must be printable ASCII mostly
+            val printable = output.count { it.code in 32..126 }
+            if (printable.toDouble() / output.length > 0.85) return true
+
+            return false
+        }
+
+        private fun attemptNew(encrypted: String, seed: Int): String {
+            return try {
+                val reversed = encrypted.reversed()
+                val decoded = Base64.decode(reversed, Base64.DEFAULT)
+
+                val sb = StringBuilder()
+                for (i in decoded.indices) {
+                    val charCode = decoded[i].toInt() and 0xFF
+                    val shift = seed % (i + 5)
+                    sb.append(((charCode - shift + 256) % 256).toChar())
+                }
+                sb.toString()
+            } catch (e: Exception) { "" }
+        }
+
         // Main function to try all known orders
         fun dynamicDecrypt(encrypted: String, seed: Int): String {
             val attempts = listOf(
@@ -570,41 +603,6 @@ class HDFilmCehennemi : MainAPI() {
 
         return true
     }
-
-    private fun isValidDecryption(output: String): Boolean {
-        if (output.isBlank()) return false
-        if (output.length < 10) return false
-
-        // Stage 1: starts with known URL schemes
-        if (output.startsWith("http://") || output.startsWith("https://")) return true
-
-        // Stage 2: check if inside contains urls even if prefix is shifted
-        if (output.contains("http")) return true
-        if (output.contains(".m3u8") || output.contains(".mp4")) return true
-
-        // Stage 3: must be printable ASCII mostly
-        val printable = output.count { it.code in 32..126 }
-        if (printable.toDouble() / output.length > 0.85) return true
-
-        return false
-    }
-
-    private fun attemptNew(encrypted: String, seed: Int): String {
-        return try {
-            val reversed = encrypted.reversed()
-            val decoded = Base64.decode(reversed, Base64.DEFAULT)
-
-            val sb = StringBuilder()
-            for (i in decoded.indices) {
-                val charCode = decoded[i].toInt() and 0xFF
-                val shift = seed % (i + 5)
-                sb.append(((charCode - shift + 256) % 256).toChar())
-            }
-            sb.toString()
-        } catch (e: Exception) { "" }
-    }
-
-
 
     data class Results(@JsonProperty("results") val results: List<String> = arrayListOf())
     data class HDFC(@JsonProperty("html") val html: String)
