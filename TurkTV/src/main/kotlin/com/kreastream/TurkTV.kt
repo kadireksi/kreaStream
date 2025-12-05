@@ -150,7 +150,7 @@ class TurkTV : MainAPI() {
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
+        callback: (newExtractorLink) -> Unit
     ): Boolean {
 
         // ── Live streams ──
@@ -184,7 +184,7 @@ class TurkTV : MainAPI() {
             if (!streamUrl.isNullOrBlank()) {
                 val finalUrl = full(cfg.baseUrl, streamUrl)!!
                 val linkType = if (finalUrl.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                val quality = if (cfg.stream.prefer == "m3u8") Qualities.HD.value else Qualities.SD.value
+                val quality = if (cfg.stream.prefer == "m3u8") Qualities.Unknown.value else Qualities.Unknown.value
 
                 callback(
                     newExtractorLink(
@@ -192,8 +192,8 @@ class TurkTV : MainAPI() {
                         name = "Stream",
                         url = finalUrl
                     ){
-                        this.referer = if (cfg.stream.referer) cfg.baseUrl else "",
-                        this.quality = quality,
+                        this.referer = if (cfg.stream.referer) cfg.baseUrl else ""
+                        this.quality = quality
                         this.type = linkType
                         if (cfg.stream.prefer.isNotBlank()) {
                             this.headers = mapOf("Accept" to cfg.stream.prefer)
