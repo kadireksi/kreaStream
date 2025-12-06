@@ -683,7 +683,7 @@ class TurkTV : MainAPI() {
                 this.year = loadData.year
                 this.score = Score.from10(loadData.score)
                 this.tags = loadData.tags?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
-                this.actors = loadData.actors?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                //this.actors = loadData.actors?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
             }
             
         } catch (e: Exception) {
