@@ -189,6 +189,42 @@
     "streamType": "tv"
   },
   {
+    "key": "tv360_live",
+    "title": "TV360",
+    "active": true,
+    "poster": "https://logos.fandom.com/wiki/File:360_TV_(Turkey)_logo.png",
+    "url": "https://turkmedya-live.ercdn.net/tv360/tv360.m3u8",
+    "requiresReferer": true,
+    "streamType": "tv"
+  },
+  {
+    "key": "tv4_live",
+    "title": "TV4",
+    "active": true,
+    "poster": "https://brandfetch.com/tv4.com.tr/logo",
+    "url": "http://hasbahcaiptv.com/iptv/tr/HasBahCa_TV4.m3u8",
+    "requiresReferer": true,
+    "streamType": "tv"
+  },
+  {
+    "key": "teve2_live",
+    "title": "Teve2",
+    "active": true,
+    "poster": "https://brandfetch.com/teve2.com.tr/logo",
+    "url": "https://demiroren-live.daioncdn.net/teve2/teve2.m3u8",
+    "requiresReferer": true,
+    "streamType": "tv"
+  },
+  {
+    "key": "a2_live",
+    "title": "A2",
+    "active": true,
+    "poster": "https://www.atv.com.tr/a2tv/logo.png",
+    "url": "https://trkvz-live.daioncdn.net/a2tv/a2tv.m3u8",
+    "requiresReferer": true,
+    "streamType": "tv"
+  },
+  {
     "key": "trt-fm",
     "title": "TRT FM",
     "active": true,
@@ -200,13 +236,13 @@
   {
     "key": "metro-fm",
     "title": "Metro FM",
-    "active": false,
+    "active": true,
     "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
     "url": "https://25583.live.streamtheworld.com/METRO_FM128AAC.aac",
     "requiresReferer": false,
     "streamType": "radio"
   },
-   {
+  {
     "key": "kral-fm",
     "title": "Kral FM",
     "active": true,
@@ -215,7 +251,7 @@
     "requiresReferer": false,
     "streamType": "radio"
   },
-   {
+  {
     "key": "kral-pop",
     "title": "Kral Pop",
     "active": true,
@@ -329,6 +365,78 @@
     "active": true,
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467484.jpeg",
     "url": "https://radio-trtradyo6.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "super-fm",
+    "title": "Süper FM",
+    "active": true,
+    "poster": "https://superfm.com.tr/wp-content/uploads/2023/05/super-fm-logo.png",
+    "url": "https://live.superfm.com.tr/;live.mp3",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "alem-fm",
+    "title": "Alem FM",
+    "active": true,
+    "poster": "https://alemfm.com.tr/wp-content/uploads/2023/01/alem-fm-logo.png",
+    "url": "https://live.alemfm.com.tr/;*.mp3",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "number-one-fm",
+    "title": "Number One FM",
+    "active": true,
+    "poster": "https://numberone.com.tr/wp-content/uploads/2022/12/numberone-fm-logo.png",
+    "url": "https://live.numberone.com.tr/;*.mp3",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "power-fm",
+    "title": "Power FM",
+    "active": true,
+    "poster": "https://powerfm.com.tr/wp-content/uploads/2023/02/power-fm-logo.png",
+    "url": "https://live.powerfm.com.tr/;*.mp3",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "best-fm",
+    "title": "Best FM",
+    "active": true,
+    "poster": "https://bestfm.com.tr/wp-content/uploads/2023/03/best-fm-logo.png",
+    "url": "https://live.bestfm.com.tr/;*.mp3",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "radyo-1",
+    "title": "Radyo 1",
+    "active": true,
+    "poster": "https://radyo1.com.tr/wp-content/uploads/2024/01/radyo1-logo.png",
+    "url": "https://live.radyo1.com.tr/;*.mp3",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "joy-turk",
+    "title": "Joy Türk",
+    "active": true,
+    "poster": "https://joyturk.com/wp-content/uploads/2023/04/joy-turk-logo.png",
+    "url": "https://live.joyturk.com/;*.mp3",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "radyo-7",
+    "title": "Radyo 7",
+    "active": true,
+    "poster": "https://radyo7.com.tr/wp-content/uploads/2023/05/radyo7-logo.png",
+    "url": "https://live.radyo7.com.tr/;*.mp3",
     "requiresReferer": false,
     "streamType": "radio"
   }
