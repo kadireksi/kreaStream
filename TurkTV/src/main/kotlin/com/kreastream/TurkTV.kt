@@ -96,8 +96,8 @@ class TurkTV : MainAPI() {
         val name: String,
         val baseUrl: String,
         val active: Boolean = true,
-        val seriesPageActive: String? = null, // <--- NEW FIELD: Active series page path
-        val seriesPageArchive: String? = null, // <--- NEW FIELD: Archive series page path
+        val seriesPageActive: String? = null, // <--- ADDED: Active series page path
+        val seriesPageArchive: String? = null, // <--- ADDED: Archive series page path
         val seriesList: ChannelSelectorBlock,
         val seriesDetail: SeriesSelectorBlock,
         val episodes: EpisodeSelectorBlock,
@@ -270,13 +270,13 @@ class TurkTV : MainAPI() {
         )
     }
 
-    private suspend fun getChannelSeries(channel: ChannelConfig, path: String, listName: String): List<SearchResponse> {
+    private suspend fun getChannelSeries(channel: ChannelConfig, path: String, listName: String): List<SearchResponse> { // <--- MODIFIED to take path and listName
         val results = mutableListOf<SearchResponse>()
         try {
             Log.d("TurkTV", "Getting $listName series from ${channel.name} for main page using path: $path")
             
             // Construct the URL using the provided path
-            val seriesUrl = "${channel.baseUrl}${path}"
+            val seriesUrl = "${channel.baseUrl}${path}" // <--- Uses provided path
             val doc = app.get(seriesUrl).document
             
             // Select series elements using the channel's configured container selector
@@ -415,7 +415,7 @@ class TurkTV : MainAPI() {
             channels!!.forEach { cfg ->
                 
                 // Active Series Section
-                cfg.seriesPageActive?.let { path ->
+                cfg.seriesPageActive?.let { path -> // <--- Check and use Active path
                     val seriesList = getChannelSeries(cfg, path, "Active")
                     if (seriesList.isNotEmpty()) {
                         lists += HomePageList("📺 ${cfg.name} Diziler", seriesList, true)
@@ -424,7 +424,7 @@ class TurkTV : MainAPI() {
                 }
                 
                 // Archived Series Section (Only created if seriesPageArchive is provided)
-                cfg.seriesPageArchive?.let { path ->
+                cfg.seriesPageArchive?.let { path -> // <--- Check and use Archive path
                     val archiveList = getChannelSeries(cfg, path, "Archive")
                     if (archiveList.isNotEmpty()) {
                         lists += HomePageList("📂 ${cfg.name} Arşiv Diziler", archiveList, true)
@@ -458,7 +458,7 @@ class TurkTV : MainAPI() {
         
         channels?.forEach { channel ->
             // Use active page for search if available
-            channel.seriesPageActive?.let { path ->
+            channel.seriesPageActive?.let { path -> // <--- Uses Active path
                 try {
                     Log.d("TurkTV", "Searching on ${channel.name} (${channel.baseUrl})")
                     
@@ -505,7 +505,7 @@ class TurkTV : MainAPI() {
         
         channels?.forEach { channel ->
             // Use active page for all series list
-            channel.seriesPageActive?.let { path ->
+            channel.seriesPageActive?.let { path -> // <--- Uses Active path
                 try {
                     Log.d("TurkTV", "Getting all active series from ${channel.name}")
                     
