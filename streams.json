@@ -218,7 +218,7 @@
   {
     "key": "a2_live",
     "title": "A2",
-    "active": true,
+    "active": false,
     "poster": "https://www.atv.com.tr/a2tv/logo.png",
     "url": "https://trkvz-live.daioncdn.net/a2tv/a2tv.m3u8",
     "requiresReferer": true,
