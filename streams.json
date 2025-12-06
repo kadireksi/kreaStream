@@ -2,7 +2,7 @@
   {
     "key": "atv_live",
     "title": "ATV",
-    "active": true,
+    "active": false,
     "poster": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
     "url": "https://trkvz.daioncdn.net/atv/atv.m3u8",
     "requiresReferer": true,
@@ -29,7 +29,7 @@
   {
     "key": "now_live",
     "title": "NOW TV",
-    "active": true,
+    "active": false,
     "poster": "https://tpsbayxekmes.merlincdn.net//img/logos/logo.svg",
     "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8",
     "requiresReferer": true,
