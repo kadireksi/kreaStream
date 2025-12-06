@@ -202,7 +202,7 @@
     "title": "TV4",
     "active": true,
     "poster": "https://brandfetch.com/tv4.com.tr/logo",
-    "url": "http://hasbahcaiptv.com/iptv/tr/HasBahCa_TV4.m3u8",
+    "url": "https://turkmedya-live.ercdn.net/tv4/tv4.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
   },
@@ -382,7 +382,7 @@
     "title": "Alem FM",
     "active": true,
     "poster": "https://alemfm.com.tr/wp-content/uploads/2023/01/alem-fm-logo.png",
-    "url": "https://live.alemfm.com.tr/;*.mp3",
+    "url": "https://alemfm.radyotvonline.net/alemfmaac",
     "requiresReferer": false,
     "streamType": "radio"
   },
