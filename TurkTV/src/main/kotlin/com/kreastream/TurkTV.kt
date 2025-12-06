@@ -13,7 +13,7 @@ import android.util.Log
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://www.atv.com.tr"
+    override var mainUrl = "https://TurkTV.local"
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
@@ -72,9 +72,7 @@ class TurkTV : MainAPI() {
         if (channels == null) {
             try {
                 Log.d("TurkTV", "Loading channels from: $channelsJsonUrl")
-                val response = app.get(channelsJsonUrl)
-                val channelsText = response.text
-                Log.d("TurkTV", "Channels response status: ${response.statusCode}")
+                val channelsText = app.get(channelsJsonUrl).text
                 Log.d("TurkTV", "Channels response length: ${channelsText.length}")
                 
                 if (channelsText.isNotBlank()) {
@@ -100,9 +98,7 @@ class TurkTV : MainAPI() {
         if (streams == null) {
             try {
                 Log.d("TurkTV", "Loading streams from: $streamsJsonUrl")
-                val response = app.get(streamsJsonUrl)
-                val streamsText = response.text
-                Log.d("TurkTV", "Streams response status: ${response.statusCode}")
+                val streamsText = app.get(streamsJsonUrl).text
                 Log.d("TurkTV", "Streams response length: ${streamsText.length}")
                 
                 if (streamsText.isNotBlank()) {
@@ -138,42 +134,48 @@ class TurkTV : MainAPI() {
             
             // Test channels.json
             result.appendLine("\n--- Testing channels.json ---")
-            val channelsResponse = app.get(channelsJsonUrl)
             result.appendLine("URL: $channelsJsonUrl")
-            result.appendLine("Status: ${channelsResponse.statusCode}")
-            result.appendLine("Response length: ${channelsResponse.text.length}")
-            result.appendLine("First 500 chars: ${channelsResponse.text.take(500)}")
-            
-            if (channelsResponse.text.isNotBlank()) {
-                try {
-                    val testChannels = parseJson<List<ChannelConfig>>(channelsResponse.text)
-                    result.appendLine("Parsed successfully: ${testChannels?.size ?: 0} channels")
-                    testChannels?.take(3)?.forEachIndexed { i, ch ->
-                        result.appendLine("  Channel $i: ${ch.name} (active: ${ch.active})")
+            try {
+                val channelsText = app.get(channelsJsonUrl).text
+                result.appendLine("Response length: ${channelsText.length}")
+                result.appendLine("First 500 chars: ${channelsText.take(500)}")
+                
+                if (channelsText.isNotBlank()) {
+                    try {
+                        val testChannels = parseJson<List<ChannelConfig>>(channelsText)
+                        result.appendLine("Parsed successfully: ${testChannels?.size ?: 0} channels")
+                        testChannels?.take(3)?.forEachIndexed { i, ch ->
+                            result.appendLine("  Channel $i: ${ch.name} (active: ${ch.active})")
+                        }
+                    } catch (e: Exception) {
+                        result.appendLine("Parse error: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    result.appendLine("Parse error: ${e.message}")
                 }
+            } catch (e: Exception) {
+                result.appendLine("Network error: ${e.message}")
             }
             
             // Test streams.json
             result.appendLine("\n--- Testing streams.json ---")
-            val streamsResponse = app.get(streamsJsonUrl)
             result.appendLine("URL: $streamsJsonUrl")
-            result.appendLine("Status: ${streamsResponse.statusCode}")
-            result.appendLine("Response length: ${streamsResponse.text.length}")
-            result.appendLine("First 500 chars: ${streamsResponse.text.take(500)}")
-            
-            if (streamsResponse.text.isNotBlank()) {
-                try {
-                    val testStreams = parseJson<List<LiveStreamConfig>>(streamsResponse.text)
-                    result.appendLine("Parsed successfully: ${testStreams?.size ?: 0} streams")
-                    testStreams?.take(3)?.forEachIndexed { i, st ->
-                        result.appendLine("  Stream $i: ${st.title} (type: ${st.streamType})")
+            try {
+                val streamsText = app.get(streamsJsonUrl).text
+                result.appendLine("Response length: ${streamsText.length}")
+                result.appendLine("First 500 chars: ${streamsText.take(500)}")
+                
+                if (streamsText.isNotBlank()) {
+                    try {
+                        val testStreams = parseJson<List<LiveStreamConfig>>(streamsText)
+                        result.appendLine("Parsed successfully: ${testStreams?.size ?: 0} streams")
+                        testStreams?.take(3)?.forEachIndexed { i, st ->
+                            result.appendLine("  Stream $i: ${st.title} (type: ${st.streamType})")
+                        }
+                    } catch (e: Exception) {
+                        result.appendLine("Parse error: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    result.appendLine("Parse error: ${e.message}")
                 }
+            } catch (e: Exception) {
+                result.appendLine("Network error: ${e.message}")
             }
             
         } catch (e: Exception) {
