@@ -192,7 +192,7 @@
     "key": "tv360_live",
     "title": "TV360",
     "active": true,
-    "poster": "https://logos.fandom.com/wiki/File:360_TV_(Turkey)_logo.png",
+    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_360tv.png",
     "url": "https://turkmedya-live.ercdn.net/tv360/tv360.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
@@ -201,7 +201,7 @@
     "key": "tv4_live",
     "title": "TV4",
     "active": true,
-    "poster": "https://brandfetch.com/tv4.com.tr/logo",
+    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_tv4_yeni_2.png",
     "url": "https://turkmedya-live.ercdn.net/tv4/tv4.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
@@ -381,7 +381,7 @@
     "key": "alem-fm",
     "title": "Alem FM",
     "active": true,
-    "poster": "https://alemfm.com.tr/wp-content/uploads/2023/01/alem-fm-logo.png",
+    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_alem_fm.png",
     "url": "https://alemfm.radyotvonline.net/alemfmaac",
     "requiresReferer": false,
     "streamType": "radio"
