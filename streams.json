@@ -200,7 +200,7 @@
   {
     "key": "metro-fm",
     "title": "Metro FM",
-    "active": true,
+    "active": false,
     "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
     "url": "https://25583.live.streamtheworld.com/METRO_FM128AAC.aac",
     "requiresReferer": false,
