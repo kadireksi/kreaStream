@@ -302,7 +302,7 @@ class TurkTV : MainAPI() {
                 live.url.contains(".m3u8") -> ExtractorLinkType.M3U8
                 live.url.contains(".aac") || live.url.contains(".mp3") || live.streamType == "radio" -> {
                     Log.d("TurkTV", "Detected audio stream, using MEDIA type")
-                    ExtractorLinkType.MEDIA
+                    ExtractorLinkType.VIDEO
                 }
                 else -> ExtractorLinkType.VIDEO
             }
