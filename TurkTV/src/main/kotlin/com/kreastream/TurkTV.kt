@@ -66,15 +66,27 @@ class TurkTV : MainAPI() {
     private suspend fun ensureLoaded() {
         if (channels == null) {
             try {
-                channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
+                val channelsText = app.get(channelsJsonUrl).text
+                if (channelsText.isNotBlank()) {
+                    channels = parseJson<List<ChannelConfig>>(channelsText)
+                } else {
+                    channels = emptyList()
+                }
             } catch (e: Exception) {
+                e.printStackTrace()
                 channels = emptyList() 
             }
         }
         if (streams == null) {
             try {
-                streams = parseJson<List<LiveStreamConfig>>(app.get(streamsJsonUrl).text)
+                val streamsText = app.get(streamsJsonUrl).text
+                if (streamsText.isNotBlank()) {
+                    streams = parseJson<List<LiveStreamConfig>>(streamsText)
+                } else {
+                    streams = emptyList()
+                }
             } catch (e: Exception) {
+                e.printStackTrace()
                 streams = emptyList()
             }
         }
@@ -93,7 +105,7 @@ class TurkTV : MainAPI() {
         liveItems += newTvSeriesSearchResponse(
             "Canlı TV", 
             liveChannelsUrl, 
-            TvType.TvSeries
+            TvType.Live  // Changed from TvSeries to Live
         ).apply {
             posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
         }
@@ -102,7 +114,7 @@ class TurkTV : MainAPI() {
         liveItems += newTvSeriesSearchResponse(
             "Radyo", 
             radioChannelsUrl, 
-            TvType.TvSeries
+            TvType.Live  // Changed from TvSeries to Live
         ).apply {
             posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
         }
@@ -117,10 +129,18 @@ class TurkTV : MainAPI() {
                         val series = fetchSeries(cfg)
                         if (series.isNotEmpty()) {
                             lists += HomePageList("${cfg.name} Diziler", series)
+                        } else {
+                            // Add placeholder if no series found for this channel
+                            lists += HomePageList("${cfg.name} Diziler", listOf(
+                                newTvSeriesSearchResponse("Dizi bulunamadı", "", TvType.TvSeries)
+                            ))
                         }
                     } catch (e: Exception) {
                         // Log error but continue with other channels
                         e.printStackTrace()
+                        lists += HomePageList("${cfg.name} Diziler", listOf(
+                            newTvSeriesSearchResponse("Yüklenemedi", "", TvType.TvSeries)
+                        ))
                     }
                 }
             } else {
@@ -169,6 +189,7 @@ class TurkTV : MainAPI() {
             }
         } catch (e: Exception) {
             // Return empty list if there's an error fetching
+            e.printStackTrace()
         }
         
         return seriesList
@@ -206,12 +227,19 @@ class TurkTV : MainAPI() {
                 } else {
                     "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
                 }
+                this.plot = if (isLiveTv) {
+                    "Canlı TV kanalları listesi"
+                } else {
+                    "Radyo kanalları listesi"
+                }
             }
         }
 
         // 2. Original Series Logic (Main Series Page)
         val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
-            ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {}
+            ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {
+                this.plot = "Bu kanal yapılandırılmamış"
+            }
 
         val episodes = fetchEpisodes(cfg, url)
 
@@ -246,6 +274,7 @@ class TurkTV : MainAPI() {
             }
         } catch (e: Exception) {
             // Return empty list if there's an error
+            e.printStackTrace()
         }
         
         return episodes
@@ -269,7 +298,7 @@ class TurkTV : MainAPI() {
                 ){
                     this.referer = if (live.requiresReferer) mainUrl else ""
                     this.quality = Qualities.Unknown.value
-                    this.type = ExtractorLinkType.M3U8
+                    this.type = if (live.url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.MEDIA
                     this.headers = mapOf(
                         "User-Agent" to "Mozilla/5.0",
                         "Accept" to "*/*",
