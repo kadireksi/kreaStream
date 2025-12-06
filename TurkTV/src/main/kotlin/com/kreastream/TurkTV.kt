@@ -133,7 +133,7 @@ class TurkTV : MainAPI() {
                             // Add placeholder if no series found for this channel
                             lists += HomePageList("${cfg.name} Diziler", listOf(
                                 newTvSeriesSearchResponse("Dizi bulunamadı", "", TvType.TvSeries)
-                            ))
+                            ), true)
                         }
                     } catch (e: Exception) {
                         // Log error but continue with other channels
