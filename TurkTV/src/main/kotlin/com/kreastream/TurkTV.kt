@@ -522,17 +522,11 @@ class TurkTV : MainAPI() {
 
     // ------------------- LOAD (Series Page) -------------------
     override suspend fun load(url: String): LoadResponse {
-        Log.d("TurkTV", "=== load() called with URL: $url ===")
         ensureLoaded()
         
-        // 1. Check for Live Hub URLs
-        if (url == liveTvHubUrl) {
-            Log.d("TurkTV", "Loading TV hub as episodes")
+        if (url == liveTvHubUrl) {  
+            val tvStreams = streams?.filter { it.streamType == "tv" && it.active == true } ?: emptyList()
             
-            val tvStreams = streams?.filter { it.streamType == "tv" } ?: emptyList()
-            Log.d("TurkTV", "TV streams found: ${tvStreams.size}")
-            
-            // Create episodes for each TV channel
             val episodes = tvStreams.mapIndexed { index, stream ->
                 newEpisode(stream.url) {
                     this.name = stream.title
@@ -544,7 +538,7 @@ class TurkTV : MainAPI() {
             }
 
             return newTvSeriesLoadResponse(
-                name = "📺 Canlı TV Kanalları (${tvStreams.size})",
+                name = "📺 TV (${tvStreams.size})",
                 url = url,
                 type = TvType.TvSeries,
                 episodes = episodes
@@ -557,13 +551,9 @@ class TurkTV : MainAPI() {
             }
         }
         
-        if (url == liveRadioHubUrl) {
-            Log.d("TurkTV", "Loading Radio hub as episodes")
+        if (url == liveRadioHubUrl) {    
+            val radioStreams = streams?.filter { it.streamType == "radio" && it.active == true } ?: emptyList()
             
-            val radioStreams = streams?.filter { it.streamType == "radio" } ?: emptyList()
-            Log.d("TurkTV", "Radio streams found: ${radioStreams.size}")
-            
-            // Create episodes for each Radio channel
             val episodes = radioStreams.mapIndexed { index, stream ->
                 newEpisode(stream.url) {
                     this.name = stream.title
@@ -575,7 +565,7 @@ class TurkTV : MainAPI() {
             }
 
             return newTvSeriesLoadResponse(
-                name = "📻 Radyo Kanalları (${radioStreams.size})",
+                name = "📻 Radyo (${radioStreams.size})",
                 url = url,
                 type = TvType.TvSeries,
                 episodes = episodes
@@ -592,15 +582,12 @@ class TurkTV : MainAPI() {
         // 2. Find which channel this series belongs to
         val channel = channels?.find { url.contains(it.baseUrl) }
         if (channel == null) {
-            Log.e("TurkTV", "No channel found for URL: $url")
             return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {
                 this.plot = "Bu kanal yapılandırılmamış"
                 this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
             }
         }
-        
-        Log.d("TurkTV", "Found channel: ${channel.name} for URL: $url")
-        
+                
         try {
             // 3. Fetch the series page
             val doc = app.get(url).document
@@ -609,19 +596,15 @@ class TurkTV : MainAPI() {
             val loadData = doc.extractLoadData(channel, channel.baseUrl)
             
             if (loadData == null) {
-                Log.e("TurkTV", "Could not extract load data from page")
                 return newTvSeriesLoadResponse("Hata", url, TvType.TvSeries, emptyList()) {
                     this.plot = "Sayfa yapısı tanınamadı"
                     this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
                 }
             }
             
-            Log.d("TurkTV", "Extracted series: ${loadData.displayTitle}")
-            
             // 5. Get episodes page URL
             val seriesPath = url.removePrefix(channel.baseUrl).trim('/')
             val episodesUrl = "${channel.baseUrl}/$seriesPath/bolumler"
-            Log.d("TurkTV", "Fetching episodes from: $episodesUrl")
             
             val episodesDoc = app.get(episodesUrl).document
             
@@ -630,12 +613,8 @@ class TurkTV : MainAPI() {
             
             // Try to find episodes from select dropdown or list
             val episodeContainers = episodesDoc.select(channel.episodes.container)
-            Log.d("TurkTV", "Found episode containers: ${episodeContainers.size}")
             
             if (episodeContainers.isNotEmpty()) {
-                // Fix for ATV: Iterate directly over episodeContainers, as the selector
-                // already targets the option elements. The previous .select("option") call 
-                // here was redundant and causing the failure.
                 episodeContainers.forEach { option ->
                     val value = option.attr("value")
                     val text = option.text().trim()
@@ -694,8 +673,6 @@ class TurkTV : MainAPI() {
                 }
             }
             
-            Log.d("TurkTV", "Total episodes found: ${episodes.size}")
-            
             // Sort episodes by episode number (descending - newest first)
             val sortedEpisodes = episodes.sortedByDescending { it.episode }
             
@@ -714,7 +691,6 @@ class TurkTV : MainAPI() {
             }
             
         } catch (e: Exception) {
-            Log.e("TurkTV", "Error loading series: ${e.message}", e)
             return newTvSeriesLoadResponse("Hata", url, TvType.TvSeries, emptyList()) {
                 this.plot = "Seri yüklenirken hata oluştu: ${e.message}"
                 this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
@@ -729,14 +705,10 @@ class TurkTV : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("TurkTV", "=== loadLinks() called with data: $data ===")
         ensureLoaded()
 
         // Individual live streams (when an episode is clicked)
         streams?.firstOrNull { it.url == data }?.let { live ->
-            Log.d("TurkTV", "Found individual live stream: ${live.title}")
-            Log.d("TurkTV", "Stream URL: ${live.url}")
-            
             // Determine the correct link type
             val linkType = when {
                 live.url.contains(".m3u8") -> ExtractorLinkType.M3U8
@@ -746,8 +718,6 @@ class TurkTV : MainAPI() {
                 }
                 else -> ExtractorLinkType.VIDEO
             }
-            
-            Log.d("TurkTV", "Using link type: $linkType")
             
             // Create appropriate headers based on stream type
             val headers = mutableMapOf(
@@ -779,14 +749,12 @@ class TurkTV : MainAPI() {
                     this.headers = headers
                 }
             )
-            Log.d("TurkTV", "loadLinks returning true for individual stream")
             return true
         }
 
         // Check if this is a series episode
         val channel = channels?.find { data.contains(it.baseUrl) }
         if (channel != null) {
-            Log.d("TurkTV", "Found channel ${channel.name} for episode URL: $data")
             
             try {
                 // Fetch the episode page
@@ -835,7 +803,6 @@ class TurkTV : MainAPI() {
                 }
                 
                 if (videoSources.isNotEmpty()) {
-                    Log.d("TurkTV", "Found ${videoSources.size} video sources")
                     
                     videoSources.forEachIndexed { index, videoUrl ->
                         val linkType = when {
@@ -875,18 +842,15 @@ class TurkTV : MainAPI() {
                         )
                     }
                     
-                    Log.d("TurkTV", "loadLinks returning true for series episode")
                     return true
                 } else {
                     Log.w("TurkTV", "No video sources found on episode page")
-                    Log.d("TurkTV", "Page HTML preview: ${doc.html().take(500)}")
                 }
             } catch (e: Exception) {
                 Log.e("TurkTV", "Error loading episode links: ${e.message}", e)
             }
         }
 
-        Log.d("TurkTV", "No match found, returning false")
         return false
     }
 }
