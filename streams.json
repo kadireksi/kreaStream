@@ -198,6 +198,15 @@
     "streamType": "radio"
   },
   {
+    "key": "metro-fm",
+    "title": "Metro FM",
+    "active": true,
+    "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
+    "url": "https://25583.live.streamtheworld.com/METRO_FM128AAC.aac",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
     "key": "trt-radyo-1",
     "title": "TRT Radyo 1",
     "active": true,
