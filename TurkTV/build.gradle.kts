@@ -11,6 +11,6 @@ cloudstream {
     description = "Türk Tv"
     status  = 1
     tvTypes = listOf("TvSeries", "Live")
-    iconUrl = "https://m.media-amazon.com/images/I/41fJO1NxFxL.png"
+    iconUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV_logo.png"
 }
 
