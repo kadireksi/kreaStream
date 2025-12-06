@@ -1,4 +1,4 @@
-version = 251205
+version = 251206
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
@@ -11,6 +11,6 @@ cloudstream {
     description = "Türk Tv"
     status  = 1
     tvTypes = listOf("TvSeries", "Live")
-    iconUrl = "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png"
+    iconUrl = "https://m.media-amazon.com/images/I/41fJO1NxFxL.png"
 }
 
