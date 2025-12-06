@@ -5,7 +5,7 @@
     "baseUrl": "https://www.atv.com.tr",
     "active": true,
     "seriesPageActive": "/diziler",
-    "seriesPageArchive": "/eski-diziler",
+    "seriesPageArchive": null,
     "seriesList": {
       "container": ".category-classic-item.type-02",
       "title": "h3.title",
@@ -16,6 +16,7 @@
       "lang": null,
       "meta": null
     },
+    "seriesListArchive": null,
     "seriesDetail": {
       "container": ".tab-content",
       "title": "h1, h2, h3.title, .page-title",
@@ -41,6 +42,48 @@
     }
   },
   {
+    "key": "nowtv",
+    "name": "NOW TV",
+    "baseUrl": "https://www.nowtv.com.tr",
+    "active": true,
+    "seriesPageActive": "/dizi-izle",
+    "seriesPageArchive": "/dizi-arsivi?filter=date",
+    "seriesList": {
+      "container": ".owl-item active",
+      "title": ".poster-image img[alt]",
+      "link": "a",
+      "poster": ".poster-image img[data-src]",
+      "year": "",
+      "score": null,
+      "lang": null,
+      "meta": ""
+    },
+    "seriesListArchive": null,
+    "seriesDetail": {
+      "container": ".dizi-sayfa",
+      "title": "h1.dizi-adi",
+      "poster": "img[src*='poster-large']",
+      "description": ".aciklama p, .ozet-metin",
+      "year": ".yayin-yili",
+      "score": null,
+      "tags": ".kategori-linkler a",
+      "actors": ".kadrolar ul li a",
+      "trailer": ".fragman-video iframe"
+    },
+    "episodes": {
+      "container": ".bolum-sec option, .episode-list option",
+      "title": "option[value]",
+      "link": "option[value]",
+      "number": ".bolum-sayisi",
+      "season": ".sezon-bilgi"
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "hls",
+      "referer": true
+    }
+  },
+  {
     "key": "startv",
     "name": "Star TV",
     "baseUrl": "https://www.startv.com.tr",
@@ -49,6 +92,16 @@
     "seriesPageArchive": "/diziler/arsiv",
     "seriesList": {
       "container": ".dizi-listesi-item, .card-item",
+      "title": ".dizi-title a, h3 a",
+      "link": "a[href*='/dizi/']",
+      "poster": ".poster img, img[src*='poster']",
+      "year": ".year span",
+      "score": null,
+      "lang": null,
+      "meta": null
+    },
+    "seriesListArchive": {
+      "container": ".arsiv-listesi-item, .card-item",
       "title": ".dizi-title a, h3 a",
       "link": "a[href*='/dizi/']",
       "poster": ".poster img, img[src*='poster']",
@@ -98,6 +151,7 @@
       "lang": null,
       "meta": null
     },
+    "seriesListArchive": null,
     "seriesDetail": {
       "container": ".dizi-tanitim",
       "title": "h1, .dizi-adi",
@@ -123,47 +177,6 @@
     }
   },
   {
-    "key": "nowtv",
-    "name": "NOW TV",
-    "baseUrl": "https://www.nowtv.com.tr",
-    "active": true,
-    "seriesPageActive": "/arsiv/diziler/tumu",
-    "seriesPageArchive": null,
-    "seriesList": {
-      "container": ".dizi-kart, .arsiv-item",
-      "title": ".dizi-baslik a",
-      "link": "a[href*='/dizi/']",
-      "poster": ".kare img, .poster[src*='thumb']",
-      "year": ".yil-tag",
-      "score": null,
-      "lang": null,
-      "meta": ".kisa-ozet"
-    },
-    "seriesDetail": {
-      "container": ".dizi-sayfa",
-      "title": "h1.dizi-adi",
-      "poster": "img[src*='poster-large']",
-      "description": ".aciklama p, .ozet-metin",
-      "year": ".yayin-yili",
-      "score": null,
-      "tags": ".kategori-linkler a",
-      "actors": ".kadrolar ul li a",
-      "trailer": ".fragman-video iframe"
-    },
-    "episodes": {
-      "container": ".bolum-sec option, .episode-list option",
-      "title": "option[value]",
-      "link": "option[value]",
-      "number": ".bolum-sayisi",
-      "season": ".sezon-bilgi"
-    },
-    "stream": {
-      "type": "m3u8",
-      "prefer": "hls",
-      "referer": true
-    }
-  },
-  {
     "key": "kanald",
     "name": "Kanal D",
     "baseUrl": "https://www.kanald.com.tr",
@@ -180,6 +193,7 @@
       "lang": null,
       "meta": null
     },
+    "seriesListArchive": null,
     "seriesDetail": {
       "container": ".dizi-detay",
       "title": "h1.dizi-isim",
@@ -213,6 +227,16 @@
     "seriesPageArchive": "/diziler?archive=true&order=title_asc",
     "seriesList": {
       "container": ".dizi-kartlari .kart",
+      "title": ".kart-baslik a",
+      "link": "a[href*='/diziler/']",
+      "poster": ".kart-gorsel img",
+      "year": ".yayin-tarihi",
+      "score": null,
+      "lang": null,
+      "meta": null
+    },
+    "seriesListArchive": {
+      "container": ".arsiv-kartlari .kart",
       "title": ".kart-baslik a",
       "link": "a[href*='/diziler/']",
       "poster": ".kart-gorsel img",
