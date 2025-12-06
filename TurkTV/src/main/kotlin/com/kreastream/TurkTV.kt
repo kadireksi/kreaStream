@@ -298,7 +298,7 @@ class TurkTV : MainAPI() {
                 ){
                     this.referer = if (live.requiresReferer) mainUrl else ""
                     this.quality = Qualities.Unknown.value
-                    this.type = if (live.url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.MEDIA
+                    this.type = if (live.url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                     this.headers = mapOf(
                         "User-Agent" to "Mozilla/5.0",
                         "Accept" to "*/*",
