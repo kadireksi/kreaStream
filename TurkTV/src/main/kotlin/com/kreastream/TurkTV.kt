@@ -96,13 +96,14 @@ class TurkTV : MainAPI() {
         val name: String,
         val baseUrl: String,
         val active: Boolean = true,
-        val seriesPageActive: String? = null,
-        val seriesPageArchive: String? = null,
-        val seriesList: ChannelSelectorBlock, // Selector block for Active/default
-        val seriesListArchive: ChannelSelectorBlock? = null, // <--- NEW FIELD: Optional selector block for Archive
+        val seriesPageActive: String? = null, // <--- ADDED (restored)
+        val seriesPageArchive: String? = null, // <--- ADDED (restored)
+        val seriesList: ChannelSelectorBlock,
+        val seriesListArchive: ChannelSelectorBlock? = null, // <--- ADDED (restored)
         val seriesDetail: SeriesSelectorBlock,
         val episodes: EpisodeSelectorBlock,
-        val stream: StreamConfig
+        val stream: StreamConfig,
+        val episodesPageSuffix: String? = null // <--- NEW FIELD
     )
 
     data class LiveStreamConfig(
@@ -631,7 +632,9 @@ class TurkTV : MainAPI() {
             
             // 5. Get episodes page URL
             val seriesPath = url.removePrefix(channel.baseUrl).trim('/')
-            val episodesUrl = "${channel.baseUrl}/$seriesPath/bolumler"
+            // Use configured suffix, default to "/bolumler"
+            val episodesSuffix = channel.episodesPageSuffix ?: "/bolumler" // <--- NEW LOGIC
+            val episodesUrl = "${channel.baseUrl}/$seriesPath${episodesSuffix}" // <--- USING NEW SUFFIX
             
             val episodesDoc = app.get(episodesUrl).document
             
