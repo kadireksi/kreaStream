@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import android.util.Log
+import org.jsoup.nodes.Element
 
 class TurkTV : MainAPI() {
 
@@ -66,27 +66,15 @@ class TurkTV : MainAPI() {
     private suspend fun ensureLoaded() {
         if (channels == null) {
             try {
-                Log.d("DEBUG: Loading channels from $channelsJsonUrl")
-                val channelsText = app.get(channelsJsonUrl).text
-                Log.d("DEBUG: Channels JSON received: ${channelsText.length} characters")
-                channels = parseJson<List<ChannelConfig>>(channelsText)
-                Log.d("DEBUG: Channels parsed successfully: ${channels?.size} channels")
+                channels = parseJson<List<ChannelConfig>>(app.get(channelsJsonUrl).text)
             } catch (e: Exception) {
-                Log.d("DEBUG: Failed to load channels: ${e.message}")
-                e.printStackTrace()
                 channels = emptyList() 
             }
         }
         if (streams == null) {
             try {
-                Log.d("DEBUG: Loading streams from $streamsJsonUrl")
-                val streamsText = app.get(streamsJsonUrl).text
-                Log.d("DEBUG: Streams JSON received: ${streamsText.length} characters")
-                streams = parseJson<List<LiveStreamConfig>>(streamsText)
-                Log.d("DEBUG: Streams parsed successfully: ${streams?.size} streams")
+                streams = parseJson<List<LiveStreamConfig>>(app.get(streamsJsonUrl).text)
             } catch (e: Exception) {
-                Log.d("DEBUG: Failed to load streams: ${e.message}")
-                e.printStackTrace()
                 streams = emptyList()
             }
         }
@@ -101,85 +89,45 @@ class TurkTV : MainAPI() {
         // --- 1. LIVE STREAMS SECTION (Combined TV and Radio) ---
         val liveItems = mutableListOf<SearchResponse>()
         
-        // Check if we have streams loaded
-        if (streams.isNullOrEmpty()) {
-            Log.d("DEBUG: No streams loaded, showing placeholder")
-            // Live TV Item (placeholder)
-            liveItems += newTvSeriesSearchResponse(
-                "Canlı TV (Yakında)", 
-                liveChannelsUrl, 
-                TvType.TvSeries
-            ).apply {
-                posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
-            }
+        // Live TV Item
+        liveItems += newTvSeriesSearchResponse(
+            "Canlı TV", 
+            liveChannelsUrl, 
+            TvType.TvSeries
+        ).apply {
+            posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+        }
 
-            // Live Radio Item (placeholder)
-            liveItems += newTvSeriesSearchResponse(
-                "Radyo (Yakında)", 
-                radioChannelsUrl, 
-                TvType.TvSeries
-            ).apply {
-                posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
-            }
-        } else {
-            Log.d("DEBUG: Streams loaded, showing real items")
-            // Live TV Item (real)
-            liveItems += newTvSeriesSearchResponse(
-                "Canlı TV", 
-                liveChannelsUrl, 
-                TvType.TvSeries
-            ).apply {
-                posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
-            }
-
-            // Live Radio Item (real)
-            liveItems += newTvSeriesSearchResponse(
-                "Radyo", 
-                radioChannelsUrl, 
-                TvType.TvSeries
-            ).apply {
-                posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
-            }
+        // Live Radio Item
+        liveItems += newTvSeriesSearchResponse(
+            "Radyo", 
+            radioChannelsUrl, 
+            TvType.TvSeries
+        ).apply {
+            posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
         }
         
         lists += HomePageList("Canlı Yayınlar", liveItems)
         
         // --- 2. SERIES SECTIONS ---
-        if (channels.isNullOrEmpty()) {
-            Log.d("DEBUG: No channels loaded, showing error")
-            // Add a placeholder if no channels loaded
-            lists += HomePageList("Diziler", listOf(
-                newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries).apply {
-                    posterUrl = "https://cdn-icons-png.flaticon.com/512/157/157933.png"
-                }
-            ))
-        } else {
-            Log.d("DEBUG: Channels loaded: ${channels!!.size} channels")
-            channels!!.forEach { cfg ->
-                try {
-                    Log.d("DEBUG: Fetching series for ${cfg.name}")
-                    val series = fetchSeries(cfg)
-                    Log.d("DEBUG: Fetched ${series.size} series for ${cfg.name}")
-                    if (series.isNotEmpty()) {
-                        lists += HomePageList("${cfg.name} Diziler", series)
-                    } else {
-                        // Add placeholder if no series found
-                        lists += HomePageList("${cfg.name} Diziler", listOf(
-                            newTvSeriesSearchResponse("Dizi Bulunamadı", "", TvType.TvSeries).apply {
-                                posterUrl = "https://cdn-icons-png.flaticon.com/512/157/157933.png"
-                            }
-                        ))
-                    }
-                } catch (e: Exception) {
-                    Log.d("DEBUG: Error fetching series for ${cfg.name}: ${e.message}")
-                    e.printStackTrace()
-                    // Add error placeholder
-                    lists += HomePageList("${cfg.name} Diziler", listOf(
-                        newTvSeriesSearchResponse("Hata: ${e.message}", "", TvType.TvSeries).apply {
-                            posterUrl = "https://cdn-icons-png.flaticon.com/512/157/157933.png"
+        channels?.let { channelList ->
+            if (channelList.isNotEmpty()) {
+                channelList.forEach { cfg ->
+                    try {
+                        val series = fetchSeries(cfg)
+                        if (series.isNotEmpty()) {
+                            lists += HomePageList("${cfg.name} Diziler", series)
                         }
-                    ))
+                    } catch (e: Exception) {
+                        // Log error but continue with other channels
+                        e.printStackTrace()
+                    }
                 }
+            } else {
+                // Add a placeholder if no channels loaded
+                lists += HomePageList("Diziler", listOf(
+                    newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries)
+                ))
             }
         }
 
@@ -191,27 +139,19 @@ class TurkTV : MainAPI() {
         val seriesList = mutableListOf<SearchResponse>()
         
         try {
-            Log.d("DEBUG: Fetching series from URL: ${cfg.series.url}")
             val doc = app.get(cfg.series.url).document
             val container = cfg.series.container
             val titleSelector = cfg.series.title
             val linkSelector = cfg.series.link
             val posterSelector = cfg.series.poster
             
-            Log.d("DEBUG: Using selectors - Container: $container, Title: $titleSelector, Link: $linkSelector")
-            
-            val elements = doc.select(container)
-            Log.d("DEBUG: Found ${elements.size} elements with container selector")
-            
-            elements.forEachIndexed { index, element ->
+            doc.select(container).forEach { element ->
                 try {
                     val title = element.select(titleSelector).text().trim()
                     val link = element.select(linkSelector).attr("href")
                     val poster = if (posterSelector != null) {
                         element.select(posterSelector).attr("src")
                     } else null
-                    
-                    Log.d("DEBUG: Element $index - Title: '$title', Link: '$link', Poster: '$poster'")
                     
                     if (title.isNotBlank() && link.isNotBlank()) {
                         val fullLink = full(cfg.baseUrl, link)
@@ -221,19 +161,16 @@ class TurkTV : MainAPI() {
                                     this.posterUrl = full(cfg.baseUrl, poster)
                                 }
                             )
-                            Log.d("DEBUG: Added series: $title")
                         }
                     }
                 } catch (e: Exception) {
-                    Log.d("DEBUG: Error processing element $index: ${e.message}")
+                    // Skip this element if there's an error
                 }
             }
         } catch (e: Exception) {
-            Log.d("DEBUG: Error fetching series: ${e.message}")
-            e.printStackTrace()
+            // Return empty list if there's an error fetching
         }
         
-        Log.d("DEBUG: Total series fetched: ${seriesList.size}")
         return seriesList
     }
 
@@ -253,28 +190,12 @@ class TurkTV : MainAPI() {
                 ?.filter { it.streamType == typeToFilter }
                 ?: emptyList()
             
-            Log.d("DEBUG: Loading $title with ${filteredStreams.size} streams")
-            
-            if (filteredStreams.isEmpty()) {
-                // Return "Coming Soon" if no streams
-                return newTvSeriesLoadResponse("$title (Yakında)", url, TvType.Live, emptyList()) {
-                    posterUrl = if (isLiveTv) {
-                        "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
-                    } else {
-                        "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
-                    }
-                }
-            }
-            
             // Create episodes for live streams
             val episodes = filteredStreams.map { live ->
                 newEpisode(live.url) { 
                     this.name = live.title
-                    this.posterUrl = live.poster ?: if (isLiveTv) {
-                        "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
-                    } else {
-                        "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
-                    }
+                    this.posterUrl = live.poster
+                    // Add additional metadata for live streams
                     this.description = "Canlı yayın"
                 }
             }
@@ -365,56 +286,46 @@ class TurkTV : MainAPI() {
         channels?.firstOrNull { data.contains(it.baseUrl, ignoreCase = true) }?.let { cfg ->
             val doc = app.get(data).document
 
-            // Build the stream URL step by step to avoid nullable chain issues
-            val source1 = doc.select("video source[src\$='.m3u8'], source[type='application/x-mpegURL']").attr("src")
-            val streamUrl1 = if (source1.isNotBlank()) source1 else ""
-            
-            val streamUrl2 = if (streamUrl1.isBlank()) {
-                doc.select("video source[src\$='.mp4']").attr("src")
-            } else streamUrl1
-            
-            val streamUrl3 = if (streamUrl2.isBlank()) {
-                Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value ?: ""
-            } else streamUrl2
-            
-            val streamUrl4 = if (streamUrl3.isBlank()) {
-                // Try alternative selectors
-                val iframeSrc = doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src")
-                iframeSrc
-            } else streamUrl3
+            var streamUrl: String? = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']")
+                .attr("src")
+                .ifBlank { doc.select("video source[src$='.mp4']").attr("src") }
+                .ifBlank {
+                    Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value
+                }
+                .ifBlank {
+                    // Try alternative selectors
+                    doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src")
+                }
 
-            if (streamUrl4.isNotBlank()) {
-                val finalUrl = full(cfg.baseUrl, streamUrl4) ?: streamUrl4
-                
-                // Ensure finalUrl is not null
-                if (finalUrl != null) {
-                    val linkType = if (finalUrl.endsWith(".m3u8")) {
-                        ExtractorLinkType.M3U8
-                    } else {
-                        ExtractorLinkType.VIDEO
-                    }
-                    
-                    callback(
-                        newExtractorLink(
-                            source = name,
-                            name = "Stream",
-                            url = finalUrl
-                        ) {
-                            this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
-                            this.quality = Qualities.Unknown.value
-                            this.type = linkType
-                            val headers = mutableMapOf(
+            if (!streamUrl.isNullOrBlank()) {
+                val finalUrl = full(cfg.baseUrl, streamUrl) ?: streamUrl
+                val linkType = if (finalUrl.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                val quality = Qualities.Unknown.value
+
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "Stream",
+                        url = finalUrl
+                    ){
+                        this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
+                        this.quality = quality
+                        this.type = linkType
+                        if (cfg.stream.prefer.isNotBlank()) {
+                            this.headers = mapOf(
+                                "Accept" to cfg.stream.prefer,
                                 "User-Agent" to "Mozilla/5.0",
                                 "Referer" to cfg.baseUrl
                             )
-                            if (cfg.stream.prefer.isNotBlank()) {
-                                headers["Accept"] = cfg.stream.prefer
-                            }
-                            this.headers = headers
+                        } else {
+                            this.headers = mapOf(
+                                "User-Agent" to "Mozilla/5.0",
+                                "Referer" to cfg.baseUrl
+                            )
                         }
-                    )
-                    return true
-                }
+                    }
+                )
+                return true
             }
         }
 
