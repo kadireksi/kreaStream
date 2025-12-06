@@ -48,6 +48,7 @@ class TurkTV : MainAPI() {
         val key: String,
         val name: String,
         val baseUrl: String,
+        val active: Boolean,
         val series: SelectorBlock,
         val episodes: SelectorBlock,
         val stream: StreamConfig
@@ -56,6 +57,7 @@ class TurkTV : MainAPI() {
     data class LiveStreamConfig(
         val key: String,
         val title: String,
+        val active: Boolean,
         val poster: String?,
         val url: String,
         val requiresReferer: Boolean = false,
