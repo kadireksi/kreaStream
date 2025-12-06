@@ -12,7 +12,7 @@
     "key": "showtv_live",
     "title": "Show TV",
     "active": true,
-    "poster": "https://www.showtv.com.tr/assets/v4/images/common/logo/svg/show-tv-logo.svg",
+    "poster": "https://images.seeklogo.com/logo-png/12/1/showtv-logo-png_seeklogo-126035.png",
     "url": "https://ciner.daioncdn.net/showtv/showtv.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
@@ -30,7 +30,7 @@
     "key": "now_live",
     "title": "NOW TV",
     "active": true,
-    "poster": "https://tpsbayxekmes.merlincdn.net//img/logos/logo.svg",
+    "poster": "https://logowik.com/content/uploads/images/now-tv-red26275.logowik.com.webp",
     "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
@@ -57,7 +57,7 @@
     "key": "trterzurum_live",
     "title": "TRT Erzurum",
     "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467466.jpeg",
+    "poster": "https://trtkurumsal.trt.net.tr/Uploads/image/png/2022-10-18-17.33.19/56913ba98b384b7da1fa26e862e5cc9c.png",
     "url": "https://radio-trterzurum.medya.trt.com.tr/master_128.m3u8",
     "requiresReferer": false,
     "streamType": "radio"
