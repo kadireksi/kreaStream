@@ -118,7 +118,9 @@ class TurkTV : MainAPI() {
 
     // ------------------- HELPER FUNCTIONS -------------------
     private fun fixUrlNull(url: String?): String? {
-        return if (url.isNullOrBlank() || url == "null") null else fixUrl(url, mainUrl)
+        return if (url.isNullOrBlank() || url == "null") null else {
+            if (url.startsWith("http")) url else fixUrl(url)
+        }
     }
 
     private fun Element.extractPosterData(channel: ChannelConfig, baseUrl: String): PosterData? {
@@ -239,16 +241,14 @@ class TurkTV : MainAPI() {
         // Get actors from configured selector or default
         val actors = channel.seriesDetail.actors?.let { selector ->
             this.select(selector).map {
-                Actor(
-                    it.selectFirst("strong")?.text() ?: it.text().trim(),
-                    fixUrlNull(it.selectFirst("img")?.attr("data-src") ?: it.selectFirst("img")?.attr("src"))
-                )
+                val actorName = it.selectFirst("strong")?.text() ?: it.text().trim()
+                val actorImage = fixUrlNull(it.selectFirst("img")?.attr("data-src") ?: it.selectFirst("img")?.attr("src"))
+                Actor(actorName, actorImage)
             }
         } ?: this.select("div.post-info-cast a, .cast a, .actors a").map {
-            Actor(
-                it.selectFirst("strong")?.text() ?: it.text().trim(),
-                fixUrlNull(it.selectFirst("img")?.attr("data-src") ?: it.selectFirst("img")?.attr("src"))
-            )
+            val actorName = it.selectFirst("strong")?.text() ?: it.text().trim()
+            val actorImage = fixUrlNull(it.selectFirst("img")?.attr("data-src") ?: it.selectFirst("img")?.attr("src"))
+            Actor(actorName, actorImage)
         }
 
         // Get trailer from configured selector or default
@@ -681,9 +681,9 @@ class TurkTV : MainAPI() {
                 this.posterUrl = loadData.poster
                 this.plot = loadData.description ?: "İzlemek için bir bölüm seçin."
                 this.year = loadData.year
-                this.score = loadData.score?.toFloatOrNull()
-                this.tags = loadData.tags?.map { it.trim() }
-                this.actors = loadData.actors?.map { it.trim() }
+                this.rating = loadData.score
+                this.tags = loadData.tags
+                this.actors = loadData.actors
             }
             
         } catch (e: Exception) {
