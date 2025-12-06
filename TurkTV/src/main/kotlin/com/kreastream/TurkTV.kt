@@ -206,6 +206,63 @@ class TurkTV : MainAPI() {
         return newHomePageResponse(lists)
     }
 
+    // ------------------- SEARCH (Series List) -------------------
+    override suspend fun search(query: String): List<SearchResponse> {
+        Log.d("TurkTV", "=== search() called with query: $query ===")
+        ensureLoaded()
+        
+        if (query.isEmpty()) return emptyList()
+        
+        val results = mutableListOf<SearchResponse>()
+        
+        channels?.forEach { channel ->
+            try {
+                Log.d("TurkTV", "Searching on ${channel.name} (${channel.baseUrl})")
+                
+                // Get the series page URL
+                val seriesUrl = channel.series.url ?: "${channel.baseUrl}/diziler"
+                Log.d("TurkTV", "Fetching series from: $seriesUrl")
+                
+                val doc = app.get(seriesUrl).document
+                
+                // Extract series using the configured selectors
+                val seriesElements = doc.select(channel.series.container)
+                Log.d("TurkTV", "Found ${seriesElements.size} series elements on ${channel.name}")
+                
+                seriesElements.forEach { element ->
+                    val titleElement = element.selectFirst(channel.series.title)
+                    val linkElement = element.selectFirst(channel.series.link)
+                    val posterElement = element.selectFirst(channel.series.poster ?: "img")
+                    
+                    if (titleElement != null && linkElement != null) {
+                        val title = titleElement.text().trim()
+                        var href = linkElement.attr("href")
+                        val poster = posterElement?.attr("src")
+                        
+                        // Check if the series title matches the query (case-insensitive)
+                        if (title.contains(query, ignoreCase = true)) {
+                            // Make URL absolute if needed
+                            if (!href.startsWith("http")) {
+                                href = full(channel.baseUrl, href) ?: href
+                            }
+                            
+                            Log.d("TurkTV", "Found series: $title -> $href")
+                            
+                            results.add(newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                                this.posterUrl = poster
+                            })
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("TurkTV", "Error searching on ${channel.name}: ${e.message}", e)
+            }
+        }
+        
+        Log.d("TurkTV", "Search returned ${results.size} results")
+        return results
+    }
+
     // ------------------- LOAD (Series Page) -------------------
     override suspend fun load(url: String): LoadResponse {
         Log.d("TurkTV", "=== load() called with URL: $url ===")
@@ -275,10 +332,92 @@ class TurkTV : MainAPI() {
             }
         }
 
-        // 2. Original Series Logic
-        return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {
-            this.plot = "Bu kanal yapılandırılmamış"
-            this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
+        // 2. Find which channel this series belongs to
+        val channel = channels?.find { url.contains(it.baseUrl) }
+        if (channel == null) {
+            Log.e("TurkTV", "No channel found for URL: $url")
+            return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {
+                this.plot = "Bu kanal yapılandırılmamış"
+                this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
+            }
+        }
+        
+        Log.d("TurkTV", "Found channel: ${channel.name} for URL: $url")
+        
+        try {
+            // 3. Fetch the series page
+            val doc = app.get(url).document
+            
+            // Extract series title and poster
+            val title = doc.select("h1, h2, .title, .series-title").firstOrNull()?.text()?.trim()
+                ?: url.substringAfterLast("/").replace("-", " ").replace("/", " ").trim().uppercase()
+            
+            val poster = doc.select("img[src*='295x410'], img[src*='295x123'], .poster img, picture img").firstOrNull()?.attr("src")
+            
+            Log.d("TurkTV", "Series title: $title, poster: $poster")
+            
+            // 4. Get episodes page URL
+            val seriesPath = url.removePrefix(channel.baseUrl).trim('/')
+            val episodesUrl = "${channel.baseUrl}/$seriesPath/bolumler"
+            Log.d("TurkTV", "Fetching episodes from: $episodesUrl")
+            
+            val episodesDoc = app.get(episodesUrl).document
+            
+            // 5. Extract episodes using the configured selectors
+            val episodes = mutableListOf<Episode>()
+            
+            // Try to find episodes from select dropdown
+            val episodeSelect = episodesDoc.select(channel.episodes.container)
+            Log.d("TurkTV", "Found episode select container: ${episodeSelect.size}")
+            
+            episodeSelect.select("option").forEach { option ->
+                val value = option.attr("value")
+                val text = option.text().trim()
+                
+                if (value.isNotBlank() && value != "bolum" && text.isNotBlank() && text != "Bölüm Seçiniz") {
+                    // Create full episode URL
+                    var episodeUrl = value
+                    if (!episodeUrl.startsWith("http")) {
+                        episodeUrl = full(channel.baseUrl, episodeUrl) ?: episodeUrl
+                    }
+                    
+                    Log.d("TurkTV", "Found episode: $text -> $episodeUrl")
+                    
+                    // Extract episode number from text
+                    val episodeNum = text.filter { it.isDigit() }.toIntOrNull() ?: 1
+                    
+                    episodes.add(
+                        newEpisode(episodeUrl) {
+                            this.name = text
+                            this.episode = episodeNum
+                            this.season = 1 // Default season
+                            this.posterUrl = poster
+                        }
+                    )
+                }
+            }
+            
+            Log.d("TurkTV", "Total episodes found: ${episodes.size}")
+            
+            // Sort episodes by episode number (descending - newest first)
+            val sortedEpisodes = episodes.sortedByDescending { it.episode }
+            
+            return newTvSeriesLoadResponse(
+                name = title,
+                url = url,
+                type = TvType.TvSeries,
+                episodes = sortedEpisodes
+            ) {
+                this.posterUrl = poster
+                this.plot = "İzlemek için bir bölüm seçin."
+            }
+            
+        } catch (e: Exception) {
+            Log.e("TurkTV", "Error loading series: ${e.message}", e)
+            return newTvSeriesLoadResponse("Hata", url, TvType.TvSeries, emptyList()) {
+                this.plot = "Seri yüklenirken hata oluştu: ${e.message}"
+                this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
+            }
         }
     }
 
@@ -341,6 +480,84 @@ class TurkTV : MainAPI() {
             )
             Log.d("TurkTV", "loadLinks returning true for individual stream")
             return true
+        }
+
+        // Check if this is a series episode
+        val channel = channels?.find { data.contains(it.baseUrl) }
+        if (channel != null) {
+            Log.d("TurkTV", "Found channel ${channel.name} for episode URL: $data")
+            
+            try {
+                // Fetch the episode page
+                val doc = app.get(data).document
+                
+                // Try to find the video source
+                // Look for video tags, iframe, or script containing m3u8
+                val videoSources = mutableListOf<String>()
+                
+                // Check video tags
+                doc.select("video source").forEach { source ->
+                    val src = source.attr("src")
+                    if (src.isNotBlank() && (src.contains(".m3u8") || src.contains(".mp4"))) {
+                        videoSources.add(src)
+                    }
+                }
+                
+                // Check iframe
+                doc.select("iframe").forEach { iframe ->
+                    val src = iframe.attr("src")
+                    if (src.isNotBlank() && src.contains("youtube") || src.contains("vimeo")) {
+                        videoSources.add(src)
+                    }
+                }
+                
+                // Look for m3u8 in script tags
+                doc.select("script").forEach { script ->
+                    val content = script.html()
+                    val m3u8Match = Regex("(https?://[^\"' ]+\\.m3u8[^\"' ]*)").find(content)
+                    m3u8Match?.let {
+                        videoSources.add(it.value)
+                    }
+                }
+                
+                if (videoSources.isNotEmpty()) {
+                    Log.d("TurkTV", "Found video sources: ${videoSources.size}")
+                    
+                    videoSources.forEachIndexed { index, videoUrl ->
+                        val linkType = if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        
+                        val headers = mutableMapOf(
+                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                            "Accept" to "*/*"
+                        )
+                        
+                        if (channel.stream.referer) {
+                            headers["Origin"] = channel.baseUrl
+                            headers["Referer"] = channel.baseUrl + "/"
+                        }
+                        
+                        callback(
+                            newExtractorLink(
+                                source = name,
+                                name = "${channel.name} Video ${index + 1}",
+                                url = videoUrl
+                            ){
+                                this.referer = if (channel.stream.referer) channel.baseUrl else ""
+                                this.quality = Qualities.Unknown.value
+                                this.type = linkType
+                                this.headers = headers
+                            }
+                        )
+                    }
+                    
+                    Log.d("TurkTV", "loadLinks returning true for series episode")
+                    return true
+                } else {
+                    Log.w("TurkTV", "No video sources found on episode page")
+                }
+            } catch (e: Exception) {
+                Log.e("TurkTV", "Error loading episode links: ${e.message}", e)
+            }
         }
 
         Log.d("TurkTV", "No match found, returning false")
