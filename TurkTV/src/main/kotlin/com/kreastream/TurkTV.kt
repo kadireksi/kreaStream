@@ -299,33 +299,35 @@ class TurkTV : MainAPI() {
 
             if (!streamUrl.isNullOrBlank()) {
                 val finalUrl = full(cfg.baseUrl, streamUrl) ?: streamUrl
-                val linkType = if (finalUrl.endsWith(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                val linkType = if (finalUrl?.endsWith(".m3u8") == true) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 val quality = Qualities.Unknown.value
 
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "Stream",
-                        url = finalUrl
-                    ){
-                        this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
-                        this.quality = quality
-                        this.type = linkType
-                        if (cfg.stream.prefer.isNotBlank()) {
-                            this.headers = mapOf(
-                                "Accept" to cfg.stream.prefer,
-                                "User-Agent" to "Mozilla/5.0",
-                                "Referer" to cfg.baseUrl
-                            )
-                        } else {
-                            this.headers = mapOf(
-                                "User-Agent" to "Mozilla/5.0",
-                                "Referer" to cfg.baseUrl
-                            )
+                if (finalUrl != null) {
+                    callback(
+                        newExtractorLink(
+                            source = name,
+                            name = "Stream",
+                            url = finalUrl
+                        ){
+                            this.referer = if (cfg.stream.referer) cfg.baseUrl else mainUrl
+                            this.quality = quality
+                            this.type = linkType
+                            if (cfg.stream.prefer.isNotBlank()) {
+                                this.headers = mapOf(
+                                    "Accept" to cfg.stream.prefer,
+                                    "User-Agent" to "Mozilla/5.0",
+                                    "Referer" to cfg.baseUrl
+                                )
+                            } else {
+                                this.headers = mapOf(
+                                    "User-Agent" to "Mozilla/5.0",
+                                    "Referer" to cfg.baseUrl
+                                )
+                            }
                         }
-                    }
-                )
-                return true
+                    )
+                    return true
+                }
             }
         }
 
