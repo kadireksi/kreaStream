@@ -11,7 +11,7 @@ import android.util.Log // Retained explicit Android Log import
 class TurkTV : MainAPI() {
 
     override var name = "Türk TV"
-    override var mainUrl = "https://www.atv.com.tr"
+    override var mainUrl = "https://turktv.local"
     override var lang = "tr"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live)
@@ -633,7 +633,7 @@ class TurkTV : MainAPI() {
             Log.d("TurkTV", "Found episode containers: ${episodeContainers.size}")
             
             if (episodeContainers.isNotEmpty()) {
-                // Method 1: Select dropdown (ATV style)
+               
                 episodeContainers.select("option").forEach { option ->
                     val value = option.attr("value")
                     val text = option.text().trim()
@@ -851,11 +851,6 @@ class TurkTV : MainAPI() {
                         if (channel.stream.referer) {
                             headers["Origin"] = channel.baseUrl
                             headers["Referer"] = channel.baseUrl + "/"
-                        }
-                        
-                        // Add specific headers for certain domains
-                        if (videoUrl.contains("atv.com.tr")) {
-                            headers["Referer"] = "https://www.atv.com.tr/"
                         }
                         
                         val sourceName = if (videoSources.size == 1) {
