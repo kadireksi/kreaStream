@@ -3,21 +3,24 @@
     "key": "atv",
     "name": "ATV",
     "baseUrl": "https://www.atv.com.tr",
+    "active": true,
     "series": {
-      "url": "https://www.atv.com.tr/diziler",
-      "container": ".series-list a.series-card",
-      "title": ".series-title, h3",
+      "container": ".category-classic-item",
+      "title": ".title",
       "link": "a",
+      "url": "https://www.atv.com.tr/diziler",
       "poster": "img"
     },
     "episodes": {
-      "container": ".episode-list .episode-item, .episodes a",
-      "title": ".episode-title, .title",
-      "link": "a"
+      "container": "#videoepisodecomobox",
+      "title": "option",
+      "link": "option",
+      "url": null,
+      "poster": null
     },
     "stream": {
       "type": "m3u8",
-      "prefer": "m3u8",
+      "prefer": "hls",
       "referer": true
     }
   },
@@ -25,6 +28,7 @@
     "key": "startv",
     "name": "Star TV",
     "baseUrl": "https://www.startv.com.tr",
+    "active": true,
     "series": {
       "url": "https://www.startv.com.tr/diziler",
       "container": ".series-grid .series-item a",
@@ -47,6 +51,7 @@
     "key": "showtv",
     "name": "Show TV",
     "baseUrl": "https://www.showtv.com.tr",
+    "active": true,
     "series": {
       "url": "https://www.showtv.com.tr/diziler",
       "container": ".dizi-list .dizi-item a",
@@ -69,6 +74,7 @@
     "key": "nowtv",
     "name": "NOW (FOX)",
     "baseUrl": "https://www.nowtv.com.tr",
+    "active": true,
     "series": {
       "url": "https://www.nowtv.com.tr/diziler",
       "container": ".series-list .series-card a",
@@ -91,6 +97,7 @@
     "key": "kanald",
     "name": "Kanal D",
     "baseUrl": "https://www.kanald.com.tr",
+    "active": true,
     "series": {
       "url": "https://www.kanald.com.tr/diziler",
       "container": ".series-list .series a",
@@ -113,8 +120,9 @@
     "key": "trt1",
     "name": "TRT 1",
     "baseUrl": "https://www.trt1.com.tr",
+    "active": true,
     "series": {
-      "url": "https://www.trt1.com.tr/diziler?archive=false&order=title_asc",
+      "url": "https://www.trt1.com.tr/archive=false&order=title_asc",
       "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
       "title": "div.card_card-title__IJ9af",
       "link": "a",
