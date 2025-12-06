@@ -30,10 +30,10 @@ class TurkTV : MainAPI() {
 
     // ------------------- DATA CLASSES -------------------
     data class SelectorBlock(
-        val url: String,
         val container: String,
         val title: String,
         val link: String,
+        val url: String? = null,  // Made nullable
         val poster: String? = null
     )
 
@@ -47,7 +47,7 @@ class TurkTV : MainAPI() {
         val key: String,
         val name: String,
         val baseUrl: String,
-        val active: Boolean,
+        val active: Boolean = true,  // Default to true
         val series: SelectorBlock,
         val episodes: SelectorBlock,
         val stream: StreamConfig
@@ -56,77 +56,75 @@ class TurkTV : MainAPI() {
     data class LiveStreamConfig(
         val key: String,
         val title: String,
-        val active: Boolean,
+        val active: Boolean = true,  // Default to true
         val poster: String?,
         val url: String,
         val requiresReferer: Boolean = false,
         val streamType: String = "tv"
     )
 
-    // ------------------- JSON LOADING WITH PROPER ERROR HANDLING -------------------
+    // ------------------- JSON LOADING -------------------
     private suspend fun ensureLoaded() {
         Log.d("TurkTV", "=== ensureLoaded() called ===")
         
         if (channels == null) {
             channels = try {
-                Log.d("TurkTV", "Attempting to load channels.json from: $channelsJsonUrl")
+                Log.d("TurkTV", "Loading channels.json...")
                 val responseText = app.get(channelsJsonUrl).text
                 Log.d("TurkTV", "Response length: ${responseText.length}")
                 
-                if (responseText.length < 10) {
-                    Log.e("TurkTV", "Response too short - might be empty or error page")
+                if (responseText.isBlank()) {
+                    Log.e("TurkTV", "Empty response")
                     emptyList()
                 } else {
-                    Log.d("TurkTV", "First 200 chars of response: ${responseText.take(200)}")
-                    
+                    // Try to parse JSON
                     val parsed = parseJson<List<ChannelConfig>>(responseText)
-                    Log.d("TurkTV", "Parsed ${parsed?.size ?: 0} channels")
+                    Log.d("TurkTV", "Successfully parsed ${parsed?.size ?: 0} channels")
                     
-                    // Filter active channels
+                    // Filter and log
                     val activeChannels = parsed?.filter { it.active } ?: emptyList()
-                    Log.d("TurkTV", "Active channels: ${activeChannels.size}")
+                    activeChannels.forEachIndexed { i, ch ->
+                        Log.d("TurkTV", "Active channel $i: ${ch.name} (${ch.key})")
+                    }
                     
                     activeChannels
                 }
             } catch (e: Exception) {
-                Log.e("TurkTV", "EXCEPTION loading channels.json: ${e.message}", e)
+                Log.e("TurkTV", "Error loading channels: ${e.message}", e)
                 emptyList()
             }
         }
         
         if (streams == null) {
             streams = try {
-                Log.d("TurkTV", "Attempting to load streams.json from: $streamsJsonUrl")
+                Log.d("TurkTV", "Loading streams.json...")
                 val responseText = app.get(streamsJsonUrl).text
                 Log.d("TurkTV", "Response length: ${responseText.length}")
                 
-                if (responseText.length < 10) {
-                    Log.e("TurkTV", "Response too short - might be empty or error page")
+                if (responseText.isBlank()) {
+                    Log.e("TurkTV", "Empty response")
                     emptyList()
                 } else {
-                    Log.d("TurkTV", "First 200 chars of response: ${responseText.take(200)}")
-                    
+                    // Try to parse JSON
                     val parsed = parseJson<List<LiveStreamConfig>>(responseText)
-                    Log.d("TurkTV", "Parsed ${parsed?.size ?: 0} streams")
+                    Log.d("TurkTV", "Successfully parsed ${parsed?.size ?: 0} streams")
                     
-                    // Filter active streams
+                    // Filter and log
                     val activeStreams = parsed?.filter { it.active } ?: emptyList()
-                    Log.d("TurkTV", "Active streams: ${activeStreams.size}")
-                    
-                    activeStreams.forEachIndexed { i, stream ->
-                        Log.d("TurkTV", "Stream $i: ${stream.title} (type: ${stream.streamType})")
+                    activeStreams.forEachIndexed { i, st ->
+                        Log.d("TurkTV", "Active stream $i: ${st.title} (${st.streamType})")
                     }
                     
                     activeStreams
                 }
             } catch (e: Exception) {
-                Log.e("TurkTV", "EXCEPTION loading streams.json: ${e.message}", e)
+                Log.e("TurkTV", "Error loading streams: ${e.message}", e)
                 emptyList()
             }
         }
         
         Log.d("TurkTV", "=== ensureLoaded() completed ===")
-        Log.d("TurkTV", "Channels: ${channels?.size ?: 0}, Streams: ${streams?.size ?: 0}")
+        Log.d("TurkTV", "Active channels: ${channels?.size ?: 0}, Active streams: ${streams?.size ?: 0}")
     }
 
     // ------------------- MAIN PAGE -------------------
@@ -140,22 +138,28 @@ class TurkTV : MainAPI() {
         val liveItems = mutableListOf<SearchResponse>()
         
         // Live TV Item
-        liveItems += newMovieSearchResponse(
-            "📺 Canlı TV", 
+        val tvStreams = streams?.filter { it.streamType == "tv" } ?: emptyList()
+        val tvItem = newMovieSearchResponse(
+            "📺 Canlı TV (${tvStreams.size} kanal)", 
             liveTvHubUrl, 
             TvType.Live
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
         }
+        liveItems += tvItem
+        Log.d("TurkTV", "TV item shows ${tvStreams.size} channels")
 
         // Live Radio Item
-        liveItems += newMovieSearchResponse(
-            "📻 Radyo", 
+        val radioStreams = streams?.filter { it.streamType == "radio" } ?: emptyList()
+        val radioItem = newMovieSearchResponse(
+            "📻 Radyo (${radioStreams.size} kanal)", 
             liveRadioHubUrl, 
             TvType.Live
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
         }
+        liveItems += radioItem
+        Log.d("TurkTV", "Radio item shows ${radioStreams.size} channels")
         
         lists += HomePageList("🎬 Canlı Yayınlar", liveItems, true)
         
@@ -164,7 +168,7 @@ class TurkTV : MainAPI() {
             Log.d("TurkTV", "Processing ${channels!!.size} channels")
             channels!!.forEach { cfg ->
                 lists += HomePageList("📺 ${cfg.name} Diziler", listOf(
-                    newTvSeriesSearchResponse("${cfg.name} Dizileri", "${cfg.baseUrl}/diziler", TvType.TvSeries) {
+                    newTvSeriesSearchResponse("${cfg.name} Dizileri", cfg.series.url ?: "${cfg.baseUrl}/diziler", TvType.TvSeries) {
                         this.posterUrl = when (cfg.key) {
                             "atv" -> "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png"
                             "showtv" -> "https://www.showtv.com.tr/assets/v4/images/common/logo/svg/show-tv-logo.svg"
@@ -201,13 +205,13 @@ class TurkTV : MainAPI() {
             Log.d("TurkTV", "TV streams found: ${tvStreams.size}")
             
             return newMovieLoadResponse(
-                name = "📺 Canlı TV Kanalları",
+                name = "📺 Canlı TV Kanalları (${tvStreams.size} kanal)",
                 url = url,
                 type = TvType.Live,
                 data = url
             ) {
                 posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
-                this.plot = "Türk TV kanallarının canlı yayınları. ${tvStreams.size} kanal bulundu."
+                this.plot = "Türk TV kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sağ/sol ok tuşlarını kullanın."
             }
         }
         
@@ -219,13 +223,13 @@ class TurkTV : MainAPI() {
             Log.d("TurkTV", "Radio streams found: ${radioStreams.size}")
             
             return newMovieLoadResponse(
-                name = "📻 Radyo Kanalları",
+                name = "📻 Radyo Kanalları (${radioStreams.size} kanal)",
                 url = url,
                 type = TvType.Live,
                 data = url
             ) {
                 posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
-                this.plot = "Türk radyo kanallarının canlı yayınları. ${radioStreams.size} kanal bulundu."
+                this.plot = "Türk radyo kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sağ/sol ok tuşlarını kullanın."
             }
         }
 
