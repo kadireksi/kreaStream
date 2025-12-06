@@ -2,22 +2,25 @@
   {
     "key": "atv_live",
     "title": "ATV",
+    "active": true,
     "poster": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
-    "url": "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=CapDjfW8Jghn5iL3qb8o8A&e=1765001592&ppid=21d804be91b8e91f11bb3789ff83f0b4",
+    "url": "https://trkvz.daioncdn.net/atv/atv.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
   },
    {
     "key": "showtv_live",
     "title": "Show TV",
+    "active": true,
     "poster": "https://www.showtv.com.tr/assets/v4/images/common/logo/svg/show-tv-logo.svg",
-    "url": "https://ciner.daioncdn.net/showtv/showtv.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558&st=RBzhSuGauna0OGld-DJUVA&e=1664766175&tv=1&ppid=8582634a455f4cf72d132c75dc389bdb",
+    "url": "https://ciner.daioncdn.net/showtv/showtv.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
   },
    {
     "key": "kanald_live",
     "title": "Kanal D",
+    "active": true,
     "poster": "https://static.kanald.com.tr/images/kanald-logo.svg",
     "url": "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web",
     "requiresReferer": true,
@@ -26,14 +29,16 @@
   {
     "key": "now_live",
     "title": "NOW TV",
+    "active": true,
     "poster": "https://tpsbayxekmes.merlincdn.net//img/logos/logo.svg",
-    "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=mMWRs0hS0BHtE4AcOu4gmQ&e=1764979672",
+    "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
   },
   {
     "key": "trtfm_live",
     "title": "TRT FM",
+    "active": true,
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467418.jpeg",
     "url": "https://trt.radyotvonline.net/trt_fm.aac",
     "requiresReferer": false,
