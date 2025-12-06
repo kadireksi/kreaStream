@@ -21,8 +21,13 @@ class TurkTV : MainAPI() {
     private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
     private val streamsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
 
-    private var channels: List<ChannelConfig>? = null
-    private var streams: List<LiveStreamConfig>? = null
+    // Remove the 'private' modifier so we can reset them
+    var channels: List<ChannelConfig>? = null
+    var streams: List<LiveStreamConfig>? = null
+
+    // Add a timestamp to force refresh
+    private var lastRefreshTime: Long = 0
+    private val refreshInterval = 5 * 60 * 1000 // 5 minutes in milliseconds
 
     // Synthetic URLs for TV and Radio Hubs
     private val liveTvHubUrl = "https://turktv.local/live/tv"
@@ -63,14 +68,26 @@ class TurkTV : MainAPI() {
         val streamType: String = "tv"
     )
 
-    // ------------------- JSON LOADING -------------------
-    private suspend fun ensureLoaded() {
-        Log.d("TurkTV", "=== ensureLoaded() called ===")
+    // ------------------- JSON LOADING WITH REFRESH -------------------
+    private suspend fun ensureLoaded(forceRefresh: Boolean = false) {
+        Log.d("TurkTV", "=== ensureLoaded() called, forceRefresh: $forceRefresh ===")
+        
+        val currentTime = System.currentTimeMillis()
+        val shouldRefresh = forceRefresh || 
+                           (lastRefreshTime == 0L) || 
+                           (currentTime - lastRefreshTime > refreshInterval)
+        
+        if (shouldRefresh) {
+            Log.d("TurkTV", "Forcing refresh of JSON data")
+            channels = null
+            streams = null
+            lastRefreshTime = currentTime
+        }
         
         if (channels == null) {
             channels = try {
                 Log.d("TurkTV", "Loading channels.json...")
-                val responseText = app.get(channelsJsonUrl).text
+                val responseText = app.get(channelsJsonUrl).document.text()
                 Log.d("TurkTV", "Response length: ${responseText.length}")
                 
                 if (responseText.isBlank()) {
@@ -96,7 +113,7 @@ class TurkTV : MainAPI() {
         if (streams == null) {
             streams = try {
                 Log.d("TurkTV", "Loading streams.json...")
-                val responseText = app.get(streamsJsonUrl).text
+                val responseText = app.get(streamsJsonUrl).document.text()
                 Log.d("TurkTV", "Response length: ${responseText.length}")
                 
                 if (responseText.isBlank()) {
@@ -108,7 +125,7 @@ class TurkTV : MainAPI() {
                     
                     val activeStreams = parsed?.filter { it.active } ?: emptyList()
                     activeStreams.forEachIndexed { i, st ->
-                        Log.d("TurkTV", "Active stream $i: ${st.title} (${st.streamType})")
+                        Log.d("TurkTV", "Active stream $i: ${st.title} (${st.streamType}) - URL: ${st.url.take(50)}...")
                     }
                     
                     activeStreams
@@ -123,33 +140,36 @@ class TurkTV : MainAPI() {
         Log.d("TurkTV", "Active channels: ${channels?.size ?: 0}, Active streams: ${streams?.size ?: 0}")
     }
 
-    // ------------------- MAIN PAGE -------------------
+    // ------------------- MAIN PAGE WITH FORCE REFRESH -------------------
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        Log.d("TurkTV", "=== getMainPage() called ===")
-        ensureLoaded()
+        Log.d("TurkTV", "=== getMainPage() called - page: $page ===")
+        
+        // Force refresh on first page load (when user opens the plugin)
+        val forceRefresh = page == 1
+        ensureLoaded(forceRefresh)
 
         val lists = mutableListOf<HomePageList>()
         
         // --- 1. LIVE STREAMS SECTION ---
         val liveItems = mutableListOf<SearchResponse>()
         
-        // Live TV Item - Use TvType.TvSeries (not TvType.Live) to show as episodes
+        // Live TV Item
         val tvStreams = streams?.filter { it.streamType == "tv" } ?: emptyList()
         liveItems += newTvSeriesSearchResponse(
-            "📺 Canlı TV (${tvStreams.size} kanal)", 
+            "📺 Canlı TV (${tvStreams.size})", 
             liveTvHubUrl, 
-            TvType.TvSeries  // Changed to TvSeries to show episodes
+            TvType.TvSeries
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
         }
         Log.d("TurkTV", "TV item shows ${tvStreams.size} channels")
 
-        // Live Radio Item - Use TvType.TvSeries (not TvType.Live) to show as episodes
+        // Live Radio Item
         val radioStreams = streams?.filter { it.streamType == "radio" } ?: emptyList()
         liveItems += newTvSeriesSearchResponse(
-            "📻 Radyo (${radioStreams.size} kanal)", 
+            "📻 Radyo (${radioStreams.size})", 
             liveRadioHubUrl, 
-            TvType.TvSeries  // Changed to TvSeries to show episodes
+            TvType.TvSeries
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
         }
@@ -198,7 +218,7 @@ class TurkTV : MainAPI() {
             val tvStreams = streams?.filter { it.streamType == "tv" } ?: emptyList()
             Log.d("TurkTV", "TV streams found: ${tvStreams.size}")
             
-            // Create episodes for each TV channel (like Trt.kt does)
+            // Create episodes for each TV channel
             val episodes = tvStreams.mapIndexed { index, stream ->
                 newEpisode(stream.url) {
                     this.name = stream.title
@@ -210,13 +230,16 @@ class TurkTV : MainAPI() {
             }
 
             return newTvSeriesLoadResponse(
-                name = "📺 Canlı TV Kanalları",
+                name = "📺 Canlı TV Kanalları (${tvStreams.size})",
                 url = url,
-                type = TvType.TvSeries,  // Use TvSeries to show episodes
+                type = TvType.TvSeries,
                 episodes = episodes
             ) {
                 posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
-                this.plot = "Türk TV kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
+                this.plot = "Türk TV kanallarının canlı yayınları.\n\n" +
+                           "• Kanallar arasında geçiş yapmak için sonraki/önceki bölüm butonlarını kullanın\n" +
+                           "• Her kanal otomatik olarak sonraki kanala geçiş yapabilir\n" +
+                           "• ${tvStreams.size} kanal bulunmaktadır"
             }
         }
         
@@ -226,7 +249,7 @@ class TurkTV : MainAPI() {
             val radioStreams = streams?.filter { it.streamType == "radio" } ?: emptyList()
             Log.d("TurkTV", "Radio streams found: ${radioStreams.size}")
             
-            // Create episodes for each Radio channel (like Trt.kt does)
+            // Create episodes for each Radio channel
             val episodes = radioStreams.mapIndexed { index, stream ->
                 newEpisode(stream.url) {
                     this.name = stream.title
@@ -238,13 +261,17 @@ class TurkTV : MainAPI() {
             }
 
             return newTvSeriesLoadResponse(
-                name = "📻 Radyo Kanalları",
+                name = "📻 Radyo Kanalları (${radioStreams.size})",
                 url = url,
-                type = TvType.TvSeries,  // Use TvSeries to show episodes
+                type = TvType.TvSeries,
                 episodes = episodes
             ) {
                 posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
-                this.plot = "Türk radyo kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
+                this.plot = "Türk radyo kanallarının canlı yayınları.\n\n" +
+                           "• Kanallar arasında geçiş yapmak için sonraki/önceki bölüm butonlarını kullanın\n" +
+                           "• Her kanal otomatik olarak sonraki kanala geçiş yapabilir\n" +
+                           "• ${radioStreams.size} kanal bulunmaktadır\n" +
+                           "• Bu kanallar sadece ses içermektedir"
             }
         }
 
@@ -268,12 +295,36 @@ class TurkTV : MainAPI() {
         // Individual live streams (when an episode is clicked)
         streams?.firstOrNull { it.url == data }?.let { live ->
             Log.d("TurkTV", "Found individual live stream: ${live.title}")
+            Log.d("TurkTV", "Stream URL: ${live.url}")
             
             // Determine the correct link type
             val linkType = when {
                 live.url.contains(".m3u8") -> ExtractorLinkType.M3U8
-                live.url.contains(".aac") -> ExtractorLinkType.VIDEO
+                live.url.contains(".aac") || live.url.contains(".mp3") || live.streamType == "radio" -> {
+                    Log.d("TurkTV", "Detected audio stream, using MEDIA type")
+                    ExtractorLinkType.MEDIA
+                }
                 else -> ExtractorLinkType.VIDEO
+            }
+            
+            Log.d("TurkTV", "Using link type: $linkType")
+            
+            // Create appropriate headers based on stream type
+            val headers = mutableMapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept" to "*/*"
+            )
+            
+            // Add referer only if required
+            if (live.requiresReferer) {
+                headers["Origin"] = mainUrl
+                headers["Referer"] = mainUrl + "/"
+            }
+            
+            // For AAC streams, we might need different headers
+            if (live.url.contains(".aac")) {
+                headers["Accept"] = "audio/*"
+                headers["Accept-Encoding"] = "identity"
             }
             
             callback(
@@ -285,13 +336,7 @@ class TurkTV : MainAPI() {
                     this.referer = if (live.requiresReferer) mainUrl else ""
                     this.quality = Qualities.Unknown.value
                     this.type = linkType
-                    this.headers = mapOf(
-                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        "Accept" to "*/*",
-                        "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-                        "Origin" to mainUrl,
-                        "Referer" to mainUrl + "/"
-                    )
+                    this.headers = headers
                 }
             )
             Log.d("TurkTV", "loadLinks returning true for individual stream")
