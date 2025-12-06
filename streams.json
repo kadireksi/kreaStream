@@ -45,6 +45,150 @@
     "streamType": "tv"
   },
   {
+    "key": "trtturk",
+    "title": "TRT Türk",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtturk.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trthaber",
+    "title": "TRT Haber",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trthaber.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtcocuk",
+    "title": "TRT Çocuk",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtmuzik",
+    "title": "TRT Müzik",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtmuzik.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trt1",
+    "title": "TRT 1",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trt1.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtspor1",
+    "title": "TRT Spor 1",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtspor1.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtdiyanetcocuk",
+    "title": "TRT Diyanet Çocuk",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtdiyanetcocuk.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtavaz",
+    "title": "TRT Avaz",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtavaz.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtarabi",
+    "title": "TRT Arabi",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtarabi.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtworld",
+    "title": "TRT World",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtworld.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtkurdi",
+    "title": "TRT Kurdi",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtkurdi.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trt2",
+    "title": "TRT 2",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trt2.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtbelgesel",
+    "title": "TRT Belgesel",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trt-1-alt",
+    "title": "TRT 1 (24 saat)",
+    "active": true,
+    "poster": "",
+    "url": "https://trt.daioncdn.net/trt-1/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtspor-yildiz",
+    "title": "TRT Spor Yıldız",
+    "active": true,
+    "poster": "",
+    "url": "https://trt.daioncdn.net/trtspor-yildiz/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
+    "key": "trtspor2",
+    "title": "TRT Spor 2",
+    "active": true,
+    "poster": "",
+    "url": "https://tv-trtspor2.medya.trt.com.tr/master.m3u8",
+    "requiresReferer": false,
+    "streamType": "tv"
+  },
+  {
     "key": "trt-fm",
     "title": "TRT FM",
     "active": true,
