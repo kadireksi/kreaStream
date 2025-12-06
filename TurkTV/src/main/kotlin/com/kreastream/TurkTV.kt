@@ -107,7 +107,7 @@ class TurkTV : MainAPI() {
             liveChannelsUrl, 
             TvType.Live  // Changed from TvSeries to Live
         ).apply {
-            posterUrl = "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+            posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
         }
 
         // Live Radio Item
@@ -116,7 +116,7 @@ class TurkTV : MainAPI() {
             radioChannelsUrl, 
             TvType.Live  // Changed from TvSeries to Live
         ).apply {
-            posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+            posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
         }
         
         lists += HomePageList("Canlı Yayınlar", liveItems)
