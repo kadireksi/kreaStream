@@ -625,7 +625,7 @@ class TurkTV : MainAPI() {
             
             val episodesDoc = app.get(episodesUrl).document
             
-            // 6. Extract episodes using the configured selectors
+                        // 6. Extract episodes using the configured selectors
             val episodes = mutableListOf<Episode>()
             
             // Try to find episodes from select dropdown or list
@@ -633,8 +633,10 @@ class TurkTV : MainAPI() {
             Log.d("TurkTV", "Found episode containers: ${episodeContainers.size}")
             
             if (episodeContainers.isNotEmpty()) {
-               
-                episodeContainers.select("option").forEach { option ->
+                // Fix for ATV: Iterate directly over episodeContainers, as the selector
+                // already targets the option elements. The previous .select("option") call 
+                // here was redundant and causing the failure.
+                episodeContainers.forEach { option ->
                     val value = option.attr("value")
                     val text = option.text().trim()
                     
