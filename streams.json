@@ -58,7 +58,7 @@
     "title": "TRT Erzurum",
     "active": true,
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467466.jpeg",
-    "url": "https://rd-trterzurum.medya.trt.com.tr/master_128.m3u8",
+    "url": "https://radio-trterzurum.medya.trt.com.tr/master_128.m3u8",
     "requiresReferer": false,
     "streamType": "radio"
    }
