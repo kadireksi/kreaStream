@@ -206,6 +206,24 @@
     "requiresReferer": false,
     "streamType": "radio"
   },
+   {
+    "key": "kral-fm",
+    "title": "Kral FM",
+    "active": true,
+    "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/17/kralfm.png",
+    "url": "https://dygedge2.radyotvonline.net/kralfm/playlist.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+   {
+    "key": "kral-pop",
+    "title": "Kral Pop",
+    "active": true,
+    "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/20/kralpop.png",
+    "url": "https://dygedge.radyotvonline.net/kralpop/playlist.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
   {
     "key": "trt-radyo-1",
     "title": "TRT Radyo 1",
