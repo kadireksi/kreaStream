@@ -5,7 +5,7 @@
     "baseUrl": "https://www.atv.com.tr",
     "active": true,
     "seriesPageActive": "/diziler",
-    "seriesPageArchive": null,
+    "seriesPageArchive": "/eski-diziler",
     "seriesList": {
       "container": ".category-classic-item.type-02",
       "title": "h3.title",
