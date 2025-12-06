@@ -8,20 +8,20 @@
     "requiresReferer": true,
     "streamType": "tv"
   },
-   {
+  {
     "key": "showtv_live",
     "title": "Show TV",
     "active": true,
-    "poster": "https://images.seeklogo.com/logo-png/12/1/showtv-logo-png_seeklogo-126035.png",
+    "poster": "https://www.showtv.com.tr/assets/v4/images/common/logo/svg/show-tv-logo.svg",
     "url": "https://ciner.daioncdn.net/showtv/showtv.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
   },
-   {
+  {
     "key": "kanald_live",
     "title": "Kanal D",
     "active": true,
-    "poster": "https://images.seeklogo.com/logo-png/7/1/kanal-d-logo-png_seeklogo-77085.png",
+    "poster": "https://static.kanald.com.tr/images/kanald-logo.svg",
     "url": "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web",
     "requiresReferer": true,
     "streamType": "tv"
@@ -30,13 +30,13 @@
     "key": "now_live",
     "title": "NOW TV",
     "active": true,
-    "poster": "https://logowik.com/content/uploads/images/now-tv-red26275.logowik.com.webp",
+    "poster": "https://tpsbayxekmes.merlincdn.net//img/logos/logo.svg",
     "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8",
     "requiresReferer": true,
     "streamType": "tv"
   },
   {
-    "key": "trtfm_live",
+    "key": "trt-fm",
     "title": "TRT FM",
     "active": true,
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467418.jpeg",
@@ -45,7 +45,25 @@
     "streamType": "radio"
   },
   {
-    "key": "trtturku_live",
+    "key": "trt-radyo-1",
+    "title": "TRT Radyo 1",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467415.jpeg",
+    "url": "https://trt.radyotvonline.net/trt_1.aac",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "trt-nagme",
+    "title": "TRT Nağme",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467465.jpeg",
+    "url": "https://rd-trtnagme.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "trt-turku",
     "title": "TRT Türkü",
     "active": true,
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467466.jpeg",
@@ -53,13 +71,85 @@
     "requiresReferer": false,
     "streamType": "radio"
   },
-   {
-    "key": "trterzurum_live",
-    "title": "TRT Erzurum",
+  {
+    "key": "memleketim-fm",
+    "title": "Memleketim FM",
     "active": true,
-    "poster": "https://trtkurumsal.trt.net.tr/Uploads/image/png/2022-10-18-17.33.19/56913ba98b384b7da1fa26e862e5cc9c.png",
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467512.jpeg",
+    "url": "https://radio-trtmemleketimfm.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "trt-radyo-haber",
+    "title": "TRT Radyo Haber",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12530424_0-0-2048-1536.jpeg",
+    "url": "https://trt.radyotvonline.net/trt_haber.aac",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "trt-radyo-3",
+    "title": "TRT Radyo 3",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
+    "url": "https://rd-trtradyo3.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "erzurum-radyosu",
+    "title": "Erzurum Radyosu",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
     "url": "https://radio-trterzurum.medya.trt.com.tr/master_128.m3u8",
     "requiresReferer": false,
     "streamType": "radio"
-   }
+  },
+  {
+    "key": "antalya-radyosu",
+    "title": "Antalya Radyosu",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467521.jpeg",
+    "url": "https://radio-trtantalya.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "cukurova-radyosu",
+    "title": "Çukurova Radyosu",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467486.jpeg",
+    "url": "https://radio-trtcukurova.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "trabzon-radyosu",
+    "title": "Trabzon Radyosu",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
+    "url": "https://radio-trttrabzon.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "gap-radyosu",
+    "title": "Gap Radyosu",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467503.jpeg",
+    "url": "https://radio-trtgap.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  },
+  {
+    "key": "trt-kurdi",
+    "title": "TRT Kurdi",
+    "active": true,
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467484.jpeg",
+    "url": "https://radio-trtradyo6.medya.trt.com.tr/master_128.m3u8",
+    "requiresReferer": false,
+    "streamType": "radio"
+  }
 ]
