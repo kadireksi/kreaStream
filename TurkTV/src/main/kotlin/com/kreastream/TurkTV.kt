@@ -4,9 +4,9 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
-import android.util.Log
+import org.jsoup.nodes.Document // Retained Jsoup import for Document
+import org.jsoup.nodes.Element // Retained Jsoup import for Element
+import android.util.Log // Retained explicit Android Log import
 
 class TurkTV : MainAPI() {
 
@@ -96,8 +96,8 @@ class TurkTV : MainAPI() {
         val name: String,
         val baseUrl: String,
         val active: Boolean = true,
-        val seriesPageActive: String? = null, // <--- NEW FIELD
-        val seriesPageArchive: String? = null, // <--- NEW FIELD
+        val seriesPageActive: String? = null, // <--- NEW FIELD: Active series page path
+        val seriesPageArchive: String? = null, // <--- NEW FIELD: Archive series page path
         val seriesList: ChannelSelectorBlock,
         val seriesDetail: SeriesSelectorBlock,
         val episodes: EpisodeSelectorBlock,
@@ -270,10 +270,10 @@ class TurkTV : MainAPI() {
         )
     }
 
-    private suspend fun getChannelSeries(channel: ChannelConfig, path: String, listName: String): List<SearchResponse> { // <--- PATH ADDED
+    private suspend fun getChannelSeries(channel: ChannelConfig, path: String, listName: String): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
         try {
-            Log.d("TurkTV", "Getting $listName series from ${channel.name} for main page")
+            Log.d("TurkTV", "Getting $listName series from ${channel.name} for main page using path: $path")
             
             // Construct the URL using the provided path
             val seriesUrl = "${channel.baseUrl}${path}"
@@ -409,7 +409,7 @@ class TurkTV : MainAPI() {
         
         lists += HomePageList("🎬 Canlı Yayınlar", liveItems, true)
         
-        // --- 2. SERIES SECTIONS (Refactored to show actual series) ---
+        // --- 2. SERIES SECTIONS (Using optional paths) ---
         if (channels != null && channels!!.isNotEmpty()) {
             Log.d("TurkTV", "Processing ${channels!!.size} channels for series lists")
             channels!!.forEach { cfg ->
@@ -423,7 +423,7 @@ class TurkTV : MainAPI() {
                     }
                 }
                 
-                // Archived Series Section
+                // Archived Series Section (Only created if seriesPageArchive is provided)
                 cfg.seriesPageArchive?.let { path ->
                     val archiveList = getChannelSeries(cfg, path, "Archive")
                     if (archiveList.isNotEmpty()) {
@@ -462,7 +462,7 @@ class TurkTV : MainAPI() {
                 try {
                     Log.d("TurkTV", "Searching on ${channel.name} (${channel.baseUrl})")
                     
-                    // Get the series page URL using the configured path
+                    // Get the series page URL using the configured active path
                     val seriesUrl = "${channel.baseUrl}${path}"
                     Log.d("TurkTV", "Fetching series from: $seriesUrl")
                     
