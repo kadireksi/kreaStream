@@ -272,7 +272,7 @@ class TurkTV : MainAPI() {
             // Determine the correct link type
             val linkType = when {
                 live.url.contains(".m3u8") -> ExtractorLinkType.M3U8
-                live.url.contains(".aac") -> ExtractorLinkType.MEDIA
+                live.url.contains(".aac") -> ExtractorLinkType.VIDEO
                 else -> ExtractorLinkType.VIDEO
             }
             
