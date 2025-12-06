@@ -5,7 +5,8 @@
     "baseUrl": "https://www.atv.com.tr",
     "active": true,
     "seriesPageActive": "/diziler",
-    "seriesPageArchive": null,
+    "seriesPageArchive": "/eski-diziler",
+    "episodesPageSuffix": "/bolumler",
     "seriesList": {
       "container": ".category-classic-item.type-02",
       "title": "h3.title",
@@ -48,6 +49,7 @@
     "active": true,
     "seriesPageActive": "/dizi-izle",
     "seriesPageArchive": "/dizi-arsivi?filter=date",
+    "episodesPageSuffix": "/bolumler",
     "seriesList": {
       "container": ".owl-item active",
       "title": ".poster-image img[alt]",
