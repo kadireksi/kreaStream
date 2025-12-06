@@ -108,7 +108,7 @@ class TurkTV : MainAPI() {
                     
                     val activeStreams = parsed?.filter { it.active } ?: emptyList()
                     activeStreams.forEachIndexed { i, st ->
-                        Log.d("TurkTV", "Active stream $i: ${st.title} (${st.streamType})")
+                        Log.d("TurkTV", "Active stream $i: ${st.title} (${st.streamType}) - URL: ${st.url.take(50)}...")
                     }
                     
                     activeStreams
@@ -204,13 +204,9 @@ class TurkTV : MainAPI() {
                     this.name = stream.title
                     this.posterUrl = stream.poster ?: "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
                     this.description = "Canlı TV yayını"
-                    this.episode = index + 1  // Essential for next/prev navigation
-                    this.season = 1           // Essential for next/prev navigation
-                    
-                    // Add more metadata for better display
-                    this.date = System.currentTimeMillis() // Current time for live streams
-                    
-                    // Episode title that will show in the UI
+                    this.episode = index + 1
+                    this.season = 1
+                    this.date = System.currentTimeMillis()
                     this.title = stream.title
                 }
             }
@@ -227,7 +223,6 @@ class TurkTV : MainAPI() {
                            "• Her kanal otomatik olarak sonraki kanala geçiş yapabilir\n" +
                            "• ${tvStreams.size} kanal bulunmaktadır"
                 
-                // Add recommendations for better navigation
                 this.recommendations = tvStreams.map { stream ->
                     RecommendedResponse(
                         name = stream.title,
@@ -250,14 +245,14 @@ class TurkTV : MainAPI() {
                     this.name = stream.title
                     this.posterUrl = stream.poster ?: "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
                     this.description = "Canlı radyo yayını"
-                    this.episode = index + 1  // Essential for next/prev navigation
-                    this.season = 1           // Essential for next/prev navigation
-                    
-                    // Add more metadata for better display
-                    this.date = System.currentTimeMillis() // Current time for live streams
-                    
-                    // Episode title that will show in the UI
+                    this.episode = index + 1
+                    this.season = 1
+                    this.date = System.currentTimeMillis()
                     this.title = stream.title
+                    
+                    // Add a marker that this is audio-only content
+                    this.videoCodec = "AAC"
+                    this.audioCodec = "AAC"
                 }
             }
 
@@ -271,9 +266,9 @@ class TurkTV : MainAPI() {
                 this.plot = "Türk radyo kanallarının canlı yayınları.\n\n" +
                            "• Kanallar arasında geçiş yapmak için sonraki/önceki bölüm butonlarını kullanın\n" +
                            "• Her kanal otomatik olarak sonraki kanala geçiş yapabilir\n" +
-                           "• ${radioStreams.size} kanal bulunmaktadır"
+                           "• ${radioStreams.size} kanal bulunmaktadır\n" +
+                           "• Bu kanallar sadece ses içermektedir"
                 
-                // Add recommendations for better navigation
                 this.recommendations = radioStreams.map { stream ->
                     RecommendedResponse(
                         name = stream.title,
@@ -304,12 +299,36 @@ class TurkTV : MainAPI() {
         // Individual live streams (when an episode is clicked)
         streams?.firstOrNull { it.url == data }?.let { live ->
             Log.d("TurkTV", "Found individual live stream: ${live.title}")
+            Log.d("TurkTV", "Stream URL: ${live.url}")
             
-            // Determine the correct link type
+            // Determine the correct link type - FIXED for radio streams
             val linkType = when {
                 live.url.contains(".m3u8") -> ExtractorLinkType.M3U8
-                live.url.contains(".aac") -> ExtractorLinkType.VIDEO
+                live.url.contains(".aac") || live.url.contains(".mp3") || live.streamType == "radio" -> {
+                    Log.d("TurkTV", "Detected audio stream, using MEDIA type")
+                    ExtractorLinkType.VIDEO
+                }
                 else -> ExtractorLinkType.VIDEO
+            }
+            
+            Log.d("TurkTV", "Using link type: $linkType")
+            
+            // Create appropriate headers based on stream type
+            val headers = mutableMapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept" to "*/*"
+            )
+            
+            // Add referer only if required
+            if (live.requiresReferer) {
+                headers["Origin"] = mainUrl
+                headers["Referer"] = mainUrl + "/"
+            }
+            
+            // For AAC streams, we might need different headers
+            if (live.url.contains(".aac")) {
+                headers["Accept"] = "audio/*"
+                headers["Accept-Encoding"] = "identity"
             }
             
             callback(
@@ -321,13 +340,12 @@ class TurkTV : MainAPI() {
                     this.referer = if (live.requiresReferer) mainUrl else ""
                     this.quality = Qualities.Unknown.value
                     this.type = linkType
-                    this.headers = mapOf(
-                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        "Accept" to "*/*",
-                        "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-                        "Origin" to mainUrl,
-                        "Referer" to mainUrl + "/"
-                    )
+                    this.headers = headers
+                    
+                    // For audio streams, we can add isAudio flag
+                    if (live.streamType == "radio" || live.url.contains(".aac") || live.url.contains(".mp3")) {
+                        this.isAudio = true
+                    }
                 }
             )
             Log.d("TurkTV", "loadLinks returning true for individual stream")
