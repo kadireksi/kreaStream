@@ -25,7 +25,7 @@ class TurkTV : MainAPI() {
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
 
-    // Synthetic URLs for TV and Radio Hubs (same as Trt.kt approach)
+    // Synthetic URLs for TV and Radio Hubs
     private val liveTvHubUrl = "turktv://live/tv"
     private val liveRadioHubUrl = "turktv://live/radio"
 
@@ -100,30 +100,30 @@ class TurkTV : MainAPI() {
 
         val lists = mutableListOf<HomePageList>()
         
-        // --- 1. LIVE STREAMS SECTION (Combined TV and Radio) ---
+        // --- 1. LIVE STREAMS SECTION ---
         val liveItems = mutableListOf<SearchResponse>()
         
-        // Live TV Item (similar to Trt.kt approach)
-        liveItems += newTvSeriesSearchResponse(
+        // Live TV Item - Use TvType.Live for live content
+        liveItems += newMovieSearchResponse(
             "📺 Canlı TV", 
             liveTvHubUrl, 
-            TvType.Live
+            TvType.Live  // Use TvType.Live for live streams
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
         }
 
-        // Live Radio Item (similar to Trt.kt approach)
-        liveItems += newTvSeriesSearchResponse(
+        // Live Radio Item - Use TvType.Live for live content
+        liveItems += newMovieSearchResponse(
             "📻 Radyo", 
             liveRadioHubUrl, 
-            TvType.Live
+            TvType.Live  // Use TvType.Live for live streams
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
         }
         
         lists += HomePageList("🎬 Canlı Yayınlar", liveItems, true)
         
-        // --- 2. SERIES SECTIONS (only show active channels) ---
+        // --- 2. SERIES SECTIONS ---
         channels?.let { channelList ->
             if (channelList.isNotEmpty()) {
                 channelList.forEach { cfg ->
@@ -132,7 +132,7 @@ class TurkTV : MainAPI() {
                         if (series.isNotEmpty()) {
                             lists += HomePageList("📺 ${cfg.name} Diziler", series, true)
                         } else {
-                            // Add placeholder if no series found for this channel
+                            // Add placeholder if no series found
                             lists += HomePageList("📺 ${cfg.name} Diziler", listOf(
                                 newTvSeriesSearchResponse("Dizi bulunamadı", "", TvType.TvSeries) {
                                     this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
@@ -140,7 +140,6 @@ class TurkTV : MainAPI() {
                             ), true)
                         }
                     } catch (e: Exception) {
-                        // Log error but continue with other channels
                         e.printStackTrace()
                         lists += HomePageList("📺 ${cfg.name} Diziler", listOf(
                             newTvSeriesSearchResponse("Yüklenemedi", "", TvType.TvSeries) {
@@ -150,7 +149,6 @@ class TurkTV : MainAPI() {
                     }
                 }
             } else {
-                // Add a placeholder if no channels loaded
                 lists += HomePageList("📺 Diziler", listOf(
                     newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries) {
                         this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
@@ -188,7 +186,6 @@ class TurkTV : MainAPI() {
                                 newTvSeriesSearchResponse(title, fullLink, TvType.TvSeries) {
                                     this.posterUrl = full(cfg.baseUrl, poster)
                                     if (this.posterUrl.isNullOrBlank()) {
-                                        // Default poster for series
                                         this.posterUrl = "https://cdn-icons-png.flaticon.com/512/1828/1828666.png"
                                     }
                                 }
@@ -196,11 +193,10 @@ class TurkTV : MainAPI() {
                         }
                     }
                 } catch (e: Exception) {
-                    // Skip this element if there's an error
+                    // Skip this element
                 }
             }
         } catch (e: Exception) {
-            // Return empty list if there's an error fetching
             e.printStackTrace()
         }
         
@@ -211,7 +207,7 @@ class TurkTV : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
         
-        // 1. Check for Live Hub URLs (similar to Trt.kt approach)
+        // 1. Check for Live Hub URLs
         if (url == liveTvHubUrl || url == liveRadioHubUrl) {
             val isTv = url == liveTvHubUrl
             val typeToFilter = if (isTv) "tv" else "radio"
@@ -222,7 +218,12 @@ class TurkTV : MainAPI() {
                 ?: emptyList()
             
             if (filteredStreams.isEmpty()) {
-                return newTvSeriesLoadResponse(title, url, TvType.Live, emptyList()) {
+                return newMovieLoadResponse(
+                    name = title,
+                    url = url,
+                    type = TvType.Live,
+                    data = url
+                ) {
                     posterUrl = if (isTv) {
                         "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
                     } else {
@@ -232,36 +233,27 @@ class TurkTV : MainAPI() {
                 }
             }
             
-            // Create episodes for live streams (similar to Trt.kt)
-            val episodes = filteredStreams.mapIndexed { index, live ->
-                newEpisode(live.url) { 
-                    this.name = live.title
-                    this.posterUrl = live.poster ?: if (isTv) {
-                        "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
-                    } else {
-                        "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
-                    }
-                    this.description = "Canlı yayın"
-                    this.episode = index + 1
-                    this.season = 1
-                }
-            }
-
-            return newTvSeriesLoadResponse(title, url, TvType.Live, episodes) {
+            // For live streams, we need to return a MovieLoadResponse, not TvSeries
+            return newMovieLoadResponse(
+                name = title,
+                url = url,
+                type = TvType.Live,
+                data = url  // Pass the URL as data for loadLinks
+            ) {
                 posterUrl = if (isTv) {
                     "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
                 } else {
                     "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
                 }
                 this.plot = if (isTv) {
-                    "Türk TV kanallarının canlı yayınları"
+                    "Türk TV kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sağ/sol ok tuşlarını kullanın."
                 } else {
-                    "Türk radyo kanallarının canlı yayınları"
+                    "Türk radyo kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sağ/sol ok tuşlarını kullanın."
                 }
             }
         }
 
-        // 2. Original Series Logic (Main Series Page)
+        // 2. Original Series Logic
         val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
             ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {
                 this.plot = "Bu kanal yapılandırılmamış"
@@ -297,11 +289,10 @@ class TurkTV : MainAPI() {
                         }
                     )
                 } catch (e: Exception) {
-                    // Skip this episode if there's an error
+                    // Skip this episode
                 }
             }
         } catch (e: Exception) {
-            // Return empty list if there's an error
             e.printStackTrace()
         }
         
@@ -316,7 +307,41 @@ class TurkTV : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        // ── Live streams ──
+        // Check if this is a live hub URL request
+        if (data == liveTvHubUrl || data == liveRadioHubUrl) {
+            val isTv = data == liveTvHubUrl
+            val typeToFilter = if (isTv) "tv" else "radio"
+            
+            val filteredStreams = streams
+                ?.filter { it.streamType == typeToFilter }
+                ?: emptyList()
+            
+            // For live hubs, we need to provide all streams as extractor links
+            filteredStreams.forEach { live ->
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = live.title,
+                        url = live.url
+                    ){
+                        this.referer = if (live.requiresReferer) mainUrl else ""
+                        this.quality = Qualities.Unknown.value
+                        this.type = if (live.url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        this.headers = mapOf(
+                            "User-Agent" to "Mozilla/5.0",
+                            "Accept" to "*/*",
+                            "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+                            "Origin" to mainUrl,
+                            "Referer" to mainUrl + "/"
+                        )
+                    }
+                )
+            }
+            
+            return filteredStreams.isNotEmpty()
+        }
+
+        // ── Individual live streams ──
         streams?.firstOrNull { it.url == data }?.let { live ->
             callback(
                 newExtractorLink(
