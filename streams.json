@@ -210,7 +210,7 @@
     "key": "teve2_live",
     "title": "Teve2",
     "active": true,
-    "poster": "https://brandfetch.com/teve2.com.tr/logo",
+    "poster": "https://static.teve2.com.tr/assets/img/teve2logo.png",
     "url": "https://demiroren.daioncdn.net/teve2/teve2.m3u8?app=kanald_web",
     "requiresReferer": true,
     "streamType": "tv"
