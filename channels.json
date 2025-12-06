@@ -114,7 +114,7 @@
     "name": "TRT 1",
     "baseUrl": "https://www.trt1.com.tr",
     "series": {
-      "url": "https://www.trt1.com.tr/archive=false&order=title_asc",
+      "url": "https://www.trt1.com.tr/diziler?archive=false&order=title_asc",
       "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
       "title": "div.card_card-title__IJ9af",
       "link": "a",
