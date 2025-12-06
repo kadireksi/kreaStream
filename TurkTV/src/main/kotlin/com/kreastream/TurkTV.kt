@@ -121,7 +121,7 @@ class TurkTV : MainAPI() {
             posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
         }
         
-        lists += HomePageList("Canlı Yayınlar", liveItems)
+        lists += HomePageList("Canlı Yayınlar", liveItems, true)
         
         // --- 2. SERIES SECTIONS ---
         channels?.let { channelList ->
@@ -130,7 +130,7 @@ class TurkTV : MainAPI() {
                     try {
                         val series = fetchSeries(cfg)
                         if (series.isNotEmpty()) {
-                            lists += HomePageList("${cfg.name} Diziler", series)
+                            lists += HomePageList("${cfg.name} Diziler", series, true)
                         } else {
                             // Add placeholder if no series found for this channel
                             lists += HomePageList("${cfg.name} Diziler", listOf(
@@ -142,14 +142,14 @@ class TurkTV : MainAPI() {
                         e.printStackTrace()
                         lists += HomePageList("${cfg.name} Diziler", listOf(
                             newTvSeriesSearchResponse("Yüklenemedi", "", TvType.TvSeries)
-                        ))
+                        ), true)
                     }
                 }
             } else {
                 // Add a placeholder if no channels loaded
                 lists += HomePageList("Diziler", listOf(
                     newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries)
-                ))
+                ), true)
             }
         }
 
