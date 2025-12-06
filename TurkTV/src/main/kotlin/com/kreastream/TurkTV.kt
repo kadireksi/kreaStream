@@ -133,23 +133,23 @@ class TurkTV : MainAPI() {
         // --- 1. LIVE STREAMS SECTION ---
         val liveItems = mutableListOf<SearchResponse>()
         
-        // Live TV Item - Use TvType.TvSeries (not TvType.Live) to show as episodes
+        // Live TV Item
         val tvStreams = streams?.filter { it.streamType == "tv" } ?: emptyList()
         liveItems += newTvSeriesSearchResponse(
-            "📺 Canlı TV (${tvStreams.size} kanal)", 
+            "📺 Canlı TV", 
             liveTvHubUrl, 
-            TvType.TvSeries  // Changed to TvSeries to show episodes
+            TvType.TvSeries
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
         }
         Log.d("TurkTV", "TV item shows ${tvStreams.size} channels")
 
-        // Live Radio Item - Use TvType.TvSeries (not TvType.Live) to show as episodes
+        // Live Radio Item
         val radioStreams = streams?.filter { it.streamType == "radio" } ?: emptyList()
         liveItems += newTvSeriesSearchResponse(
-            "📻 Radyo (${radioStreams.size} kanal)", 
+            "📻 Radyo", 
             liveRadioHubUrl, 
-            TvType.TvSeries  // Changed to TvSeries to show episodes
+            TvType.TvSeries
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
         }
@@ -198,25 +198,43 @@ class TurkTV : MainAPI() {
             val tvStreams = streams?.filter { it.streamType == "tv" } ?: emptyList()
             Log.d("TurkTV", "TV streams found: ${tvStreams.size}")
             
-            // Create episodes for each TV channel (like Trt.kt does)
+            // Create episodes for each TV channel
             val episodes = tvStreams.mapIndexed { index, stream ->
                 newEpisode(stream.url) {
                     this.name = stream.title
                     this.posterUrl = stream.poster ?: "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
                     this.description = "Canlı TV yayını"
-                    this.episode = index + 1
-                    this.season = 1
+                    this.episode = index + 1  // Essential for next/prev navigation
+                    this.season = 1           // Essential for next/prev navigation
+                    
+                    // Add more metadata for better display
+                    this.date = System.currentTimeMillis() // Current time for live streams
+                    
+                    // Episode title that will show in the UI
+                    this.title = stream.title
                 }
             }
 
             return newTvSeriesLoadResponse(
                 name = "📺 Canlı TV Kanalları",
                 url = url,
-                type = TvType.TvSeries,  // Use TvSeries to show episodes
+                type = TvType.TvSeries,
                 episodes = episodes
             ) {
                 posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
-                this.plot = "Türk TV kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
+                this.plot = "Türk TV kanallarının canlı yayınları.\n\n" +
+                           "• Kanallar arasında geçiş yapmak için sonraki/önceki bölüm butonlarını kullanın\n" +
+                           "• Her kanal otomatik olarak sonraki kanala geçiş yapabilir\n" +
+                           "• ${tvStreams.size} kanal bulunmaktadır"
+                
+                // Add recommendations for better navigation
+                this.recommendations = tvStreams.map { stream ->
+                    RecommendedResponse(
+                        name = stream.title,
+                        url = stream.url,
+                        posterUrl = stream.poster
+                    )
+                }
             }
         }
         
@@ -226,25 +244,43 @@ class TurkTV : MainAPI() {
             val radioStreams = streams?.filter { it.streamType == "radio" } ?: emptyList()
             Log.d("TurkTV", "Radio streams found: ${radioStreams.size}")
             
-            // Create episodes for each Radio channel (like Trt.kt does)
+            // Create episodes for each Radio channel
             val episodes = radioStreams.mapIndexed { index, stream ->
                 newEpisode(stream.url) {
                     this.name = stream.title
                     this.posterUrl = stream.poster ?: "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
                     this.description = "Canlı radyo yayını"
-                    this.episode = index + 1
-                    this.season = 1
+                    this.episode = index + 1  // Essential for next/prev navigation
+                    this.season = 1           // Essential for next/prev navigation
+                    
+                    // Add more metadata for better display
+                    this.date = System.currentTimeMillis() // Current time for live streams
+                    
+                    // Episode title that will show in the UI
+                    this.title = stream.title
                 }
             }
 
             return newTvSeriesLoadResponse(
                 name = "📻 Radyo Kanalları",
                 url = url,
-                type = TvType.TvSeries,  // Use TvSeries to show episodes
+                type = TvType.TvSeries,
                 episodes = episodes
             ) {
                 posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
-                this.plot = "Türk radyo kanallarının canlı yayınları. Kanallar arasında geçiş yapmak için sonraki bölüm butonunu kullanın."
+                this.plot = "Türk radyo kanallarının canlı yayınları.\n\n" +
+                           "• Kanallar arasında geçiş yapmak için sonraki/önceki bölüm butonlarını kullanın\n" +
+                           "• Her kanal otomatik olarak sonraki kanala geçiş yapabilir\n" +
+                           "• ${radioStreams.size} kanal bulunmaktadır"
+                
+                // Add recommendations for better navigation
+                this.recommendations = radioStreams.map { stream ->
+                    RecommendedResponse(
+                        name = stream.title,
+                        url = stream.url,
+                        posterUrl = stream.poster
+                    )
+                }
             }
         }
 
