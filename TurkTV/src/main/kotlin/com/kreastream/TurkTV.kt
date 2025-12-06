@@ -288,9 +288,10 @@ class TurkTV : MainAPI() {
 
             var streamUrl: String? = doc.select("video source[src$='.m3u8'], source[type='application/x-mpegURL']")
                 .attr("src")
-                .ifBlank { doc.select("video source[src$='.mp4']").attr("src") }
-                .ifBlank { Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value }
-                .ifBlank { doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src")? }
+                .takeIf { it.isNotBlank() }
+                ?: doc.select("video source[src$='.mp4']").attr("src").takeIf { it.isNotBlank() }
+                ?: Regex("""https?://[^\s"']+\.(?:m3u8|mp4)""").find(doc.html())?.value?.takeIf { it.isNotBlank() }
+                ?: doc.select("iframe[src*='.m3u8'], iframe[src*='.mp4']").attr("src").takeIf { it.isNotBlank() }
 
             if (!streamUrl.isNullOrBlank()) {
                 val finalUrl = full(cfg.baseUrl, streamUrl) ?: streamUrl
