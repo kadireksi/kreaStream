@@ -25,9 +25,9 @@ class TurkTV : MainAPI() {
     private var channels: List<ChannelConfig>? = null
     private var streams: List<LiveStreamConfig>? = null
 
-    // Synthetic URLs for TV and Radio Hubs
-    private val liveChannelsUrl = "turktv://livechannels"
-    private val radioChannelsUrl = "turktv://radiochannels"
+    // Synthetic URLs for TV and Radio Hubs (same as Trt.kt approach)
+    private val liveTvHubUrl = "turktv://live/tv"
+    private val liveRadioHubUrl = "turktv://live/radio"
 
     // ------------------- DATA CLASSES -------------------
     data class SelectorBlock(
@@ -70,7 +70,7 @@ class TurkTV : MainAPI() {
             try {
                 val channelsText = app.get(channelsJsonUrl).text
                 if (channelsText.isNotBlank()) {
-                    channels = parseJson<List<ChannelConfig>>(channelsText)
+                    channels = parseJson<List<ChannelConfig>>(channelsText)?.filter { it.active }
                 } else {
                     channels = emptyList()
                 }
@@ -83,7 +83,7 @@ class TurkTV : MainAPI() {
             try {
                 val streamsText = app.get(streamsJsonUrl).text
                 if (streamsText.isNotBlank()) {
-                    streams = parseJson<List<LiveStreamConfig>>(streamsText)
+                    streams = parseJson<List<LiveStreamConfig>>(streamsText)?.filter { it.active }
                 } else {
                     streams = emptyList()
                 }
@@ -103,52 +103,58 @@ class TurkTV : MainAPI() {
         // --- 1. LIVE STREAMS SECTION (Combined TV and Radio) ---
         val liveItems = mutableListOf<SearchResponse>()
         
-        // Live TV Item
+        // Live TV Item (similar to Trt.kt approach)
         liveItems += newTvSeriesSearchResponse(
-            "Canlı TV", 
-            liveChannelsUrl, 
-            TvType.Live  // Changed from TvSeries to Live
+            "📺 Canlı TV", 
+            liveTvHubUrl, 
+            TvType.Live
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
         }
 
-        // Live Radio Item
+        // Live Radio Item (similar to Trt.kt approach)
         liveItems += newTvSeriesSearchResponse(
-            "Radyo", 
-            radioChannelsUrl, 
-            TvType.Live  // Changed from TvSeries to Live
+            "📻 Radyo", 
+            liveRadioHubUrl, 
+            TvType.Live
         ).apply {
             posterUrl = "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
         }
         
-        lists += HomePageList("Canlı Yayınlar", liveItems, true)
+        lists += HomePageList("🎬 Canlı Yayınlar", liveItems, true)
         
-        // --- 2. SERIES SECTIONS ---
+        // --- 2. SERIES SECTIONS (only show active channels) ---
         channels?.let { channelList ->
             if (channelList.isNotEmpty()) {
                 channelList.forEach { cfg ->
                     try {
                         val series = fetchSeries(cfg)
                         if (series.isNotEmpty()) {
-                            lists += HomePageList("${cfg.name} Diziler", series, true)
+                            lists += HomePageList("📺 ${cfg.name} Diziler", series, true)
                         } else {
                             // Add placeholder if no series found for this channel
-                            lists += HomePageList("${cfg.name} Diziler", listOf(
-                                newTvSeriesSearchResponse("Dizi bulunamadı", "", TvType.TvSeries)
+                            lists += HomePageList("📺 ${cfg.name} Diziler", listOf(
+                                newTvSeriesSearchResponse("Dizi bulunamadı", "", TvType.TvSeries) {
+                                    this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
+                                }
                             ), true)
                         }
                     } catch (e: Exception) {
                         // Log error but continue with other channels
                         e.printStackTrace()
-                        lists += HomePageList("${cfg.name} Diziler", listOf(
-                            newTvSeriesSearchResponse("Yüklenemedi", "", TvType.TvSeries)
+                        lists += HomePageList("📺 ${cfg.name} Diziler", listOf(
+                            newTvSeriesSearchResponse("Yüklenemedi", "", TvType.TvSeries) {
+                                this.posterUrl = "https://cdn-icons-png.flaticon.com/512/1828/1828666.png"
+                            }
                         ), true)
                     }
                 }
             } else {
                 // Add a placeholder if no channels loaded
-                lists += HomePageList("Diziler", listOf(
-                    newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries)
+                lists += HomePageList("📺 Diziler", listOf(
+                    newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries) {
+                        this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
+                    }
                 ), true)
             }
         }
@@ -181,6 +187,10 @@ class TurkTV : MainAPI() {
                             seriesList.add(
                                 newTvSeriesSearchResponse(title, fullLink, TvType.TvSeries) {
                                     this.posterUrl = full(cfg.baseUrl, poster)
+                                    if (this.posterUrl.isNullOrBlank()) {
+                                        // Default poster for series
+                                        this.posterUrl = "https://cdn-icons-png.flaticon.com/512/1828/1828666.png"
+                                    }
                                 }
                             )
                         }
@@ -201,38 +211,52 @@ class TurkTV : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         ensureLoaded()
         
-        // 1. Check for Synthetic Live Hub URLs
-        val isLiveTv = url == liveChannelsUrl
-        val isRadio = url == radioChannelsUrl
-
-        if (isLiveTv || isRadio) {
-            val typeToFilter = if (isLiveTv) "tv" else "radio"
-            val title = if (isLiveTv) "Canlı TV Kanalları" else "Radyo Kanalları"
+        // 1. Check for Live Hub URLs (similar to Trt.kt approach)
+        if (url == liveTvHubUrl || url == liveRadioHubUrl) {
+            val isTv = url == liveTvHubUrl
+            val typeToFilter = if (isTv) "tv" else "radio"
+            val title = if (isTv) "📺 Canlı TV Kanalları" else "📻 Radyo Kanalları"
             
             val filteredStreams = streams
                 ?.filter { it.streamType == typeToFilter }
                 ?: emptyList()
             
-            // Create episodes for live streams
-            val episodes = filteredStreams.map { live ->
+            if (filteredStreams.isEmpty()) {
+                return newTvSeriesLoadResponse(title, url, TvType.Live, emptyList()) {
+                    posterUrl = if (isTv) {
+                        "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
+                    } else {
+                        "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
+                    }
+                    this.plot = "Henüz kanal yüklenmedi"
+                }
+            }
+            
+            // Create episodes for live streams (similar to Trt.kt)
+            val episodes = filteredStreams.mapIndexed { index, live ->
                 newEpisode(live.url) { 
                     this.name = live.title
-                    this.posterUrl = live.poster
-                    // Add additional metadata for live streams
+                    this.posterUrl = live.poster ?: if (isTv) {
+                        "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
+                    } else {
+                        "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
+                    }
                     this.description = "Canlı yayın"
+                    this.episode = index + 1
+                    this.season = 1
                 }
             }
 
             return newTvSeriesLoadResponse(title, url, TvType.Live, episodes) {
-                posterUrl = if (isLiveTv) {
-                    "https://cdn-icons-png.flaticon.com/512/3198/3198691.png"
+                posterUrl = if (isTv) {
+                    "https://img.freepik.com/premium-vector/television-icon-logo-vector-design-template_827767-3402.jpg"
                 } else {
-                    "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
+                    "https://img.freepik.com/premium-vector/retro-black-white-boombox_788759-25590.jpg"
                 }
-                this.plot = if (isLiveTv) {
-                    "Canlı TV kanalları listesi"
+                this.plot = if (isTv) {
+                    "Türk TV kanallarının canlı yayınları"
                 } else {
-                    "Radyo kanalları listesi"
+                    "Türk radyo kanallarının canlı yayınları"
                 }
             }
         }
@@ -241,6 +265,7 @@ class TurkTV : MainAPI() {
         val cfg = channels?.firstOrNull { url.contains(it.baseUrl, ignoreCase = true) }
             ?: return newTvSeriesLoadResponse("Bulunamadı", url, TvType.TvSeries, emptyList()) {
                 this.plot = "Bu kanal yapılandırılmamış"
+                this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
             }
 
         val episodes = fetchEpisodes(cfg, url)
@@ -268,6 +293,7 @@ class TurkTV : MainAPI() {
                         newEpisode(episodeUrl) {
                             this.name = title
                             this.episode = index + 1
+                            this.season = 1
                         }
                     )
                 } catch (e: Exception) {
