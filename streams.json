@@ -21,7 +21,7 @@
     "key": "kanald_live",
     "title": "Kanal D",
     "active": true,
-    "poster": "https://static.kanald.com.tr/images/kanald-logo.svg",
+    "poster": "https://images.seeklogo.com/logo-png/7/1/kanal-d-logo-png_seeklogo-77085.png",
     "url": "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web",
     "requiresReferer": true,
     "streamType": "tv"
