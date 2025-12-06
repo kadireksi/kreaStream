@@ -4,6 +4,8 @@
     "name": "ATV",
     "baseUrl": "https://www.atv.com.tr",
     "active": true,
+    "seriesPageActive": "/diziler",
+    "seriesPageArchive": null,
     "seriesList": {
       "container": ".category-classic-item.type-02",
       "title": "h3.title",
@@ -43,6 +45,8 @@
     "name": "Star TV",
     "baseUrl": "https://www.startv.com.tr",
     "active": true,
+    "seriesPageActive": "/diziler/yayinlanan-diziler",
+    "seriesPageArchive": "/diziler/arsiv",
     "seriesList": {
       "container": ".dizi-listesi-item, .card-item",
       "title": ".dizi-title a, h3 a",
@@ -82,6 +86,8 @@
     "name": "Show TV",
     "baseUrl": "https://www.showtv.com.tr",
     "active": true,
+    "seriesPageActive": "/diziler",
+    "seriesPageArchive": null,
     "seriesList": {
       "container": ".dizi-grid .item, .series-card",
       "title": ".title-link, h2 a",
@@ -121,6 +127,8 @@
     "name": "NOW TV",
     "baseUrl": "https://www.nowtv.com.tr",
     "active": true,
+    "seriesPageActive": "/arsiv/diziler/tumu",
+    "seriesPageArchive": null,
     "seriesList": {
       "container": ".dizi-kart, .arsiv-item",
       "title": ".dizi-baslik a",
@@ -160,6 +168,8 @@
     "name": "Kanal D",
     "baseUrl": "https://www.kanald.com.tr",
     "active": true,
+    "seriesPageActive": "/diziler",
+    "seriesPageArchive": null,
     "seriesList": {
       "container": ".dizi-promo, .liste-item",
       "title": ".promo-title a",
@@ -199,6 +209,8 @@
     "name": "TRT 1",
     "baseUrl": "https://www.trt1.com.tr",
     "active": true,
+    "seriesPageActive": "/diziler?archive=false&order=title_asc",
+    "seriesPageArchive": "/diziler?archive=true&order=title_asc",
     "seriesList": {
       "container": ".dizi-kartlari .kart",
       "title": ".kart-baslik a",
