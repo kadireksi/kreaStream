@@ -65,26 +65,26 @@ class TurkTV : MainAPI() {
     private suspend fun ensureLoaded() {
         if (channels == null) {
             try {
-                println("DEBUG: Loading channels from $channelsJsonUrl")
+                Log.d("DEBUG: Loading channels from $channelsJsonUrl")
                 val channelsText = app.get(channelsJsonUrl).text
-                println("DEBUG: Channels JSON received: ${channelsText.length} characters")
+                Log.d("DEBUG: Channels JSON received: ${channelsText.length} characters")
                 channels = parseJson<List<ChannelConfig>>(channelsText)
-                println("DEBUG: Channels parsed successfully: ${channels?.size} channels")
+                Log.d("DEBUG: Channels parsed successfully: ${channels?.size} channels")
             } catch (e: Exception) {
-                println("DEBUG: Failed to load channels: ${e.message}")
+                Log.d("DEBUG: Failed to load channels: ${e.message}")
                 e.printStackTrace()
                 channels = emptyList() 
             }
         }
         if (streams == null) {
             try {
-                println("DEBUG: Loading streams from $streamsJsonUrl")
+                Log.d("DEBUG: Loading streams from $streamsJsonUrl")
                 val streamsText = app.get(streamsJsonUrl).text
-                println("DEBUG: Streams JSON received: ${streamsText.length} characters")
+                Log.d("DEBUG: Streams JSON received: ${streamsText.length} characters")
                 streams = parseJson<List<LiveStreamConfig>>(streamsText)
-                println("DEBUG: Streams parsed successfully: ${streams?.size} streams")
+                Log.d("DEBUG: Streams parsed successfully: ${streams?.size} streams")
             } catch (e: Exception) {
-                println("DEBUG: Failed to load streams: ${e.message}")
+                Log.d("DEBUG: Failed to load streams: ${e.message}")
                 e.printStackTrace()
                 streams = emptyList()
             }
@@ -102,7 +102,7 @@ class TurkTV : MainAPI() {
         
         // Check if we have streams loaded
         if (streams.isNullOrEmpty()) {
-            println("DEBUG: No streams loaded, showing placeholder")
+            Log.d("DEBUG: No streams loaded, showing placeholder")
             // Live TV Item (placeholder)
             liveItems += newTvSeriesSearchResponse(
                 "Canlı TV (Yakında)", 
@@ -121,7 +121,7 @@ class TurkTV : MainAPI() {
                 posterUrl = "https://cdn-icons-png.flaticon.com/512/3106/3106776.png"
             }
         } else {
-            println("DEBUG: Streams loaded, showing real items")
+            Log.d("DEBUG: Streams loaded, showing real items")
             // Live TV Item (real)
             liveItems += newTvSeriesSearchResponse(
                 "Canlı TV", 
@@ -145,7 +145,7 @@ class TurkTV : MainAPI() {
         
         // --- 2. SERIES SECTIONS ---
         if (channels.isNullOrEmpty()) {
-            println("DEBUG: No channels loaded, showing error")
+            Log.d("DEBUG: No channels loaded, showing error")
             // Add a placeholder if no channels loaded
             lists += HomePageList("Diziler", listOf(
                 newTvSeriesSearchResponse("Kanal Yüklenemedi", "", TvType.TvSeries).apply {
@@ -153,12 +153,12 @@ class TurkTV : MainAPI() {
                 }
             ))
         } else {
-            println("DEBUG: Channels loaded: ${channels!!.size} channels")
+            Log.d("DEBUG: Channels loaded: ${channels!!.size} channels")
             channels!!.forEach { cfg ->
                 try {
-                    println("DEBUG: Fetching series for ${cfg.name}")
+                    Log.d("DEBUG: Fetching series for ${cfg.name}")
                     val series = fetchSeries(cfg)
-                    println("DEBUG: Fetched ${series.size} series for ${cfg.name}")
+                    Log.d("DEBUG: Fetched ${series.size} series for ${cfg.name}")
                     if (series.isNotEmpty()) {
                         lists += HomePageList("${cfg.name} Diziler", series)
                     } else {
@@ -170,7 +170,7 @@ class TurkTV : MainAPI() {
                         ))
                     }
                 } catch (e: Exception) {
-                    println("DEBUG: Error fetching series for ${cfg.name}: ${e.message}")
+                    Log.d("DEBUG: Error fetching series for ${cfg.name}: ${e.message}")
                     e.printStackTrace()
                     // Add error placeholder
                     lists += HomePageList("${cfg.name} Diziler", listOf(
@@ -190,17 +190,17 @@ class TurkTV : MainAPI() {
         val seriesList = mutableListOf<SearchResponse>()
         
         try {
-            println("DEBUG: Fetching series from URL: ${cfg.series.url}")
+            Log.d("DEBUG: Fetching series from URL: ${cfg.series.url}")
             val doc = app.get(cfg.series.url).document
             val container = cfg.series.container
             val titleSelector = cfg.series.title
             val linkSelector = cfg.series.link
             val posterSelector = cfg.series.poster
             
-            println("DEBUG: Using selectors - Container: $container, Title: $titleSelector, Link: $linkSelector")
+            Log.d("DEBUG: Using selectors - Container: $container, Title: $titleSelector, Link: $linkSelector")
             
             val elements = doc.select(container)
-            println("DEBUG: Found ${elements.size} elements with container selector")
+            Log.d("DEBUG: Found ${elements.size} elements with container selector")
             
             elements.forEachIndexed { index, element ->
                 try {
@@ -210,7 +210,7 @@ class TurkTV : MainAPI() {
                         element.select(posterSelector).attr("src")
                     } else null
                     
-                    println("DEBUG: Element $index - Title: '$title', Link: '$link', Poster: '$poster'")
+                    Log.d("DEBUG: Element $index - Title: '$title', Link: '$link', Poster: '$poster'")
                     
                     if (title.isNotBlank() && link.isNotBlank()) {
                         val fullLink = full(cfg.baseUrl, link)
@@ -220,19 +220,19 @@ class TurkTV : MainAPI() {
                                     this.posterUrl = full(cfg.baseUrl, poster)
                                 }
                             )
-                            println("DEBUG: Added series: $title")
+                            Log.d("DEBUG: Added series: $title")
                         }
                     }
                 } catch (e: Exception) {
-                    println("DEBUG: Error processing element $index: ${e.message}")
+                    Log.d("DEBUG: Error processing element $index: ${e.message}")
                 }
             }
         } catch (e: Exception) {
-            println("DEBUG: Error fetching series: ${e.message}")
+            Log.d("DEBUG: Error fetching series: ${e.message}")
             e.printStackTrace()
         }
         
-        println("DEBUG: Total series fetched: ${seriesList.size}")
+        Log.d("DEBUG: Total series fetched: ${seriesList.size}")
         return seriesList
     }
 
@@ -252,7 +252,7 @@ class TurkTV : MainAPI() {
                 ?.filter { it.streamType == typeToFilter }
                 ?: emptyList()
             
-            println("DEBUG: Loading $title with ${filteredStreams.size} streams")
+            Log.d("DEBUG: Loading $title with ${filteredStreams.size} streams")
             
             if (filteredStreams.isEmpty()) {
                 // Return "Coming Soon" if no streams
