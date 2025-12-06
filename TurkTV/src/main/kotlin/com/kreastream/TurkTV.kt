@@ -4,9 +4,9 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import org.jsoup.nodes.Document // Retained Jsoup import for Document
-import org.jsoup.nodes.Element // Retained Jsoup import for Element
-import android.util.Log // Retained explicit Android Log import
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
+import android.util.Log
 
 class TurkTV : MainAPI() {
 
@@ -19,19 +19,15 @@ class TurkTV : MainAPI() {
     private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
     private val streamsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
 
-    // Remove the 'private' modifier so we can reset them
     var channels: List<ChannelConfig>? = null
     var streams: List<LiveStreamConfig>? = null
 
-    // Add a timestamp to force refresh
     private var lastRefreshTime: Long = 0
     private val refreshInterval = 5 * 60 * 1000 // 5 minutes in milliseconds
 
-    // Synthetic URLs for TV and Radio Hubs
     private val liveTvHubUrl = "https://turktv.local/live/tv"
     private val liveRadioHubUrl = "https://turktv.local/live/radio"
 
-    // ------------------- DATA CLASSES -------------------
     data class LoadData(
         val originalTitle: String,
         val displayTitle: String,
@@ -100,6 +96,8 @@ class TurkTV : MainAPI() {
         val name: String,
         val baseUrl: String,
         val active: Boolean = true,
+        val seriesPageActive: String? = null, // <--- NEW FIELD
+        val seriesPageArchive: String? = null, // <--- NEW FIELD
         val seriesList: ChannelSelectorBlock,
         val seriesDetail: SeriesSelectorBlock,
         val episodes: EpisodeSelectorBlock,
@@ -272,18 +270,18 @@ class TurkTV : MainAPI() {
         )
     }
 
-    private suspend fun getChannelSeries(channel: ChannelConfig): List<SearchResponse> {
+    private suspend fun getChannelSeries(channel: ChannelConfig, path: String, listName: String): List<SearchResponse> { // <--- PATH ADDED
         val results = mutableListOf<SearchResponse>()
         try {
-            Log.d("TurkTV", "Getting all series from ${channel.name} for main page")
+            Log.d("TurkTV", "Getting $listName series from ${channel.name} for main page")
             
-            // Construct the URL for the channel's series list
-            val seriesUrl = "${channel.baseUrl}/diziler"
+            // Construct the URL using the provided path
+            val seriesUrl = "${channel.baseUrl}${path}"
             val doc = app.get(seriesUrl).document
             
             // Select series elements using the channel's configured container selector
             val seriesElements = doc.select(channel.seriesList.container)
-            Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name}")
+            Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name} ($listName)")
             
             seriesElements.forEach { element ->
                 // Use the existing helper to extract poster data
@@ -297,7 +295,7 @@ class TurkTV : MainAPI() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("TurkTV", "Error getting series from ${channel.name}: ${e.message}", e)
+            Log.e("TurkTV", "Error getting $listName series from ${channel.name}: ${e.message}", e)
         }
         return results
     }
@@ -415,13 +413,23 @@ class TurkTV : MainAPI() {
         if (channels != null && channels!!.isNotEmpty()) {
             Log.d("TurkTV", "Processing ${channels!!.size} channels for series lists")
             channels!!.forEach { cfg ->
-                // Call the new helper function to fetch actual series
-                val seriesList = getChannelSeries(cfg)
                 
-                // Only add the list if series are found
-                if (seriesList.isNotEmpty()) {
-                    lists += HomePageList("📺 ${cfg.name} Diziler", seriesList, true)
-                    Log.d("TurkTV", "Added ${seriesList.size} series for ${cfg.name}")
+                // Active Series Section
+                cfg.seriesPageActive?.let { path ->
+                    val seriesList = getChannelSeries(cfg, path, "Active")
+                    if (seriesList.isNotEmpty()) {
+                        lists += HomePageList("📺 ${cfg.name} Diziler", seriesList, true)
+                        Log.d("TurkTV", "Added ${seriesList.size} active series for ${cfg.name}")
+                    }
+                }
+                
+                // Archived Series Section
+                cfg.seriesPageArchive?.let { path ->
+                    val archiveList = getChannelSeries(cfg, path, "Archive")
+                    if (archiveList.isNotEmpty()) {
+                        lists += HomePageList("📂 ${cfg.name} Arşiv Diziler", archiveList, true)
+                        Log.d("TurkTV", "Added ${archiveList.size} archived series for ${cfg.name}")
+                    }
                 }
             }
         } else {
@@ -449,38 +457,41 @@ class TurkTV : MainAPI() {
         val results = mutableListOf<SearchResponse>()
         
         channels?.forEach { channel ->
-            try {
-                Log.d("TurkTV", "Searching on ${channel.name} (${channel.baseUrl})")
-                
-                // Get the series page URL
-                val seriesUrl = "${channel.baseUrl}/diziler"
-                Log.d("TurkTV", "Fetching series from: $seriesUrl")
-                
-                val doc = app.get(seriesUrl).document
-                
-                // Extract series using the configured selectors
-                val seriesElements = doc.select(channel.seriesList.container)
-                Log.d("TurkTV", "Found ${seriesElements.size} series elements on ${channel.name}")
-                
-                seriesElements.forEach { element ->
-                    val posterData = element.extractPosterData(channel, channel.baseUrl)
+            // Use active page for search if available
+            channel.seriesPageActive?.let { path ->
+                try {
+                    Log.d("TurkTV", "Searching on ${channel.name} (${channel.baseUrl})")
                     
-                    if (posterData != null) {
-                        // Check if the series title matches the query (case-insensitive)
-                        if (posterData.displayTitle.contains(query, ignoreCase = true) ||
-                            posterData.originalTitle.contains(query, ignoreCase = true)) {
-                            
-                            Log.d("TurkTV", "Found series: ${posterData.displayTitle} -> ${posterData.href}")
-                            
-                            results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
-                                this.posterUrl = posterData.posterUrl
-                                this.year = posterData.year
-                            })
+                    // Get the series page URL using the configured path
+                    val seriesUrl = "${channel.baseUrl}${path}"
+                    Log.d("TurkTV", "Fetching series from: $seriesUrl")
+                    
+                    val doc = app.get(seriesUrl).document
+                    
+                    // Extract series using the configured selectors
+                    val seriesElements = doc.select(channel.seriesList.container)
+                    Log.d("TurkTV", "Found ${seriesElements.size} series elements on ${channel.name}")
+                    
+                    seriesElements.forEach { element ->
+                        val posterData = element.extractPosterData(channel, channel.baseUrl)
+                        
+                        if (posterData != null) {
+                            // Check if the series title matches the query (case-insensitive)
+                            if (posterData.displayTitle.contains(query, ignoreCase = true) ||
+                                posterData.originalTitle.contains(query, ignoreCase = true)) {
+                                
+                                Log.d("TurkTV", "Found series: ${posterData.displayTitle} -> ${posterData.href}")
+                                
+                                results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
+                                    this.posterUrl = posterData.posterUrl
+                                    this.year = posterData.year
+                                })
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    Log.e("TurkTV", "Error searching on ${channel.name}: ${e.message}", e)
                 }
-            } catch (e: Exception) {
-                Log.e("TurkTV", "Error searching on ${channel.name}: ${e.message}", e)
             }
         }
         
@@ -493,27 +504,30 @@ class TurkTV : MainAPI() {
         val results = mutableListOf<SearchResponse>()
         
         channels?.forEach { channel ->
-            try {
-                Log.d("TurkTV", "Getting all series from ${channel.name}")
-                
-                val seriesUrl = "${channel.baseUrl}/diziler"
-                val doc = app.get(seriesUrl).document
-                
-                val seriesElements = doc.select(channel.seriesList.container)
-                Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name}")
-                
-                seriesElements.forEach { element ->
-                    val posterData = element.extractPosterData(channel, channel.baseUrl)
+            // Use active page for all series list
+            channel.seriesPageActive?.let { path ->
+                try {
+                    Log.d("TurkTV", "Getting all active series from ${channel.name}")
                     
-                    if (posterData != null) {
-                        results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
-                            this.posterUrl = posterData.posterUrl
-                            this.year = posterData.year
-                        })
+                    val seriesUrl = "${channel.baseUrl}${path}"
+                    val doc = app.get(seriesUrl).document
+                    
+                    val seriesElements = doc.select(channel.seriesList.container)
+                    Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name}")
+                    
+                    seriesElements.forEach { element ->
+                        val posterData = element.extractPosterData(channel, channel.baseUrl)
+                        
+                        if (posterData != null) {
+                            results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
+                                this.posterUrl = posterData.posterUrl
+                                this.year = posterData.year
+                            })
+                        }
                     }
+                } catch (e: Exception) {
+                    Log.e("TurkTV", "Error getting series from ${channel.name}: ${e.message}", e)
                 }
-            } catch (e: Exception) {
-                Log.e("TurkTV", "Error getting series from ${channel.name}: ${e.message}", e)
             }
         }
         
