@@ -211,7 +211,7 @@
     "title": "Teve2",
     "active": true,
     "poster": "https://brandfetch.com/teve2.com.tr/logo",
-    "url": "https://demiroren.daioncdn.net/teve2/teve2_master.m3u8",
+    "url": "https://demiroren.daioncdn.net/teve2/teve2.m3u8?app=kanald_web",
     "requiresReferer": true,
     "streamType": "tv"
   },
