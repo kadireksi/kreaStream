@@ -681,9 +681,9 @@ class TurkTV : MainAPI() {
                 this.posterUrl = loadData.poster
                 this.plot = loadData.description ?: "İzlemek için bir bölüm seçin."
                 this.year = loadData.year
-                this.rating = loadData.score
-                this.tags = loadData.tags
-                this.actors = loadData.actors
+                this.score = Score.from10(loadData.score)
+                this.tags = loadData.tags?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                this.actors = loadData.actors?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
             }
             
         } catch (e: Exception) {
