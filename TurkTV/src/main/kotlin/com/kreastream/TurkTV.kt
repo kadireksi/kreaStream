@@ -266,6 +266,14 @@ class TurkTV : MainAPI() {
             // For live hubs, provide all streams as extractor links
             filteredStreams.forEachIndexed { index, live ->
                 Log.d("TurkTV", "Creating extractor link $index: ${live.title}")
+                
+                // Determine the correct link type
+                val linkType = when {
+                    live.url.contains(".m3u8") -> ExtractorLinkType.M3U8
+                    live.url.contains(".aac") -> ExtractorLinkType.MEDIA
+                    else -> ExtractorLinkType.VIDEO
+                }
+                
                 callback(
                     newExtractorLink(
                         source = name,
@@ -274,9 +282,9 @@ class TurkTV : MainAPI() {
                     ){
                         this.referer = if (live.requiresReferer) mainUrl else ""
                         this.quality = Qualities.Unknown.value
-                        this.type = if (live.url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        this.type = linkType
                         this.headers = mapOf(
-                            "User-Agent" to "Mozilla/5.0",
+                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                             "Accept" to "*/*",
                             "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
                             "Origin" to mainUrl,
