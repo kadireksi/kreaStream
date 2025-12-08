@@ -100,7 +100,7 @@ class TurkTV : MainAPI() {
         val seriesPageActive: String? = null, // <--- ADDED (restored)
         val seriesPageArchive: String? = null, // <--- ADDED (restored)
         val seriesList: ChannelSelectorBlock,
-        val seriesListArchive: ChannelSelectorBlock, // <--- ADDED (restored)
+        val seriesListArchive: ChannelSelectorBlock? = null, // <--- ADDED (restored)
         val seriesDetail: SeriesSelectorBlock,
         val episodes: EpisodeSelectorBlock,
         val stream: StreamConfig,
@@ -436,10 +436,11 @@ class TurkTV : MainAPI() {
                 // Archived Series Section (Only created if seriesPageArchive is provided)
                 cfg.seriesPageArchive?.let { path ->
                     // Use archive selectors if available, fallback to active selectors
-                    val selectorBlock = cfg.seriesListArchive ?: cfg.seriesList
+                    val xarchive = cfg.seriesListArchive ?: cfg.seriesList
+                    val selectorBlock = xarchive
                     val archiveList = getChannelSeries(cfg, path, "Archive", selectorBlock) // <--- Pass the determined selectorBlock
                     if (archiveList.isNotEmpty()) {
-                        lists += HomePageList("📂 ${cfg.name} Arşiv Diziler", archiveList, cfg.seriesListArchive.isHorizontal)
+                        lists += HomePageList("📂 ${cfg.name} Arşiv Diziler", archiveList, xarchive.isHorizontal)
                         Log.d("TurkTV", "Added ${archiveList.size} archived series for ${cfg.name}")
                     }
                 }
