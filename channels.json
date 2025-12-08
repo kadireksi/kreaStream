@@ -171,9 +171,9 @@
         "episodesPageSuffix": "/bolumler",
         "seriesList": {
             "container": ".poster-card",
-            "title": "img[title*=]",
-            "link": "a[href*=]",
-            "poster": "img[src*]",
+            "title": "img[title]",
+            "link": "a[href]",
+            "poster": "img[src]",
             "year": "",
             "score": null,
             "lang": null,
@@ -182,7 +182,7 @@
         },
         "seriesListArchive": null,
         "seriesDetail": {
-            "container": ".poster",
+            "container": ".dizi-detail",
             "title": "h1.dizi-baslik, .page-title",
             "poster": "img[src*='afis'], .poster-large img",
             "description": ".hikaye p, .sinopsis",
