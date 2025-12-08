@@ -72,7 +72,17 @@
       "meta": "",
       "isHorizontal": true
     },
-    "seriesListArchive": null,
+    "seriesListArchive": {
+      "container": ".owl-item active",
+      "title": ".poster-image img[alt]",
+      "link": "a",
+      "poster": ".poster-image img[data-src]",
+      "year": "",
+      "score": null,
+      "lang": null,
+      "meta": "",
+      "isHorizontal": true
+    },
     "seriesDetail": {
       "container": ".dizi-sayfa",
       "title": "h1.dizi-adi",
@@ -170,7 +180,17 @@
       "meta": null,
       "isHorizontal": true
     },
-    "seriesListArchive": null,
+    "seriesListArchive": {
+      "container": ".owl-item active",
+      "title": ".poster-image img[alt]",
+      "link": "a",
+      "poster": ".poster-image img[data-src]",
+      "year": "",
+      "score": null,
+      "lang": null,
+      "meta": "",
+      "isHorizontal": true
+    },
     "seriesDetail": {
       "container": ".dizi-tanitim",
       "title": "h1, .dizi-adi",
@@ -214,7 +234,17 @@
       "meta": null,
       "isHorizontal": true
     },
-    "seriesListArchive": null,
+    "seriesListArchive": {
+      "container": ".owl-item active",
+      "title": ".poster-image img[alt]",
+      "link": "a",
+      "poster": ".poster-image img[data-src]",
+      "year": "",
+      "score": null,
+      "lang": null,
+      "meta": "",
+      "isHorizontal": true
+    },
     "seriesDetail": {
       "container": ".dizi-detay",
       "title": "h1.dizi-isim",
