@@ -171,8 +171,8 @@
         "episodesPageSuffix": "/bolumler",
         "seriesList": {
             "container": ".poster-card.hover-animation.relative.flex.w-full.rounded-md.overflow-hidden.max-w-[500px].flex-col",
-            "title": "img[title*]",
-            "link": "a[href*='/dizi/']",
+            "title": "img[title*=]",
+            "link": "a[href*=]",
             "poster": "img[src*]",
             "year": "",
             "score": null,
