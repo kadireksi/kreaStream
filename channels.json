@@ -1,306 +1,385 @@
 [
-    {
-        "key": "trt1",
-        "name": "TRT 1",
-        "baseUrl": "https://www.trt1.com.tr",
-        "active": true,
-        "seriesPageActive": "/diziler?archive=false&order=title_asc",
-        "seriesPageArchive": "/diziler?archive=true&order=title_asc",
-        "episodesPageSuffix": "/bolum",
-        "seriesList": {
-            "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
-            "title": "div.card_card-title__IJ9af",
-            "link": "href",
-            "poster": "img[src]",
-            "year": null,
-            "score": null,
-            "lang": null,
-            "meta": null,
-            "isHorizontal": true
-        },
-        "seriesListArchive": {
-            "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
-            "title": "div.card_card-title__IJ9af",
-            "link": "href",
-            "poster": "img[src]",
-            "year": null,
-            "score": null,
-            "lang": null,
-            "meta": null,
-            "isHorizontal": true
-        },
-        "seriesDetail": {
-            "container": ".dizi-icerik",
-            "title": "h1",
-            "poster": "picture.card_card-image__T64bP img",
-            "description": "meta[name=description]",
-            "year": null,
-            "score": null,
-            "tags": "",
-            "actors": "",
-            "trailer": ""
-        },
-        "episodes": {
-            "container": ".bolumler option, .episode-secenekleri",
-            "title": "option[value]",
-            "link": "option[value]",
-            "number": ".bolum-no",
-            "season": ".sezon-etiket"
-        },
-        "stream": {
-            "type": "m3u8",
-            "prefer": "hls",
-            "referer": true
-        }
+  {
+    "key": "trt1",
+    "name": "TRT 1",
+    "baseUrl": "https://www.trt1.com.tr",
+    "active": true,
+    "seriesPageActive": "/diziler?archive=false&order=title_asc",
+    "seriesPageArchive": "/diziler?archive=true&order=title_asc",
+    "episodesPageSuffix": "/bolum",
+    "seriesList": {
+      "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full",
+      "title": "div.card_card-title__IJ9af",
+      "link": "a",
+      "poster": "img[src]",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": true
     },
-    {
-        "key": "atv",
-        "name": "ATV",
-        "baseUrl": "https://www.atv.com.tr",
-        "active": true,
-        "seriesPageActive": "/diziler",
-        "seriesPageArchive": "/eski-diziler",
-        "episodesPageSuffix": "/bolumler",
-        "seriesList": {
-            "container": ".category-classic-item.type-02",
-            "title": "h3.title",
-            "link": "a.blankpage",
-            "poster": ".wrap-295x410 img",
-            "year": null,
-            "score": null,
-            "lang": null,
-            "meta": null,
-            "isHorizontal": false
-        },
-        "seriesListArchive": {
-            "container": ".col-12.col-sm-6.col-md-4.col-lg-3",
-            "title": "h2.title",
-            "link": "a.blankpage",
-            "poster": "picture.img img",
-            "year": null,
-            "score": null,
-            "lang": null,
-            "meta": null,
-            "isHorizontal": true
-        },
-        "seriesDetail": {
-            "container": ".tab-content",
-            "title": "h1, h2, h3.title, .page-title",
-            "poster": "img[src*='295x']",
-            "description": "article.post-info-content > p:first-of-type, .summary p",
-            "year": "div.post-info-year-country a:first-child",
-            "score": "div.post-info-imdb-rating span",
-            "tags": "div.post-info-genres a",
-            "actors": "div.post-info-cast a",
-            "trailer": "div.post-info-trailer button"
-        },
-        "episodes": {
-            "container": "#videoepisodecombobox option[value]:not([value=''])",
-            "title": "option[value]:not([value=''])",
-            "link": "option[value]:not([value=''])",
-            "number": null,
-            "season": null
-        },
-        "stream": {
-            "type": "m3u8",
-            "prefer": "hls",
-            "referer": true
-        }
+    "seriesListArchive": {
+      "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full",
+      "title": "div.card_card-title__IJ9af",
+      "link": "a",
+      "poster": "img[src]",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": true
     },
-    {
-        "key": "nowtv",
-        "name": "NOW TV",
-        "baseUrl": "https://www.nowtv.com.tr",
-        "active": true,
-        "seriesPageActive": "/dizi-izle",
-        "seriesPageArchive": "/dizi-arsivi?filter=date",
-        "episodesPageSuffix": "/bolumler",
-        "seriesList": {
-            "container": ".owl-item active",
-            "title": ".poster-image img[alt]",
-            "link": "a",
-            "poster": ".poster-image img[data-src]",
-            "year": "",
-            "score": null,
-            "lang": null,
-            "meta": "",
-            "isHorizontal": true
-        },
-        "seriesListArchive": {
-            "container": ".owl-item active",
-            "title": ".poster-image img[alt]",
-            "link": "a",
-            "poster": ".poster-image img[data-src]",
-            "year": "",
-            "score": null,
-            "lang": null,
-            "meta": "",
-            "isHorizontal": true
-        },
-        "seriesDetail": {
-            "container": ".dizi-sayfa",
-            "title": "h1.dizi-adi",
-            "poster": "img[src*='poster-large']",
-            "description": ".aciklama p, .ozet-metin",
-            "year": ".yayin-yili",
-            "score": null,
-            "tags": ".kategori-linkler a",
-            "actors": ".kadrolar ul li a",
-            "trailer": ".fragman-video iframe"
-        },
-        "episodes": {
-            "container": ".bolum-sec option, .episode-list option",
-            "title": "option[value]",
-            "link": "option[value]",
-            "number": ".bolum-sayisi",
-            "season": ".sezon-bilgi"
-        },
-        "stream": {
-            "type": "m3u8",
-            "prefer": "hls",
-            "referer": true
-        }
+    "pagination": {
+      "type": "selector",
+      "nextSelector": "a.next, .pagination-next",
+      "maxPages": "5",
+      "pageParam": ""
     },
-    {
-        "key": "startv",
-        "name": "Star TV",
-        "baseUrl": "https://www.startv.com.tr",
-        "active": true,
-        "seriesPageActive": "/dizi",
-        "seriesPageArchive": null,
-        "episodesPageSuffix": "/bolumler",
-        "seriesList": {
-            "container": ".poster-card",
-            "title": "img[title]",
-            "link": "a[href]",
-            "poster": "img[src]",
-            "year": "",
-            "score": null,
-            "lang": null,
-            "meta": null,
-            "isHorizontal": false
-        },
-        "seriesListArchive": null,
-        "seriesDetail": {
-            "container": ".dizi-detail",
-            "title": "h1.dizi-baslik, .page-title",
-            "poster": "img[src*='afis'], .poster-large img",
-            "description": ".hikaye p, .sinopsis",
-            "year": ".yil span",
-            "score": ".rating span",
-            "tags": ".genres a",
-            "actors": ".oyuncular a, .cast-list li",
-            "trailer": ".fragman button, iframe[src*='youtube']"
-        },
-        "episodes": {
-            "container": ".bolum-list option, #episode-select option",
-            "title": "option[value]",
-            "link": "option[value]",
-            "number": ".bolum-no",
-            "season": ".sezon-no"
-        },
-        "stream": {
-            "type": "m3u8",
-            "prefer": "hls",
-            "referer": true
-        }
+    "seriesDetail": {
+      "container": ".dizi-icerik",
+      "title": "h1",
+      "poster": "picture.card_card-image__T64bP img",
+      "description": "meta[name=description]",
+      "year": null,
+      "score": null,
+      "tags": "",
+      "actors": "",
+      "trailer": ""
     },
-    {
-        "key": "showtv",
-        "name": "Show TV",
-        "baseUrl": "https://www.showtv.com.tr",
-        "active": true,
-        "seriesPageActive": "/diziler",
-        "seriesPageArchive": null,
-        "episodesPageSuffix": "/bolumler",
-        "seriesList": {
-            "container": "ul.grid li",
-            "title": "a[title]",
-            "link": "a[href]",
-            "poster": "img[src]",
-            "year": null,
-            "score": null,
-            "lang": null,
-            "meta": null,
-            "isHorizontal": false
-        },
-        "seriesListArchive": null,
-        "seriesDetail": {
-            "container": ".dizi-tanitim",
-            "title": "h1, .dizi-adi",
-            "poster": "img[src*='afis'], .hero-image",
-            "description": ".hikaye-metin p, .ozet",
-            "year": ".yil-bilgi",
-            "score": ".imdb-puan",
-            "tags": ".turler a",
-            "actors": ".oyuncu-listesi a",
-            "trailer": ".video-fragman button"
-        },
-        "episodes": {
-            "container": ".bolumler option, #sezon-bolum option",
-            "title": "option[value]:not([value=''])",
-            "link": "option[value]",
-            "number": ".bolum-num",
-            "season": ".sezon-select"
-        },
-        "stream": {
-            "type": "m3u8",
-            "prefer": "hls",
-            "referer": true
-        }
+    "episodes": {
+      "container": ".bolumler option, .episode-secenekleri",
+      "title": "option[value]",
+      "link": "option[value]",
+      "number": ".bolum-no",
+      "season": ".sezon-etiket",
+      "date": ""
     },
-    {
-        "key": "kanald",
-        "name": "Kanal D",
-        "baseUrl": "https://www.kanald.com.tr",
-        "active": true,
-        "seriesPageActive": "/diziler",
-        "seriesPageArchive": null,
-        "episodesPageSuffix": "/bolumler",
-        "seriesList": {
-            "container": ".dizi-promo, .liste-item",
-            "title": ".promo-title a",
-            "link": "a[href*='/dizi/']",
-            "poster": ".promo-img img",
-            "year": null,
-            "score": null,
-            "lang": null,
-            "meta": null,
-            "isHorizontal": true
-        },
-        "seriesListArchive": {
-            "container": ".owl-item active",
-            "title": ".poster-image img[alt]",
-            "link": "a",
-            "poster": ".poster-image img[data-src]",
-            "year": "",
-            "score": null,
-            "lang": null,
-            "meta": "",
-            "isHorizontal": true
-        },
-        "seriesDetail": {
-            "container": ".dizi-detay",
-            "title": "h1.dizi-isim",
-            "poster": "img[src*='afis']",
-            "description": ".sinopsis-text, article p",
-            "year": ".yil-deger",
-            "score": ".puan-goster",
-            "tags": ".janr-etiket a",
-            "actors": ".oyuncu-kadro a",
-            "trailer": ".trailer-btn"
-        },
-        "episodes": {
-            "container": "#bolum-combobox option",
-            "title": "option[value]:not([value=''])",
-            "link": "option[value]",
-            "number": null,
-            "season": null
-        },
-        "stream": {
-            "type": "m3u8",
-            "prefer": "hls",
-            "referer": true
-        }
+    "stream": {
+      "type": "m3u8",
+      "prefer": "hls",
+      "referer": true,
+      "streamPattern": "",
+      "headers": "",
+      "referrer": ""
+    },
+    "archive": {
+      "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full",
+      "title": "div.card_card-title__IJ9af",
+      "link": "a",
+      "poster": "img[src]",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": true
     }
-]
+  },
+  {
+    "key": "atv",
+    "name": "ATV",
+    "baseUrl": "https://www.atv.com.tr",
+    "active": false,
+    "seriesPageActive": "/diziler",
+    "seriesPageArchive": "/eski-diziler",
+    "episodesPageSuffix": "/bolumler",
+    "seriesList": {
+      "container": ".category-classic-item.type-02",
+      "title": "h3.title",
+      "link": "a",
+      "poster": ".wrap-295x410 img",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": false
+    },
+    "seriesListArchive": {
+      "container": ".col-12.col-sm-6.col-md-4.col-lg-3",
+      "title": "h2.title",
+      "link": "a.blankpage",
+      "poster": "picture.img img",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": true
+    },
+    "pagination": {
+      "type": "selector",
+      "nextSelector": "a.next, .pagination-next",
+      "maxPages": "5",
+      "pageParam": ""
+    },
+    "seriesDetail": {
+      "container": ".tab-content",
+      "title": "h1, h2, h3.title, .page-title",
+      "poster": "img[src*='295x']",
+      "description": "article.post-info-content > p:first-of-type, .summary p",
+      "year": "div.post-info-year-country a:first-child",
+      "score": "div.post-info-imdb-rating span",
+      "tags": "div.post-info-genres a",
+      "actors": "div.post-info-cast a",
+      "trailer": "div.post-info-trailer button"
+    },
+    "episodes": {
+      "container": "#videoepisodecombobox option[value]:not([value=''])",
+      "title": "option[value]:not([value=''])",
+      "link": "option[value]:not([value=''])",
+      "number": null,
+      "season": null,
+      "date": ""
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "hls",
+      "referer": true,
+      "streamPattern": "",
+      "headers": "",
+      "referrer": ""
+    },
+    "archive": {
+      "container": ".col-12.col-sm-6.col-md-4.col-lg-3",
+      "title": "h2.title",
+      "link": "a.blankpage",
+      "poster": "picture.img img",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": true
+    }
+  },
+  {
+    "key": "nowtv",
+    "name": "NOW TV",
+    "baseUrl": "https://www.nowtv.com.tr",
+    "active": false,
+    "seriesPageActive": "/dizi-izle",
+    "seriesPageArchive": "/dizi-arsivi",
+    "episodesPageSuffix": "/bolumler",
+    "seriesList": {
+      "container": "div.menu-content-wrapper",
+      "title": "h2",
+      "link": "a[href]",
+      "poster": ""
+    },
+    "seriesListArchive": {
+      "container": ".list-item",
+      "title": "",
+      "link": ".list-item.list-item-image.a",
+      "poster": ".list-item.list-item-image > img",
+      "year": "",
+      "score": "",
+      "lang": "",
+      "meta": "",
+      "isHorizontal": "on"
+    },
+    "pagination": {
+      "type": "selector",
+      "nextSelector": "a.next, .pagination-next",
+      "maxPages": "5",
+      "pageParam": ""
+    },
+    "seriesDetail": {
+      "container": ".dizi-sayfa",
+      "title": "h1.dizi-adi",
+      "poster": "img[src*='poster-large']",
+      "description": ".aciklama p, .ozet-metin",
+      "year": ".yayin-yili",
+      "score": "",
+      "tags": ".kategori-linkler a",
+      "actors": ".kadrolar ul li a",
+      "trailer": ".fragman-video iframe"
+    },
+    "episodes": {
+      "container": ".bolum-sec option, .episode-list option",
+      "title": "option[value]",
+      "link": "option[value]",
+      "number": ".bolum-sayisi",
+      "season": ".sezon-bilgi",
+      "date": ""
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "hls",
+      "referer": "on",
+      "streamPattern": "",
+      "headers": "",
+      "referrer": ""
+    },
+    "type,nextSelector,pageParam,maxPages": {
+      "type": "",
+      "nextSelector": "",
+      "pageParam": "",
+      "maxPages": ""
+    },
+    "archive": {
+      "container": ".list-item",
+      "title": "",
+      "link": ".list-item.list-item-image.a",
+      "poster": ".list-item.list-item-image > img",
+      "year": "",
+      "score": "",
+      "lang": "",
+      "meta": "",
+      "isHorizontal": "on"
+    }
+  },
+  {
+    "key": "startv",
+    "name": "Star TV",
+    "baseUrl": "https://www.startv.com.tr",
+    "active": true,
+    "seriesPageActive": "/dizi",
+    "seriesPageArchive": null,
+    "episodesPageSuffix": "/bolumler",
+    "seriesList": {
+      "container": ".poster-card",
+      "title": "img[title]",
+      "link": "a[href]",
+      "poster": "img[src]",
+      "year": "",
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": false
+    },
+    "pagination": {
+      "type": "selector",
+      "nextSelector": "a.next, .pagination-next",
+      "maxPages": 5
+    },
+    "seriesListArchive": null,
+    "seriesDetail": {
+      "container": ".dizi-detail",
+      "title": "h1.dizi-baslik, .page-title",
+      "poster": "img[src*='afis'], .poster-large img",
+      "description": ".hikaye p, .sinopsis",
+      "year": ".yil span",
+      "score": ".rating span",
+      "tags": ".genres a",
+      "actors": ".oyuncular a, .cast-list li",
+      "trailer": ".fragman button, iframe[src*='youtube']"
+    },
+    "episodes": {
+      "container": ".bolum-list option, #episode-select option",
+      "title": "option[value]",
+      "link": "option[value]",
+      "number": ".bolum-no",
+      "season": ".sezon-no"
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "hls",
+      "referer": true
+    }
+  },
+  {
+    "key": "showtv",
+    "name": "Show TV",
+    "baseUrl": "https://www.showtv.com.tr",
+    "active": true,
+    "seriesPageActive": "/diziler",
+    "seriesPageArchive": null,
+    "episodesPageSuffix": "/bolumler",
+    "seriesList": {
+      "container": "ul.grid li",
+      "title": "a[title]",
+      "link": "a[href]",
+      "poster": "img[src]",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": false
+    },
+    "pagination": {
+      "type": "selector",
+      "nextSelector": "a.next, .pagination-next",
+      "maxPages": 5
+    },
+    "seriesListArchive": null,
+    "seriesDetail": {
+      "container": ".dizi-tanitim",
+      "title": "h1, .dizi-adi",
+      "poster": "img[src*='afis'], .hero-image",
+      "description": ".hikaye-metin p, .ozet",
+      "year": ".yil-bilgi",
+      "score": ".imdb-puan",
+      "tags": ".turler a",
+      "actors": ".oyuncu-listesi a",
+      "trailer": ".video-fragman button"
+    },
+    "episodes": {
+      "container": ".bolumler option, #sezon-bolum option",
+      "title": "option[value]:not([value=''])",
+      "link": "option[value]",
+      "number": ".bolum-num",
+      "season": ".sezon-select"
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "hls",
+      "referer": true
+    }
+  },
+  {
+    "key": "kanald",
+    "name": "Kanal D",
+    "baseUrl": "https://www.kanald.com.tr",
+    "active": true,
+    "seriesPageActive": "/diziler",
+    "seriesPageArchive": null,
+    "episodesPageSuffix": "/bolumler",
+    "seriesList": {
+      "container": ".dizi-promo, .liste-item",
+      "title": ".promo-title a",
+      "link": "a[href*='/dizi/']",
+      "poster": ".promo-img img",
+      "year": null,
+      "score": null,
+      "lang": null,
+      "meta": null,
+      "isHorizontal": true
+    },
+    "seriesListArchive": {
+      "container": ".owl-item active",
+      "title": ".poster-image img[alt]",
+      "link": "a",
+      "poster": ".poster-image img[data-src]",
+      "year": "",
+      "score": null,
+      "lang": null,
+      "meta": "",
+      "isHorizontal": true
+    },
+    "pagination": {
+      "type": "selector",
+      "nextSelector": "a.next, .pagination-next",
+      "maxPages": 5
+    },
+    "seriesDetail": {
+      "container": ".dizi-detay",
+      "title": "h1.dizi-isim",
+      "poster": "img[src*='afis']",
+      "description": ".sinopsis-text, article p",
+      "year": ".yil-deger",
+      "score": ".puan-goster",
+      "tags": ".janr-etiket a",
+      "actors": ".oyuncu-kadro a",
+      "trailer": ".trailer-btn"
+    },
+    "episodes": {
+      "container": "#bolum-combobox option",
+      "title": "option[value]:not([value=''])",
+      "link": "option[value]",
+      "number": null,
+      "season": null
+    },
+    "stream": {
+      "type": "m3u8",
+      "prefer": "hls",
+      "referer": true
+    }
+  }
+      ]
