@@ -249,14 +249,14 @@
     },
     "seriesDetail": {
       "container": ".dizi-icerik",
-      "title": "h1.dizi-adi",
-      "poster": ".ana-gorsel img",
-      "description": ".konu-ozeti p",
-      "year": ".baslangic-yili",
+      "title": "h1",
+      "poster": "picture.card_card-image__T64bP img",
+      "description": "meta[name=description]",
+      "year": null,
       "score": null,
-      "tags": ".tur-bilgisi a",
-      "actors": ".oyuncular-liste li",
-      "trailer": ".fragman-alani video"
+      "tags": "",
+      "actors": "",
+      "trailer": ""
     },
     "episodes": {
       "container": ".bolumler option, .episode-secenekleri",
