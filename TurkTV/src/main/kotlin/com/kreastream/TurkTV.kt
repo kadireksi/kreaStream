@@ -428,7 +428,7 @@ class TurkTV : MainAPI() {
                 cfg.seriesPageActive?.let { path ->
                     val seriesList = getChannelSeries(cfg, path, "Active", cfg.seriesList) // <--- Pass cfg.seriesList
                     if (seriesList.isNotEmpty()) {
-                        lists += HomePageList("📺 ${cfg.name} Diziler", seriesList, cfg.seriesList?.isHorizontal)
+                        lists += HomePageList("📺 ${cfg.name} Diziler", seriesList, cfg.seriesList.isHorizontal)
                         Log.d("TurkTV", "Added ${seriesList.size} active series for ${cfg.name}")
                     }
                 }
@@ -439,7 +439,7 @@ class TurkTV : MainAPI() {
                     val selectorBlock = cfg.seriesListArchive ?: cfg.seriesList
                     val archiveList = getChannelSeries(cfg, path, "Archive", selectorBlock) // <--- Pass the determined selectorBlock
                     if (archiveList.isNotEmpty()) {
-                        lists += HomePageList("📂 ${cfg.name} Arşiv Diziler", archiveList, cfg.seriesListArchive?.isHorizontal)
+                        lists += HomePageList("📂 ${cfg.name} Arşiv Diziler", archiveList, cfg.seriesListArchive.isHorizontal)
                         Log.d("TurkTV", "Added ${archiveList.size} archived series for ${cfg.name}")
                     }
                 }
