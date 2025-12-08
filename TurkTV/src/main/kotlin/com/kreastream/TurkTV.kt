@@ -62,7 +62,8 @@ class TurkTV : MainAPI() {
         val year: String? = null,
         val score: String? = null,
         val lang: String? = null,
-        val meta: String? = null
+        val meta: String? = null,
+        val isHorizontal: Boolean = false
     )
 
     data class SeriesSelectorBlock(
@@ -96,11 +97,14 @@ class TurkTV : MainAPI() {
         val name: String,
         val baseUrl: String,
         val active: Boolean = true,
+        val seriesPageActive: String? = null, // <--- ADDED (restored)
+        val seriesPageArchive: String? = null, // <--- ADDED (restored)
         val seriesList: ChannelSelectorBlock,
+        val seriesListArchive: ChannelSelectorBlock? = null, // <--- ADDED (restored)
         val seriesDetail: SeriesSelectorBlock,
         val episodes: EpisodeSelectorBlock,
         val stream: StreamConfig,
-        val episodesPageSuffix: String? = null // <--- NEW FIELD: Added episodes page suffix
+        val episodesPageSuffix: String? = null // <--- NEW FIELD
     )
 
     data class LiveStreamConfig(
@@ -120,22 +124,23 @@ class TurkTV : MainAPI() {
         }
     }
 
-    private fun Element.extractPosterData(channel: ChannelConfig, baseUrl: String): PosterData? {
+    // Refactored to take a specific ChannelSelectorBlock
+    private fun Element.extractPosterData(selectorBlock: ChannelSelectorBlock, baseUrl: String): PosterData? {
         // Get title from configured selector or default fallbacks
-        val title = channel.seriesList.title?.let { selector ->
+        val title = selectorBlock.title?.let { selector ->
             this.selectFirst(selector)?.text()?.trim()
         } ?: this.attr("title").takeIf { it.isNotEmpty() }?.trim()
         ?: this.selectFirst("strong.poster-title, h4.title, h3.title, h2.title, .title")?.text()?.trim()
         ?: return null
 
         // Get href from configured selector or default
-        val href = channel.seriesList.link?.let { selector ->
+        val href = selectorBlock.link?.let { selector ->
             this.selectFirst(selector)?.attr("href")
         } ?: this.attr("href")
         val fullUrl = fixUrlNull(href) ?: return null
 
         // Get poster from configured selector or default
-        val rawPosterUrl = channel.seriesList.poster?.let { selector ->
+        val rawPosterUrl = selectorBlock.poster?.let { selector ->
             this.selectFirst(selector)?.attr("src") ?: this.selectFirst(selector)?.attr("data-src")
         } ?: this.selectFirst("img[data-src], img[src]")?.attr("data-src")
             ?: this.selectFirst("img")?.attr("src")
@@ -145,17 +150,17 @@ class TurkTV : MainAPI() {
             ?.replace("/thumb/", "/")
 
         // Get year from configured selector or default
-        val year = channel.seriesList.year?.let { selector ->
+        val year = selectorBlock.year?.let { selector ->
             this.selectFirst(selector)?.text()?.trim()?.toIntOrNull()
         } ?: this.selectFirst(".poster-meta span, .year, .meta")?.text()?.trim()?.toIntOrNull()
 
         // Get score from configured selector or default
-        val score = channel.seriesList.score?.let { selector ->
+        val score = selectorBlock.score?.let { selector ->
             this.selectFirst(selector)?.ownText()?.trim()?.toFloatOrNull()
         } ?: this.selectFirst(".poster-meta .imdb, .rating, .score")?.ownText()?.trim()?.toFloatOrNull()
         
         // Get language info from configured selector or default
-        val lang = channel.seriesList.lang?.let { selector ->
+        val lang = selectorBlock.lang?.let { selector ->
             this.selectFirst(selector)?.text()?.trim()
         } ?: this.selectFirst(".poster-lang span, .poster-meta-genre span, .language")?.text()?.trim()
         
@@ -172,7 +177,7 @@ class TurkTV : MainAPI() {
         // Determine type from href or other indicators
         val typeCheck = href.contains("/dizi/", ignoreCase = true) || 
                        href.contains("/series", ignoreCase = true) ||
-                       channel.seriesList.meta?.let { selector ->
+                       selectorBlock.meta?.let { selector ->
                            this.selectFirst(selector)?.text()?.contains("Dizi", ignoreCase = true) == true
                        } ?: false
         
@@ -193,6 +198,10 @@ class TurkTV : MainAPI() {
     }
 
     private fun Document.extractLoadData(channel: ChannelConfig, baseUrl: String): LoadData? {
+        // ... LoadData logic remains the same ...
+        // Uses channel.seriesDetail which is a separate block, so no change needed here.
+        // ... (function body remains as in previous response)
+        
         // Get title from configured selector or default
         val originalTitle = channel.seriesDetail.title?.let { selector ->
             this.selectFirst(selector)?.text()?.trim()
@@ -269,23 +278,23 @@ class TurkTV : MainAPI() {
         )
     }
 
-    private suspend fun getChannelSeries(channel: ChannelConfig): List<SearchResponse> {
+    // Refactored to accept a specific selectorBlock
+    private suspend fun getChannelSeries(channel: ChannelConfig, path: String, listName: String, selectorBlock: ChannelSelectorBlock): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
         try {
-            Log.d("TurkTV", "Getting all series from ${channel.name} for main page")
+            Log.d("TurkTV", "Getting $listName series from ${channel.name} for main page using path: $path")
             
-            // Construct the URL for the channel's series list
-            // NOTE: This assumes "/diziler" as it was in the base file.
-            val seriesUrl = "${channel.baseUrl}/diziler"
+            // Construct the URL using the provided path
+            val seriesUrl = "${channel.baseUrl}${path}"
             val doc = app.get(seriesUrl).document
             
-            // Select series elements using the channel's configured container selector
-            val seriesElements = doc.select(channel.seriesList.container)
-            Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name}")
+            // Select series elements using the specific selector block's container
+            val seriesElements = doc.select(selectorBlock.container)
+            Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name} ($listName)")
             
             seriesElements.forEach { element ->
-                // Use the existing helper to extract poster data
-                val posterData = element.extractPosterData(channel, channel.baseUrl)
+                // Pass the specific selectorBlock to the extraction helper
+                val posterData = element.extractPosterData(selectorBlock, channel.baseUrl)
                 
                 if (posterData != null) {
                     results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
@@ -295,14 +304,14 @@ class TurkTV : MainAPI() {
                 }
             }
         } catch (e: Exception) {
-            // Log the error but return empty list, allowing the main page to show the channel name
-            Log.e("TurkTV", "Error getting series from ${channel.name}: ${e.message}", e)
+            Log.e("TurkTV", "Error getting $listName series from ${channel.name}: ${e.message}", e)
         }
         return results
     }
 
     // ------------------- JSON LOADING WITH REFRESH -------------------
     private suspend fun ensureLoaded(forceRefresh: Boolean = false) {
+        // ... (function body remains as in previous response)
         Log.d("TurkTV", "=== ensureLoaded() called, forceRefresh: $forceRefresh ===")
         
         val currentTime = System.currentTimeMillis()
@@ -410,28 +419,30 @@ class TurkTV : MainAPI() {
         
         lists += HomePageList("🎬 Canlı Yayınlar", liveItems, true)
         
-        // --- 2. SERIES SECTIONS (Show channel name even if series load fails or is empty) ---
+        // --- 2. SERIES SECTIONS (Using optional paths and selector blocks) ---
         if (channels != null && channels!!.isNotEmpty()) {
             Log.d("TurkTV", "Processing ${channels!!.size} channels for series lists")
             channels!!.forEach { cfg ->
-                // Call the helper function to fetch actual series
-                val seriesList = getChannelSeries(cfg)
                 
-                // If the list is empty, create a placeholder entry to still show the channel name
-                val listItems = if (seriesList.isNotEmpty()) {
-                    seriesList
-                } else {
-                    Log.w("TurkTV", "No series found for ${cfg.name}, adding placeholder for debugging.")
-                    listOf(
-                        newTvSeriesSearchResponse("Series data not loaded. Check JSON selectors for ${cfg.name}.", "${cfg.baseUrl}/diziler", TvType.TvSeries) {
-                            this.posterUrl = "https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
-                        }
-                    )
+                // Active Series Section
+                cfg.seriesPageActive?.let { path ->
+                    val seriesList = getChannelSeries(cfg, path, "Active", cfg.seriesList) // <--- Pass cfg.seriesList
+                    if (seriesList.isNotEmpty()) {
+                        lists += HomePageList("📺 ${cfg.name} Diziler", seriesList, cfg.seriesList?.isHorizontal)
+                        Log.d("TurkTV", "Added ${seriesList.size} active series for ${cfg.name}")
+                    }
                 }
-
-                // Always add the HomePageList for the channel
-                lists += HomePageList("📺 ${cfg.name} Diziler", listItems, true)
-                Log.d("TurkTV", "Added ${listItems.size} items for ${cfg.name}")
+                
+                // Archived Series Section (Only created if seriesPageArchive is provided)
+                cfg.seriesPageArchive?.let { path ->
+                    // Use archive selectors if available, fallback to active selectors
+                    val selectorBlock = cfg.seriesListArchive ?: cfg.seriesList
+                    val archiveList = getChannelSeries(cfg, path, "Archive", selectorBlock) // <--- Pass the determined selectorBlock
+                    if (archiveList.isNotEmpty()) {
+                        lists += HomePageList("📂 ${cfg.name} Arşiv Diziler", archiveList, cfg.seriesListArchive?.isHorizontal)
+                        Log.d("TurkTV", "Added ${archiveList.size} archived series for ${cfg.name}")
+                    }
+                }
             }
         } else {
             Log.w("TurkTV", "No channels available, adding placeholder")
@@ -458,38 +469,42 @@ class TurkTV : MainAPI() {
         val results = mutableListOf<SearchResponse>()
         
         channels?.forEach { channel ->
-            try {
-                Log.d("TurkTV", "Searching on ${channel.name} (${channel.baseUrl})")
-                
-                // Get the series page URL
-                val seriesUrl = "${channel.baseUrl}/diziler"
-                Log.d("TurkTV", "Fetching series from: $seriesUrl")
-                
-                val doc = app.get(seriesUrl).document
-                
-                // Extract series using the configured selectors
-                val seriesElements = doc.select(channel.seriesList.container)
-                Log.d("TurkTV", "Found ${seriesElements.size} series elements on ${channel.name}")
-                
-                seriesElements.forEach { element ->
-                    val posterData = element.extractPosterData(channel, channel.baseUrl)
+            // Use active page for search if available
+            channel.seriesPageActive?.let { path ->
+                try {
+                    Log.d("TurkTV", "Searching on ${channel.name} (${channel.baseUrl})")
                     
-                    if (posterData != null) {
-                        // Check if the series title matches the query (case-insensitive)
-                        if (posterData.displayTitle.contains(query, ignoreCase = true) ||
-                            posterData.originalTitle.contains(query, ignoreCase = true)) {
-                            
-                            Log.d("TurkTV", "Found series: ${posterData.displayTitle} -> ${posterData.href}")
-                            
-                            results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
-                                this.posterUrl = posterData.posterUrl
-                                this.year = posterData.year
-                            })
+                    // Get the series page URL using the configured active path
+                    val seriesUrl = "${channel.baseUrl}${path}"
+                    Log.d("TurkTV", "Fetching series from: $seriesUrl")
+                    
+                    val doc = app.get(seriesUrl).document
+                    
+                    // Extract series using the configured active selectors
+                    val seriesElements = doc.select(channel.seriesList.container)
+                    Log.d("TurkTV", "Found ${seriesElements.size} series elements on ${channel.name}")
+                    
+                    seriesElements.forEach { element ->
+                        // Pass active selector block
+                        val posterData = element.extractPosterData(channel.seriesList, channel.baseUrl)
+                        
+                        if (posterData != null) {
+                            // Check if the series title matches the query (case-insensitive)
+                            if (posterData.displayTitle.contains(query, ignoreCase = true) ||
+                                posterData.originalTitle.contains(query, ignoreCase = true)) {
+                                
+                                Log.d("TurkTV", "Found series: ${posterData.displayTitle} -> ${posterData.href}")
+                                
+                                results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
+                                    this.posterUrl = posterData.posterUrl
+                                    this.year = posterData.year
+                                })
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    Log.e("TurkTV", "Error searching on ${channel.name}: ${e.message}", e)
                 }
-            } catch (e: Exception) {
-                Log.e("TurkTV", "Error searching on ${channel.name}: ${e.message}", e)
             }
         }
         
@@ -502,27 +517,31 @@ class TurkTV : MainAPI() {
         val results = mutableListOf<SearchResponse>()
         
         channels?.forEach { channel ->
-            try {
-                Log.d("TurkTV", "Getting all series from ${channel.name}")
-                
-                val seriesUrl = "${channel.baseUrl}/diziler"
-                val doc = app.get(seriesUrl).document
-                
-                val seriesElements = doc.select(channel.seriesList.container)
-                Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name}")
-                
-                seriesElements.forEach { element ->
-                    val posterData = element.extractPosterData(channel, channel.baseUrl)
+            // Use active page for all series list
+            channel.seriesPageActive?.let { path ->
+                try {
+                    Log.d("TurkTV", "Getting all active series from ${channel.name}")
                     
-                    if (posterData != null) {
-                        results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
-                            this.posterUrl = posterData.posterUrl
-                            this.year = posterData.year
-                        })
+                    val seriesUrl = "${channel.baseUrl}${path}"
+                    val doc = app.get(seriesUrl).document
+                    
+                    val seriesElements = doc.select(channel.seriesList.container)
+                    Log.d("TurkTV", "Found ${seriesElements.size} series on ${channel.name}")
+                    
+                    seriesElements.forEach { element ->
+                        // Pass active selector block
+                        val posterData = element.extractPosterData(channel.seriesList, channel.baseUrl)
+                        
+                        if (posterData != null) {
+                            results.add(newTvSeriesSearchResponse(posterData.displayTitle, posterData.href, posterData.tvType) {
+                                this.posterUrl = posterData.posterUrl
+                                this.year = posterData.year
+                            })
+                        }
                     }
+                } catch (e: Exception) {
+                    Log.e("TurkTV", "Error getting series from ${channel.name}: ${e.message}", e)
                 }
-            } catch (e: Exception) {
-                Log.e("TurkTV", "Error getting series from ${channel.name}: ${e.message}", e)
             }
         }
         
@@ -531,6 +550,7 @@ class TurkTV : MainAPI() {
 
     // ------------------- LOAD (Series Page) -------------------
     override suspend fun load(url: String): LoadResponse {
+        // ... (function body remains as in previous response)
         ensureLoaded()
         
         if (url == liveTvHubUrl) {  
@@ -614,8 +634,8 @@ class TurkTV : MainAPI() {
             // 5. Get episodes page URL
             val seriesPath = url.removePrefix(channel.baseUrl).trim('/')
             // Use configured suffix, default to "/bolumler"
-            val episodesSuffix = channel.episodesPageSuffix ?: "/bolumler"
-            val episodesUrl = "${channel.baseUrl}/$seriesPath${episodesSuffix}"
+            val episodesSuffix = channel.episodesPageSuffix ?: "/bolumler" // <--- NEW LOGIC
+            val episodesUrl = "${channel.baseUrl}/$seriesPath${episodesSuffix}" // <--- USING NEW SUFFIX
             
             val episodesDoc = app.get(episodesUrl).document
             
@@ -716,6 +736,7 @@ class TurkTV : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // ... (function body remains as in previous response)
         ensureLoaded()
 
         // Individual live streams (when an episode is clicked)
