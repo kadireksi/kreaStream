@@ -3,45 +3,36 @@
     "key": "atv",
     "name": "ATV",
     "baseUrl": "https://www.atv.com.tr",
-    "active": true,
+    "active": false,
     "seriesPageActive": "/diziler",
     "seriesPageArchive": "/eski-diziler",
     "episodesPageSuffix": "/bolumler",
     "seriesList": {
-      "container": "a[href*='/diziler/'], .dizi-list a, .card-item a",
-      "title": "a[title], h3.title, .card-title",
-      "link": "a[href*='/diziler/']",
-      "poster": "img[data-src], img[src]",
+      "container": ".category-classic-item.type-02",
+      "title": "h3.title",
+      "link": "a.blankpage",
+      "poster": ".wrap-295x410 img",
       "year": null,
       "score": null,
       "lang": null,
       "meta": null
     },
-    "seriesListArchive": {
-      "container": "a[href*='/diziler/'], .dizi-list a, .card-item a",
-      "title": "a[title], h3.title, .card-title",
-      "link": "a[href*='/diziler/']",
-      "poster": "img[data-src], img[src]",
-      "year": null,
-      "score": null,
-      "lang": null,
-      "meta": null
-    },
+    "seriesListArchive": null,
     "seriesDetail": {
-      "container": ".tab-content, .dizi-detail, .program-detail",
+      "container": ".tab-content",
       "title": "h1, h2, h3.title, .page-title",
-      "poster": "img[src*='295x'], .poster img, img[data-src]",
-      "description": "article.post-info-content > p:first-of-type, .summary p, .sinopsis",
-      "year": "div.post-info-year-country a:first-child, .yayin-yili",
-      "score": "div.post-info-imdb-rating span, .imdb-puan",
-      "tags": "div.post-info-genres a, .turler a",
-      "actors": "div.post-info-cast a, .kadro a",
-      "trailer": "div.post-info-trailer button, iframe[src*='youtube']"
+      "poster": "img[src*='295x']",
+      "description": "article.post-info-content > p:first-of-type, .summary p",
+      "year": "div.post-info-year-country a:first-child",
+      "score": "div.post-info-imdb-rating span",
+      "tags": "div.post-info-genres a",
+      "actors": "div.post-info-cast a",
+      "trailer": "div.post-info-trailer button"
     },
     "episodes": {
-      "container": "#videoepisodecombobox option[value]:not([value='']), select#bolumler option, .episode-list option",
-      "title": "option[value]:not([value='']), option",
-      "link": "option[value]:not([value='']), option",
+      "container": "#videoepisodecombobox option[value]:not([value=''])",
+      "title": "option[value]:not([value=''])",
+      "link": "option[value]:not([value=''])",
       "number": null,
       "season": null
     },
@@ -51,43 +42,42 @@
       "referer": true
     }
   },
-
   {
     "key": "nowtv",
     "name": "NOW TV",
     "baseUrl": "https://www.nowtv.com.tr",
-    "active": true,
+    "active": false,
     "seriesPageActive": "/dizi-izle",
     "seriesPageArchive": "/dizi-arsivi?filter=date",
     "episodesPageSuffix": "/bolumler",
     "seriesList": {
-      "container": ".dizi-card, .dizi-list .card, .card, li.dizi-item, .owl-item",
-      "title": "img[alt], .card-title, a[title]",
-      "link": "a[href*='/dizi/'], a",
-      "poster": "img[data-src], img[src], img[loading]",
-      "year": null,
+      "container": ".owl-item active",
+      "title": ".poster-image img[alt]",
+      "link": "a",
+      "poster": ".poster-image img[data-src]",
+      "year": "",
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": ""
     },
     "seriesListArchive": null,
     "seriesDetail": {
-      "container": ".dizi-sayfa, .dizi-detail",
-      "title": "h1.dizi-adi, .page-title",
-      "poster": "img[src*='poster-large'], img[data-src], .poster img",
-      "description": ".aciklama p, .ozet-metin, .sinopsis, .summary p",
-      "year": ".yayin-yili, .yayin-yili span",
+      "container": ".dizi-sayfa",
+      "title": "h1.dizi-adi",
+      "poster": "img[src*='poster-large']",
+      "description": ".aciklama p, .ozet-metin",
+      "year": ".yayin-yili",
       "score": null,
-      "tags": ".kategori-linkler a, .tur-bilgisi a",
-      "actors": ".kadrolar ul li a, .oyuncular a",
-      "trailer": ".fragman-video iframe, .fragman iframe"
+      "tags": ".kategori-linkler a",
+      "actors": ".kadrolar ul li a",
+      "trailer": ".fragman-video iframe"
     },
     "episodes": {
-      "container": ".bolum-sec option, .episode-list option, select#episodes option",
-      "title": "option[value], option",
-      "link": "option[value], option",
-      "number": ".bolum-sayisi, .bolum-no",
-      "season": ".sezon-bilgi, .sezon-no"
+      "container": ".bolum-sec option, .episode-list option",
+      "title": "option[value]",
+      "link": "option[value]",
+      "number": ".bolum-sayisi",
+      "season": ".sezon-bilgi"
     },
     "stream": {
       "type": "m3u8",
@@ -95,42 +85,50 @@
       "referer": true
     }
   },
-
   {
     "key": "startv",
     "name": "Star TV",
     "baseUrl": "https://www.startv.com.tr",
-    "active": true,
+    "active": false,
     "seriesPageActive": "/diziler/yayinlanan-diziler",
     "seriesPageArchive": "/diziler/arsiv",
     "seriesList": {
-      "container": ".dizi-listesi-item, .card-item, .dizi-card, a[href*='/dizi/']",
-      "title": ".dizi-title a, h3 a, a[title]",
+      "container": ".dizi-listesi-item, .card-item",
+      "title": ".dizi-title a, h3 a",
       "link": "a[href*='/dizi/']",
-      "poster": ".poster img, img[src*='poster'], img[data-src]",
-      "year": ".year span, .yil span",
+      "poster": ".poster img, img[src*='poster']",
+      "year": ".year span",
       "score": null,
       "lang": null,
       "meta": null
     },
-    "seriesListArchive": null,
+    "seriesListArchive": {
+      "container": ".arsiv-listesi-item, .card-item",
+      "title": ".dizi-title a, h3 a",
+      "link": "a[href*='/dizi/']",
+      "poster": ".poster img, img[src*='poster']",
+      "year": ".year span",
+      "score": null,
+      "lang": null,
+      "meta": null
+    },
     "seriesDetail": {
-      "container": ".dizi-detail, .program-detail",
+      "container": ".dizi-detail",
       "title": "h1.dizi-baslik, .page-title",
-      "poster": "img[src*='afis'], .poster-large img, img[data-src]",
-      "description": ".hikaye p, .sinopsis, .summary p",
-      "year": ".yil span, .baslangic-yili",
+      "poster": "img[src*='afis'], .poster-large img",
+      "description": ".hikaye p, .sinopsis",
+      "year": ".yil span",
       "score": ".rating span",
       "tags": ".genres a",
-      "actors": ".oyuncular a, .cast-list li, .oyuncular-liste li",
+      "actors": ".oyuncular a, .cast-list li",
       "trailer": ".fragman button, iframe[src*='youtube']"
     },
     "episodes": {
-      "container": ".bolum-list option, #episode-select option, select#episodes option",
-      "title": "option[value], option",
-      "link": "option[value], option",
-      "number": ".bolum-no, .bolum-num",
-      "season": ".sezon-no, .sezon-select"
+      "container": ".bolum-list option, #episode-select option",
+      "title": "option[value]",
+      "link": "option[value]",
+      "number": ".bolum-no",
+      "season": ".sezon-no"
     },
     "stream": {
       "type": "m3u8",
@@ -138,19 +136,18 @@
       "referer": true
     }
   },
-
   {
     "key": "showtv",
     "name": "Show TV",
     "baseUrl": "https://www.showtv.com.tr",
-    "active": true,
+    "active": false,
     "seriesPageActive": "/diziler",
     "seriesPageArchive": null,
     "seriesList": {
-      "container": ".dizi-grid .item, .series-card, .card-item, .shows-list a",
-      "title": ".title-link, h2 a, a[title], .card-title",
-      "link": "a[href*='/dizi/'], a",
-      "poster": ".thumb img, img[src*='poster'], img[data-src]",
+      "container": ".dizi-grid .item, .series-card",
+      "title": ".title-link, h2 a",
+      "link": "a[href*='/dizi/']",
+      "poster": ".thumb img, img[src*='poster']",
       "year": null,
       "score": null,
       "lang": null,
@@ -158,20 +155,20 @@
     },
     "seriesListArchive": null,
     "seriesDetail": {
-      "container": ".dizi-tanitim, .program-detail, .detail-content",
-      "title": "h1, .dizi-adi, .page-title",
-      "poster": "img[src*='afis'], .hero-image img, img[data-src]",
-      "description": ".hikaye-metin p, .ozet, .summary p",
+      "container": ".dizi-tanitim",
+      "title": "h1, .dizi-adi",
+      "poster": "img[src*='afis'], .hero-image",
+      "description": ".hikaye-metin p, .ozet",
       "year": ".yil-bilgi",
       "score": ".imdb-puan",
       "tags": ".turler a",
-      "actors": ".oyuncu-listesi a, .cast-list li",
-      "trailer": ".video-fragman button, iframe[src*='youtube']"
+      "actors": ".oyuncu-listesi a",
+      "trailer": ".video-fragman button"
     },
     "episodes": {
-      "container": ".bolumler option, #sezon-bolum option, select#episodes option",
-      "title": "option[value]:not([value='']), option",
-      "link": "option[value], option",
+      "container": ".bolumler option, #sezon-bolum option",
+      "title": "option[value]:not([value=''])",
+      "link": "option[value]",
       "number": ".bolum-num",
       "season": ".sezon-select"
     },
@@ -181,19 +178,18 @@
       "referer": true
     }
   },
-
   {
     "key": "kanald",
     "name": "Kanal D",
     "baseUrl": "https://www.kanald.com.tr",
-    "active": true,
+    "active": false,
     "seriesPageActive": "/diziler",
     "seriesPageArchive": null,
     "seriesList": {
-      "container": ".dizi-promo, .liste-item, .dizi-list .item, .card-item, a[href*='/dizi/']",
-      "title": ".promo-title a, a[title], .card-title",
+      "container": ".dizi-promo, .liste-item",
+      "title": ".promo-title a",
       "link": "a[href*='/dizi/']",
-      "poster": ".promo-img img, img[src], img[data-src]",
+      "poster": ".promo-img img",
       "year": null,
       "score": null,
       "lang": null,
@@ -201,20 +197,20 @@
     },
     "seriesListArchive": null,
     "seriesDetail": {
-      "container": ".dizi-detay, .program-detail",
-      "title": "h1.dizi-isim, .page-title, h1",
-      "poster": "img[src*='afis'], img[data-src], .poster img",
-      "description": ".sinopsis-text, article p, .summary p",
+      "container": ".dizi-detay",
+      "title": "h1.dizi-isim",
+      "poster": "img[src*='afis']",
+      "description": ".sinopsis-text, article p",
       "year": ".yil-deger",
       "score": ".puan-goster",
       "tags": ".janr-etiket a",
-      "actors": ".oyuncu-kadro a, .oyuncular a",
-      "trailer": ".trailer-btn, iframe[src*='youtube']"
+      "actors": ".oyuncu-kadro a",
+      "trailer": ".trailer-btn"
     },
     "episodes": {
-      "container": "#bolum-combobox option, select#episodes option",
-      "title": "option[value]:not([value='']), option",
-      "link": "option[value], option",
+      "container": "#bolum-combobox option",
+      "title": "option[value]:not([value=''])",
+      "link": "option[value]",
       "number": null,
       "season": null
     },
@@ -224,7 +220,6 @@
       "referer": true
     }
   },
-
   {
     "key": "trt1",
     "name": "TRT 1",
@@ -233,40 +228,40 @@
     "seriesPageActive": "/diziler?archive=false&order=title_asc",
     "seriesPageArchive": "/diziler?archive=true&order=title_asc",
     "seriesList": {
-      "container": ".dizi-kartlari .kart, .kart, .dizi-list a, a[href*='/diziler/']",
-      "title": ".kart-baslik a, a[title], .card-title",
-      "link": "a[href*='/diziler/'], a",
-      "poster": ".kart-gorsel img, img[data-src], img[src]",
-      "year": ".yayin-tarihi, .baslangic-yili",
+      "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
+      "title": "div.card_card-title__IJ9af",
+      "link": "href",
+      "poster": "img[src]",
+      "year": null,
       "score": null,
       "lang": null,
       "meta": null
     },
     "seriesListArchive": {
-      "container": ".arsiv-kartlari .kart, .arsiv-kartlari .kart, a[href*='/diziler/']",
-      "title": ".kart-baslik a, a[title]",
-      "link": "a[href*='/diziler/']",
-      "poster": ".kart-gorsel img",
-      "year": ".yayin-tarihi",
+      "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
+      "title": "div.card_card-title__IJ9af",
+      "link": "href",
+      "poster": "img[src]",
+      "year": null,
       "score": null,
       "lang": null,
       "meta": null
     },
     "seriesDetail": {
-      "container": ".dizi-icerik, .program-detail",
-      "title": "h1.dizi-adi, .page-title",
-      "poster": ".ana-gorsel img, img[data-src]",
-      "description": ".konu-ozeti p, .summary p",
+      "container": ".dizi-icerik",
+      "title": "h1.dizi-adi",
+      "poster": ".ana-gorsel img",
+      "description": ".konu-ozeti p",
       "year": ".baslangic-yili",
       "score": null,
       "tags": ".tur-bilgisi a",
-      "actors": ".oyuncular-liste li, .oyuncular a",
-      "trailer": ".fragman-alani video, iframe[src*='youtube']"
+      "actors": ".oyuncular-liste li",
+      "trailer": ".fragman-alani video"
     },
     "episodes": {
-      "container": ".bolumler option, .episode-secenekleri, select#episodes option",
-      "title": "option[value], option",
-      "link": "option[value], option",
+      "container": ".bolumler option, .episode-secenekleri",
+      "title": "option[value]",
+      "link": "option[value]",
       "number": ".bolum-no",
       "season": ".sezon-etiket"
     },
