@@ -3,7 +3,7 @@
     "key": "atv",
     "name": "ATV",
     "baseUrl": "https://www.atv.com.tr",
-    "active": false,
+    "active": true,
     "seriesPageActive": "/diziler",
     "seriesPageArchive": "/eski-diziler",
     "episodesPageSuffix": "/bolumler",
@@ -15,7 +15,8 @@
       "year": null,
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": null,
+      "isHorizontal": false
     },
     "seriesListArchive": null,
     "seriesDetail": {
@@ -58,7 +59,8 @@
       "year": "",
       "score": null,
       "lang": null,
-      "meta": ""
+      "meta": "",
+      "isHorizontal": true
     },
     "seriesListArchive": null,
     "seriesDetail": {
@@ -100,7 +102,8 @@
       "year": ".year span",
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": null,
+      "isHorizontal": true
     },
     "seriesListArchive": {
       "container": ".arsiv-listesi-item, .card-item",
@@ -110,7 +113,8 @@
       "year": ".year span",
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": null,
+      "isHorizontal": true
     },
     "seriesDetail": {
       "container": ".dizi-detail",
@@ -151,7 +155,8 @@
       "year": null,
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": null,
+      "isHorizontal": true
     },
     "seriesListArchive": null,
     "seriesDetail": {
@@ -193,7 +198,8 @@
       "year": null,
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": null,
+      "isHorizontal": true
     },
     "seriesListArchive": null,
     "seriesDetail": {
@@ -235,7 +241,8 @@
       "year": null,
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": null,
+      "isHorizontal": true
     },
     "seriesListArchive": {
       "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
@@ -245,7 +252,8 @@
       "year": null,
       "score": null,
       "lang": null,
-      "meta": null
+      "meta": null,
+      "isHorizontal": true
     },
     "seriesDetail": {
       "container": ".dizi-icerik",
