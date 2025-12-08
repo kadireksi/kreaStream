@@ -170,7 +170,7 @@
         "seriesPageArchive": null,
         "episodesPageSuffix": "/bolumler",
         "seriesList": {
-            "container": ".poster-card.hover-animation.relative.flex.w-full.rounded-md.overflow-hidden.max-w-[500px].flex-col",
+            "container": ".poster-card",
             "title": "img[title*=]",
             "link": "a[href*=]",
             "poster": "img[src*]",
@@ -214,27 +214,17 @@
         "seriesPageArchive": null,
         "episodesPageSuffix": "/bolumler",
         "seriesList": {
-            "container": ".dizi-grid .item, .series-card",
-            "title": ".title-link, h2 a",
-            "link": "a[href*='/dizi/']",
-            "poster": ".thumb img, img[src*='poster']",
+            "container": "ul.grid li",
+            "title": "a[title]",
+            "link": "a[href]",
+            "poster": "img[src]",
             "year": null,
             "score": null,
             "lang": null,
             "meta": null,
             "isHorizontal": true
         },
-        "seriesListArchive": {
-            "container": ".owl-item active",
-            "title": ".poster-image img[alt]",
-            "link": "a",
-            "poster": ".poster-image img[data-src]",
-            "year": "",
-            "score": null,
-            "lang": null,
-            "meta": "",
-            "isHorizontal": true
-        },
+        "seriesListArchive": null,
         "seriesDetail": {
             "container": ".dizi-tanitim",
             "title": "h1, .dizi-adi",
