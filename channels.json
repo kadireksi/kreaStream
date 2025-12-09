@@ -98,18 +98,18 @@
         ],
         "detail_page": {
             "selectors": {
-                "title": "p.text_title__UMoMd",
-                "description": "p.text_body__os3WN > p",
-                "poster": "img.card_card-image__T64bP",
+                "title": "h1",
+                "description": "meta[name=description]",
+                "poster": "picture.card_card-image__T64bP img",
                 "tags": "div.basic-dot_badge__1nsQT"
             }
         },
         "episode_page": {
             "path_suffix": "/bolum",
             "selectors": {
-                "container": "div.h-full w-full",
+                "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
                 "name": "div.card_card-title__IJ9af",
-                "url": "a"
+                "url": "href"
             },
             "reverse_order": true
         },
