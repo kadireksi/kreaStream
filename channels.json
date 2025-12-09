@@ -9,7 +9,7 @@
     "episodesPageSuffix": "/bolumler",
     "seriesList": {
       "container": "div.item",
-      "title": ".promo-title a",
+      "title": "a[title]",
       "link": "a",
       "poster": "img",
       "year": null,
@@ -51,12 +51,6 @@
       "streamPattern": "",
       "headers": "",
       "referrer": ""
-    },
-    "archive": {
-      "container": "",
-      "title": "",
-      "link": "",
-      "poster": ""
     }
   }
 ]
