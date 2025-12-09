@@ -443,8 +443,8 @@
   {
     "key": "number1Best",
     "title": "Number1 Best Of",
-    "url": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
-    "poster": "https://eustr75.mediatriple.net/Number1Media/29_Number1_BEST_OF.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
+    "url": "https://eustr75.mediatriple.net/Number1Media/29_Number1_BEST_OF.stream/playlist.m3u8",
     "streamType": "radio",
     "active": true,
     "requiresReferer": false
