@@ -18,27 +18,25 @@ class TurkTV : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live, TvType.Movie)
 
-    // Remote Configuration URLs (Use your GitHub raw links)
+    // Remote Configuration URLs
     private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
     private val streamsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
 
     // =========================================================================
-    // 2. DYNAMIC DATA CLASSES (The "Fuel" Schemas)
+    // 2. DYNAMIC DATA CLASSES
     // =========================================================================
     
-    // --- Stream Config ---
     data class StreamItem(
         val id: String,
         val title: String,
-        val group: String = "TV", // "TV" or "Radio"
+        val group: String = "TV",
         val url: String,
         val poster: String? = null,
-        val type: String = "Live", // "Live"
+        val type: String = "Live",
         val is_audio: Boolean = false,
         val headers: Map<String, String> = emptyMap()
     )
 
-    // --- Channel Config ---
     data class ChannelConfig(
         val id: String,
         val name: String,
@@ -55,16 +53,16 @@ class TurkTV : MainAPI() {
         val title: String,
         val path: String,
         val layout: String? = "grid",
-        val selectors: Map<String, String> // "container", "title", "url", "poster"
+        val selectors: Map<String, String>
     )
 
     data class DetailConfig(
-        val selectors: Map<String, String> // "title", "description", "poster", "year", "tags"
+        val selectors: Map<String, String>
     )
 
     data class EpisodePageConfig(
         val path_suffix: String = "",
-        val selectors: Map<String, String>, // "container", "name", "url"
+        val selectors: Map<String, String>,
         val reverse_order: Boolean = false
     )
 
@@ -79,7 +77,6 @@ class TurkTV : MainAPI() {
         val attribute: String? = null
     )
 
-    // In-memory cache
     private var channels: List<ChannelConfig> = emptyList()
     private var streams: List<StreamItem> = emptyList()
 
@@ -88,12 +85,10 @@ class TurkTV : MainAPI() {
     // =========================================================================
     
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // Refresh Config only on first load to save bandwidth
         if (page == 1) fetchConfiguration()
 
         val pages = mutableListOf<HomePageList>()
 
-        // -- A. Live Streams Section --
         val tvStreams = streams.filter { !it.is_audio }
         val radioStreams = streams.filter { it.is_audio }
 
@@ -104,7 +99,6 @@ class TurkTV : MainAPI() {
             pages.add(HomePageList("📻 Radyo", radioStreams.map { it.toSearchResponse() }, true))
         }
 
-        // -- B. Channel Listings Section --
         channels.filter { it.active }.forEach { channel ->
             channel.listings.forEach { listing ->
                 try {
@@ -114,7 +108,6 @@ class TurkTV : MainAPI() {
                     val items = extractItems(doc, listing.selectors, channel.base_url)
                     
                     if (items.isNotEmpty()) {
-                         // Combine Channel Name + List Title (e.g., "Kanal D - Güncel")
                         val header = "${channel.name} - ${listing.title}"
                         pages.add(HomePageList(header, items, listing.layout != "list"))
                     }
@@ -132,19 +125,12 @@ class TurkTV : MainAPI() {
     // =========================================================================
 
     override suspend fun search(query: String): List<SearchResponse> {
-        fetchConfiguration() // Ensure loaded
+        fetchConfiguration()
         val results = mutableListOf<SearchResponse>()
         
-        // Search matches in Stream titles
         streams.filter { it.title.contains(query, true) }.forEach { 
             results.add(it.toSearchResponse()) 
         }
-
-        // Basic Search in Channels (Iterates active listings)
-        // Note: Real-time search on websites requires site-specific search URLs.
-        // For now, we search the "Fetched" catalog if we want deep integration, 
-        // but simpler is to just return empty or impl site-specific search later.
-        // This simple version just relies on what's visible or cached logic if extended.
         
         return results
     }
@@ -156,7 +142,7 @@ class TurkTV : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         fetchConfiguration()
 
-        // -- A. Handle Live Streams --
+        // Handle Live Streams
         val streamItem = streams.find { it.url == url }
         if (streamItem != null) {
             return newTvSeriesLoadResponse(streamItem.title, url, TvType.Live, 
@@ -170,13 +156,12 @@ class TurkTV : MainAPI() {
             }
         }
 
-        // -- B. Handle Channel Content --
+        // Handle Channel Content
         val channel = channels.find { url.startsWith(it.base_url) } 
             ?: throw Error("Channel config not found for this URL")
 
         val doc = app.get(url, headers = channel.headers).document
         
-        // 1. Extract Details
         val selectors = channel.detail_page?.selectors ?: emptyMap()
         val title = doc.smartSelect(selectors["title"]) ?: "Bilinmeyen Başlık"
         val plot = doc.smartSelect(selectors["description"])
@@ -184,13 +169,10 @@ class TurkTV : MainAPI() {
         val year = doc.smartSelect(selectors["year"])?.filter { it.isDigit() }?.toIntOrNull()
         val tags = doc.smartSelect(selectors["tags"], all = true)
 
-        // 2. Fetch Episodes
         val episodes = mutableListOf<Episode>()
         
-        // Check if we need to visit a separate page for episodes
         val suffix = channel.episode_page?.path_suffix ?: ""
         val episodeDoc = if (suffix.isNotEmpty()) {
-             // Smart URL combining
              val cleanUrl = if (url.endsWith("/")) url.dropLast(1) else url
              app.get("$cleanUrl$suffix", headers = channel.headers).document
         } else {
@@ -230,7 +212,7 @@ class TurkTV : MainAPI() {
     }
 
     // =========================================================================
-    // 6. LOAD LINKS (VIDEO EXTRACTION)
+    // 6. LOAD LINKS (VIDEO EXTRACTION) - FIXED
     // =========================================================================
 
     override suspend fun loadLinks(
@@ -244,10 +226,21 @@ class TurkTV : MainAPI() {
         // -- A. Direct Live Stream --
         val live = streams.find { it.url == data }
         if (live != null) {
-            callback(newExtractorLink(live.title, live.title, live.url, "", Qualities.Unknown.value) {
-                this.headers = live.headers
-                this.isM3u8 = live.url.contains("m3u8")
-            })
+            // Determine type
+            val type = if (live.url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+            
+            callback(
+                newExtractorLink(
+                    source = this.name,
+                    name = live.title,
+                    url = live.url
+                ){
+                    this.referer = live.headers["Referer"] ?: ""
+                    this.quality = Qualities.Unknown.value
+                    this.type = type
+                    this.headers = live.headers
+                }
+            )
             return true
         }
 
@@ -264,7 +257,8 @@ class TurkTV : MainAPI() {
                         doc.select(method.selector ?: "iframe").forEach { iframe ->
                             val src = iframe.attr("src")
                             if (src.isNotEmpty()) {
-                                loadExtractor(src, callback)
+                                // FIXED: loadExtractor requires subtitleCallback as 2nd arg (or 3rd if referer included)
+                                loadExtractor(src, subtitleCallback, callback)
                             }
                         }
                     }
@@ -272,20 +266,36 @@ class TurkTV : MainAPI() {
                         val html = doc.html()
                         val regex = method.pattern?.toRegex()
                         regex?.find(html)?.groupValues?.get(1)?.let { link ->
-                            val cleanLink = link.replace("\\/", "/") // Fix JSON escaped slashes
-                            callback(newExtractorLink("Source", "Source", cleanLink, "", Qualities.Unknown.value))
+                            val cleanLink = link.replace("\\/", "/")
+                            callback(
+                                newExtractorLink(
+                                    source = "Source",
+                                    name = "Source",
+                                    url = cleanLink
+                                ){
+                                    this.referer = ""
+                                    this.quality = Qualities.Unknown.value
+                                    this.type = ExtractorLinkType.VIDEO
+                                }
+                            )
                         }
                     }
                     "css" -> {
                         val link = doc.select(method.selector ?: "").attr(method.attribute ?: "src")
                         if(link.isNotEmpty()) {
-                             callback(newExtractorLink("Source", "Source", link, "", Qualities.Unknown.value))
+                            val type = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                            callback(
+                                newExtractorLink(
+                                    source = "Source",
+                                    name = "Source",
+                                    url = link
+                                ){
+                                    this.referer = ""
+                                    this.quality = Qualities.Unknown.value
+                                    this.type = type
+                                }
+                            )
                         }
-                    }
-                    "direct_m3u8" -> {
-                         // Default Cloudstream generic extraction
-                         // This is usually handled automatically if we don't return true, 
-                         // but we can try to find common patterns here.
                     }
                 }
             }
@@ -297,27 +307,23 @@ class TurkTV : MainAPI() {
     }
 
     // =========================================================================
-    // 7. HELPER FUNCTIONS (The "Magic")
+    // 7. HELPER FUNCTIONS
     // =========================================================================
 
     private suspend fun fetchConfiguration() {
         if (channels.isEmpty() || streams.isEmpty()) {
             try {
-                // Fetch channels
                 val chanText = app.get(channelsJsonUrl).text
                 channels = parseJson<List<ChannelConfig>>(chanText)
                 
-                // Fetch streams
                 val streamText = app.get(streamsJsonUrl).text
                 streams = parseJson<List<StreamItem>>(streamText)
-                
             } catch (e: Exception) {
                 Log.e("TurkTV", "Failed to load config: ${e.message}")
             }
         }
     }
 
-    // Generic selector parser: "element > child@attribute"
     private fun Element.smartSelect(selectorStr: String?): String? {
         if (selectorStr.isNullOrEmpty()) return null
         if (selectorStr == "self@text") return this.text()
@@ -337,7 +343,6 @@ class TurkTV : MainAPI() {
         }
     }
     
-    // List version of smartSelect
     private fun Element.smartSelect(selectorStr: String?, all: Boolean): List<String> {
         if (selectorStr.isNullOrEmpty()) return emptyList()
         val parts = selectorStr.split("@")
