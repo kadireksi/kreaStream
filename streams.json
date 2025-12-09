@@ -1,48 +1,48 @@
 [
   {
-    "key": "atv_live",
+    "key": "atv",
     "title": "ATV",
-    "active": true,
-    "poster": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
     "url": "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=wQs8URtOWkENnnQkuYEDpg&e=1765066569&ppid=21d804be91b8e91f11bb3789ff83f0b4",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "poster": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
-    "key": "showtv_live",
+    "key": "showtv",
     "title": "Show TV",
-    "active": true,
-    "poster": "https://www.showtv.com.tr/assets/images/other/showtv_social_media.jpg",
     "url": "https://ciner.daioncdn.net/showtv/showtv.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558&st=RBzhSuGauna0OGld-DJUVA&e=1664766175&tv=1&ppid=8582634a455f4cf72d132c75dc389bdb",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "poster": "https://www.showtv.com.tr/assets/images/other/showtv_social_media.jpg",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
-    "key": "startv_live",
-    "title": "Star TV",
-    "active": true,
-    "poster": "https://media.startv.com.tr/star-tv/images/logopic.jpg?height=320",
+    "key": "startv",
+    "title": "Start TV",
     "url": "https://dogus.daioncdn.net/startv/startv.m3u8?ce=3&app=a20ac41e-bdc3-4aa1-934d-26b484480ac9&ppid=8da08b73a240ae4239b8cec6dbc09aab",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "poster": "https://media.startv.com.tr/star-tv/images/logopic.jpg?height=320",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
-    "key": "kanald_live",
+    "key": "kanald",
     "title": "Kanal D",
-    "active": true,
-    "poster": "https://image.kanald.com.tr/i/kanald/100/1200x630/5b8c55b5e94fb71488087b88.jpg",
     "url": "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "poster": "https://image.kanald.com.tr/i/kanald/100/1200x630/5b8c55b5e94fb71488087b88.jpg",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
-    "key": "now_live",
+    "key": "nowtv",
     "title": "NOW TV",
-    "active": true,
-    "poster": "https://images.seeklogo.com/logo-png/51/1/now-tv-turkey-logo-png_seeklogo-519520.png",
     "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=alc1fE2gxymjUwt9fz_1mw&e=1765036148",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "poster": "https://images.seeklogo.com/logo-png/51/1/now-tv-turkey-logo-png_seeklogo-519520.png",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
     "key": "trtturk",
@@ -162,22 +162,22 @@
     "streamType": "tv"
   },
   {
-    "key": "trt-1-alt",
+    "key": "trt1alt",
     "title": "TRT 1 (24 saat)",
-    "active": true,
-    "poster": "",
     "url": "https://trt.daioncdn.net/trt-1/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": null,
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": false
   },
   {
-    "key": "trtspor-yildiz",
+    "key": "trtsporyildiz",
     "title": "TRT Spor Yıldız",
-    "active": true,
-    "poster": "",
     "url": "https://trt.daioncdn.net/trtspor-yildiz/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": null,
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": false
   },
   {
     "key": "trtspor2",
@@ -189,40 +189,40 @@
     "streamType": "tv"
   },
   {
-    "key": "tv360_live",
+    "key": "tv360",
     "title": "TV360",
-    "active": true,
-    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_360tv.png",
     "url": "https://turkmedya-live.ercdn.net/tv360/tv360.m3u8",
-    "requiresReferer": true,
-    "streamType": "tv"
-  },
-  {
-    "key": "tv4_live",
-    "title": "TV4",
+    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_360tv.png",
+    "streamType": "tv",
     "active": true,
-    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_tv4_yeni_2.png",
+    "requiresReferer": true
+  },
+  {
+    "key": "tv4",
+    "title": "TV4",
     "url": "https://turkmedya-live.ercdn.net/tv4/tv4.m3u8",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_tv4_yeni_2.png",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
-    "key": "teve2_live",
+    "key": "teve2",
     "title": "Teve2",
-    "active": false,
-    "poster": "https://static.teve2.com.tr/assets/img/teve2logo.png",
-    "url": "https://demiroren.daioncdn.net/teve2/teve2.m3u8?app=kanald_web",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "url": "https://demiroren-live.daioncdn.net/teve2/teve2.m3u8",
+    "poster": "https://brandfetch.com/teve2.com.tr/logo",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
-    "key": "a2_live",
+    "key": "a2",
     "title": "A2",
-    "active": false,
-    "poster": "https://www.atv.com.tr/a2tv/logo.png",
     "url": "https://trkvz-live.daioncdn.net/a2tv/a2tv.m3u8",
-    "requiresReferer": true,
-    "streamType": "tv"
+    "poster": "https://www.atv.com.tr/a2tv/logo.png",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": true
   },
   {
     "key": "trt-fm",
@@ -236,11 +236,11 @@
   {
     "key": "metro-fm",
     "title": "Metro FM",
-    "active": false,
-    "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
     "url": "https://25583.live.streamtheworld.com/METRO_FM128AAC.aac",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
   },
   {
     "key": "kral-fm",
@@ -371,29 +371,29 @@
   {
     "key": "super-fm",
     "title": "Süper FM",
-    "active": true,
+    "url": "https://27823.live.streamtheworld.com/SUPER_FM128AAC.aac",
     "poster": "https://superfm.com.tr/wp-content/uploads/2023/05/super-fm-logo.png",
-    "url": "https://live.superfm.com.tr/;live.mp3",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
   },
   {
     "key": "alem-fm",
     "title": "Alem FM",
-    "active": true,
-    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_alem_fm.png",
     "url": "https://alemfm.radyotvonline.net/alemfmaac",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_alem_fm.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
   },
   {
     "key": "number-one-fm",
     "title": "Number One FM",
+    "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
+    "streamType": "radio",
     "active": true,
-    "poster": "https://numberone.com.tr/wp-content/uploads/2022/12/numberone-fm-logo.png",
-    "url": "https://live.numberone.com.tr/;*.mp3",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "requiresReferer": false
   },
   {
     "key": "power-fm",
@@ -439,5 +439,50 @@
     "url": "https://live.radyo7.com.tr/;*.mp3",
     "requiresReferer": false,
     "streamType": "radio"
+  },
+  {
+    "key": "number1Best",
+    "title": "Number1 Best Of",
+    "url": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
+    "poster": "https://eustr75.mediatriple.net/Number1Media/29_Number1_BEST_OF.stream/playlist.m3u8",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "number1Slow",
+    "title": "Number1 Slow",
+    "url": "\thttps://eustr75.mediatriple.net/Number1Media/16_Number1_Slow.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Slow-1.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "number1Lounge",
+    "title": "Number1 Lounge",
+    "url": "\thttps://eustr75.mediatriple.net/Number1Media/12_Number1_Lounge.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2016/03/nr1lounge-300x300.jpg",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "number1Dance",
+    "title": "Number1 Dance",
+    "url": "https://eustr75.mediatriple.net/Number1Media/06_Number1_Dance.stream/playlist.m3u8?listeningSessionID=69330d27764d7449_344574_thwO6u3Q__00000004zwW&downloadSessionID=0",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Dance-1.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "number1Heart",
+    "title": "Number1 Heart",
+    "url": "https://eustr75.mediatriple.net/Number1Media/10_Number1_Heart.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Heart-1.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
   }
 ]
