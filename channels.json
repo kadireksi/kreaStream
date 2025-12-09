@@ -94,21 +94,27 @@
     ],
     "detail_page": {
       "selectors": {
-        "title": "h1@text",
-        "description": "meta[name=description]@content",
-        "poster": "picture img@src"
+        "title": "p.text_title__UMoMd",
+        "description": "p.text_body__os3WN > p",
+        "poster": "img.card_card-image__T64bP",
+        "tags": "div.basic-dot_badge__1nsQT"
       }
     },
     "episode_page": {
       "path_suffix": "/bolum",
       "selectors": {
-        "container": ".bolumler option",
-        "name": "self@text",
-        "url": "self@value"
-      }
+        "container": "div.h-full w-full",
+        "name": "div.card_card-title__IJ9af",
+        "url": "a"
+      },
+      "reverse_order": true
     },
     "video_extraction": {
       "methods": [
+        {
+          "type": "iframe",
+          "selector": "iframe[src*='https']"
+        },
         {
           "type": "direct_m3u8"
         }
