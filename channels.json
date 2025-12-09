@@ -32,8 +32,7 @@
     "pagination": {
       "type": "selector",
       "nextSelector": "a.next, .pagination-next",
-      "maxPages": "5",
-      "pageParam": ""
+      "maxPages": 5
     },
     "seriesDetail": {
       "container": ".dizi-icerik",
@@ -51,41 +50,26 @@
       "title": "option[value]",
       "link": "option[value]",
       "number": ".bolum-no",
-      "season": ".sezon-etiket",
-      "date": ""
+      "season": ".sezon-etiket"
     },
     "stream": {
       "type": "m3u8",
       "prefer": "hls",
-      "referer": true,
-      "streamPattern": "",
-      "headers": "",
-      "referrer": ""
-    },
-    "archive": {
-      "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full",
-      "title": "div.card_card-title__IJ9af",
-      "link": "a",
-      "poster": "img[src]",
-      "year": null,
-      "score": null,
-      "lang": null,
-      "meta": null,
-      "isHorizontal": true
+      "referer": true
     }
   },
   {
     "key": "atv",
     "name": "ATV",
     "baseUrl": "https://www.atv.com.tr",
-    "active": false,
+    "active": true,
     "seriesPageActive": "/diziler",
     "seriesPageArchive": "/eski-diziler",
     "episodesPageSuffix": "/bolumler",
     "seriesList": {
       "container": ".category-classic-item.type-02",
       "title": "h3.title",
-      "link": "a",
+      "link": "a.blankpage",
       "poster": ".wrap-295x410 img",
       "year": null,
       "score": null,
@@ -107,8 +91,7 @@
     "pagination": {
       "type": "selector",
       "nextSelector": "a.next, .pagination-next",
-      "maxPages": "5",
-      "pageParam": ""
+      "maxPages": 5
     },
     "seriesDetail": {
       "container": ".tab-content",
@@ -126,34 +109,19 @@
       "title": "option[value]:not([value=''])",
       "link": "option[value]:not([value=''])",
       "number": null,
-      "season": null,
-      "date": ""
+      "season": null
     },
     "stream": {
       "type": "m3u8",
       "prefer": "hls",
-      "referer": true,
-      "streamPattern": "",
-      "headers": "",
-      "referrer": ""
-    },
-    "archive": {
-      "container": ".col-12.col-sm-6.col-md-4.col-lg-3",
-      "title": "h2.title",
-      "link": "a.blankpage",
-      "poster": "picture.img img",
-      "year": null,
-      "score": null,
-      "lang": null,
-      "meta": null,
-      "isHorizontal": true
+      "referer": true
     }
   },
   {
     "key": "nowtv",
     "name": "NOW TV",
     "baseUrl": "https://www.nowtv.com.tr",
-    "active": false,
+    "active": "on",
     "seriesPageActive": "/dizi-izle",
     "seriesPageArchive": "/dizi-arsivi",
     "episodesPageSuffix": "/bolumler",
@@ -177,8 +145,7 @@
     "pagination": {
       "type": "selector",
       "nextSelector": "a.next, .pagination-next",
-      "maxPages": "5",
-      "pageParam": ""
+      "maxPages": 5
     },
     "seriesDetail": {
       "container": ".dizi-sayfa",
@@ -196,33 +163,18 @@
       "title": "option[value]",
       "link": "option[value]",
       "number": ".bolum-sayisi",
-      "season": ".sezon-bilgi",
-      "date": ""
+      "season": ".sezon-bilgi"
     },
     "stream": {
       "type": "m3u8",
       "prefer": "hls",
-      "referer": "on",
-      "streamPattern": "",
-      "headers": "",
-      "referrer": ""
+      "referer": "on"
     },
     "type,nextSelector,pageParam,maxPages": {
       "type": "",
       "nextSelector": "",
       "pageParam": "",
       "maxPages": ""
-    },
-    "archive": {
-      "container": ".list-item",
-      "title": "",
-      "link": ".list-item.list-item-image.a",
-      "poster": ".list-item.list-item-image > img",
-      "year": "",
-      "score": "",
-      "lang": "",
-      "meta": "",
-      "isHorizontal": "on"
     }
   },
   {
@@ -231,7 +183,7 @@
     "baseUrl": "https://www.startv.com.tr",
     "active": true,
     "seriesPageActive": "/dizi",
-    "seriesPageArchive": null,
+    "seriesPageArchive": "",
     "episodesPageSuffix": "/bolumler",
     "seriesList": {
       "container": ".poster-card",
@@ -247,7 +199,8 @@
     "pagination": {
       "type": "selector",
       "nextSelector": "a.next, .pagination-next",
-      "maxPages": 5
+      "maxPages": "5",
+      "pageParam": ""
     },
     "seriesListArchive": null,
     "seriesDetail": {
@@ -266,12 +219,22 @@
       "title": "option[value]",
       "link": "option[value]",
       "number": ".bolum-no",
-      "season": ".sezon-no"
+      "season": ".sezon-no",
+      "date": ""
     },
     "stream": {
       "type": "m3u8",
       "prefer": "hls",
-      "referer": true
+      "referer": true,
+      "streamPattern": "",
+      "headers": "",
+      "referrer": ""
+    },
+    "archive": {
+      "container": "",
+      "title": "",
+      "link": "",
+      "poster": ""
     }
   },
   {
@@ -329,34 +292,25 @@
     "baseUrl": "https://www.kanald.com.tr",
     "active": true,
     "seriesPageActive": "/diziler",
-    "seriesPageArchive": null,
+    "seriesPageArchive": "/diziler/arsiv",
     "episodesPageSuffix": "/bolumler",
     "seriesList": {
-      "container": ".dizi-promo, .liste-item",
+      "container": "div.item",
       "title": ".promo-title a",
-      "link": "a[href*='/dizi/']",
-      "poster": ".promo-img img",
+      "link": "a",
+      "poster": "img",
       "year": null,
       "score": null,
       "lang": null,
       "meta": null,
       "isHorizontal": true
     },
-    "seriesListArchive": {
-      "container": ".owl-item active",
-      "title": ".poster-image img[alt]",
-      "link": "a",
-      "poster": ".poster-image img[data-src]",
-      "year": "",
-      "score": null,
-      "lang": null,
-      "meta": "",
-      "isHorizontal": true
-    },
+    "seriesListArchive": null,
     "pagination": {
       "type": "selector",
       "nextSelector": "a.next, .pagination-next",
-      "maxPages": 5
+      "maxPages": "5",
+      "pageParam": ""
     },
     "seriesDetail": {
       "container": ".dizi-detay",
@@ -374,12 +328,22 @@
       "title": "option[value]:not([value=''])",
       "link": "option[value]",
       "number": null,
-      "season": null
+      "season": null,
+      "date": ""
     },
     "stream": {
       "type": "m3u8",
       "prefer": "hls",
-      "referer": true
+      "referer": true,
+      "streamPattern": "",
+      "headers": "",
+      "referrer": ""
+    },
+    "archive": {
+      "container": "",
+      "title": "",
+      "link": "",
+      "poster": ""
     }
   }
-      ]
+]
