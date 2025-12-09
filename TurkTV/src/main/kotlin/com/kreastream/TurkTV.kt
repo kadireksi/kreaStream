@@ -93,10 +93,10 @@ class TurkTV : MainAPI() {
         val radioStreams = streams.filter { it.is_audio }
 
         if (tvStreams.isNotEmpty()) {
-            pages.add(HomePageList("📺 Canlı TV", tvStreams.map { it.toSearchResponse() }, it.ishorizontal))
+            pages.add(HomePageList("📺 Canlı TV", tvStreams.map { it.toSearchResponse() }, listing.ishorizontal))
         }
         if (radioStreams.isNotEmpty()) {
-            pages.add(HomePageList("📻 Radyo", radioStreams.map { it.toSearchResponse() }, it.ishorizontal))
+            pages.add(HomePageList("📻 Radyo", radioStreams.map { it.toSearchResponse() }, listing.ishorizontal))
         }
 
         channels.filter { it.active }.forEach { channel ->
