@@ -387,15 +387,6 @@
     "requiresReferer": false
   },
   {
-    "key": "number-one-fm",
-    "title": "Number One FM",
-    "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
-    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
-  },
-  {
     "key": "power-fm",
     "title": "Power FM",
     "active": true,
@@ -439,6 +430,15 @@
     "url": "https://live.radyo7.com.tr/;*.mp3",
     "requiresReferer": false,
     "streamType": "radio"
+  },
+  {
+    "key": "number-one-fm",
+    "title": "Number One FM",
+    "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
   },
   {
     "key": "number1Best",
