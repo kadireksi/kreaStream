@@ -182,7 +182,7 @@
         "baseUrl": "https://www.startv.com.tr",
         "active": true,
         "seriesPageActive": "/dizi",
-        "seriesPageArchive": null,
+        "seriesPageArchive": "",
         "episodesPageSuffix": "/bolumler",
         "seriesList": {
             "container": ".poster-card",
