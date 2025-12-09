@@ -387,15 +387,6 @@
     "requiresReferer": false
   },
   {
-    "key": "number-one-fm",
-    "title": "Number One FM",
-    "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
-    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
-  },
-  {
     "key": "power-fm",
     "title": "Power FM",
     "active": true,
@@ -441,6 +432,15 @@
     "streamType": "radio"
   },
   {
+    "key": "number1fm",
+    "title": "Number 1 FM",
+    "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
     "key": "number1Best",
     "title": "Number1 Best Of",
     "url": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
@@ -452,7 +452,7 @@
   {
     "key": "number1Slow",
     "title": "Number1 Slow",
-    "url": "\thttps://eustr75.mediatriple.net/Number1Media/16_Number1_Slow.stream/playlist.m3u8",
+    "url": "https://eustr75.mediatriple.net/Number1Media/16_Number1_Slow.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Slow-1.png",
     "streamType": "radio",
     "active": true,
@@ -461,7 +461,7 @@
   {
     "key": "number1Lounge",
     "title": "Number1 Lounge",
-    "url": "\thttps://eustr75.mediatriple.net/Number1Media/12_Number1_Lounge.stream/playlist.m3u8",
+    "url": "https://eustr75.mediatriple.net/Number1Media/12_Number1_Lounge.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2016/03/nr1lounge-300x300.jpg",
     "streamType": "radio",
     "active": true,
@@ -470,7 +470,7 @@
   {
     "key": "number1Dance",
     "title": "Number1 Dance",
-    "url": "https://eustr75.mediatriple.net/Number1Media/06_Number1_Dance.stream/playlist.m3u8?listeningSessionID=69330d27764d7449_344574_thwO6u3Q__00000004zwW&downloadSessionID=0",
+    "url": "https://eustr75.mediatriple.net/Number1Media/06_Number1_Dance.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Dance-1.png",
     "streamType": "radio",
     "active": true,
@@ -529,5 +529,14 @@
     "streamType": "tv",
     "active": true,
     "requiresReferer": false
+  },
+  {
+    "key": "new_stream_1765300069466",
+    "title": "New Stream",
+    "active": true,
+    "poster": "",
+    "url": "https://",
+    "requiresReferer": false,
+    "streamType": "tv"
   }
 ]
