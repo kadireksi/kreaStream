@@ -52,8 +52,8 @@ class TurkTV : MainAPI() {
     data class ListingConfig(
         val title: String,
         val path: String,
-        val layout: String? = "grid",
-        val selectors: Map<String, String>
+        val selectors: Map<String, String>,
+        val ishorizontal: Boolean = false
     )
 
     data class DetailConfig(
@@ -93,10 +93,10 @@ class TurkTV : MainAPI() {
         val radioStreams = streams.filter { it.is_audio }
 
         if (tvStreams.isNotEmpty()) {
-            pages.add(HomePageList("📺 Canlı TV", tvStreams.map { it.toSearchResponse() }, true))
+            pages.add(HomePageList("📺 Canlı TV", tvStreams.map { it.toSearchResponse() }, it.ishorizontal))
         }
         if (radioStreams.isNotEmpty()) {
-            pages.add(HomePageList("📻 Radyo", radioStreams.map { it.toSearchResponse() }, true))
+            pages.add(HomePageList("📻 Radyo", radioStreams.map { it.toSearchResponse() }, it.ishorizontal))
         }
 
         channels.filter { it.active }.forEach { channel ->
@@ -109,7 +109,7 @@ class TurkTV : MainAPI() {
                     
                     if (items.isNotEmpty()) {
                         val header = "${channel.name} - ${listing.title}"
-                        pages.add(HomePageList(header, items, listing.layout != "list"))
+                        pages.add(HomePageList(header, items, listing.ishorizontal))
                     }
                 } catch (e: Exception) {
                     Log.e("TurkTV", "Error loading ${channel.name}: ${e.message}")
