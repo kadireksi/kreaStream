@@ -1,542 +1,560 @@
 [
   {
-    "key": "atv",
-    "title": "ATV",
-    "url": "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=wQs8URtOWkENnnQkuYEDpg&e=1765066569&ppid=21d804be91b8e91f11bb3789ff83f0b4",
+    "id": "atv_live",
+    "title": "ATV Canlı",
+    "group": "TV",
+    "url": "https://trkvz.daioncdn.net/atv/atv.m3u8?...",
     "poster": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "Live",
+    "headers": {
+      "Referer": "https://www.atv.com.tr/",
+      "Origin": "https://www.atv.com.tr"
+    }
   },
   {
-    "key": "showtv",
+    "id": "showtv",
     "title": "Show TV",
+    "group": "TV",
     "url": "https://ciner.daioncdn.net/showtv/showtv.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558&st=RBzhSuGauna0OGld-DJUVA&e=1664766175&tv=1&ppid=8582634a455f4cf72d132c75dc389bdb",
     "poster": "https://www.showtv.com.tr/assets/images/other/showtv_social_media.jpg",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.showtv.com.tr/",
+      "Origin": "https://www.showtv.com.tr"
+    }
   },
   {
-    "key": "startv",
+    "id": "startv",
     "title": "Start TV",
+    "group": "TV",
     "url": "https://dogus.daioncdn.net/startv/startv.m3u8?ce=3&app=a20ac41e-bdc3-4aa1-934d-26b484480ac9&ppid=8da08b73a240ae4239b8cec6dbc09aab",
     "poster": "https://media.startv.com.tr/star-tv/images/logopic.jpg?height=320",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.startv.com.tr/",
+      "Origin": "https://www.startv.com.tr"
+    }
   },
   {
-    "key": "kanald",
+    "id": "kanald",
     "title": "Kanal D",
+    "group": "TV",
     "url": "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web",
     "poster": "https://image.kanald.com.tr/i/kanald/100/1200x630/5b8c55b5e94fb71488087b88.jpg",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.kanald.com.tr/",
+      "Origin": "https://www.kanald.com.tr"
+    }
   },
   {
-    "key": "nowtv",
+    "id": "nowtv",
     "title": "NOW TV",
+    "group": "TV",
     "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=alc1fE2gxymjUwt9fz_1mw&e=1765036148",
     "poster": "https://images.seeklogo.com/logo-png/51/1/now-tv-turkey-logo-png_seeklogo-519520.png",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.nowtv.com.tr/",
+      "Origin": "https://www.nowtv.com.tr"
+    }
   },
   {
-    "key": "trtturk",
+    "id": "trtturk",
     "title": "TRT Türk",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtturk.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trthaber",
+    "id": "trthaber",
     "title": "TRT Haber",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trthaber.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtcocuk",
+    "id": "trtcocuk",
     "title": "TRT Çocuk",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtmuzik",
+    "id": "trtmuzik",
     "title": "TRT Müzik",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtmuzik.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trt1",
+    "id": "trt1",
     "title": "TRT 1",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtspor1",
+    "id": "trtspor1",
     "title": "TRT Spor 1",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtspor1.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtdiyanetcocuk",
+    "id": "trtdiyanetcocuk",
     "title": "TRT Diyanet Çocuk",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtdiyanetcocuk.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtavaz",
+    "id": "trtavaz",
     "title": "TRT Avaz",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtavaz.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtarabi",
+    "id": "trtarabi",
     "title": "TRT Arabi",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtarabi.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtworld",
+    "id": "trtworld",
     "title": "TRT World",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtworld.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtkurdi",
+    "id": "trtkurdi",
     "title": "TRT Kurdi",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtkurdi.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trt2",
+    "id": "trt2",
     "title": "TRT 2",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trt2.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
-  },
-  {
-    "key": "trtbelgesel",
-    "title": "TRT Belgesel",
-    "active": true,
     "poster": "",
-    "url": "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trt1alt",
+    "id": "trtbelgesel",
+    "title": "TRT Belgesel",
+    "group": "TV",
+    "url": "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8",
+    "poster": "",
+    "type": "tv",
+    "headers": {}
+  },
+  {
+    "id": "trt1alt",
     "title": "TRT 1 (24 saat)",
+    "group": "TV",
     "url": "https://trt.daioncdn.net/trt-1/master.m3u8",
     "poster": null,
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": false
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtsporyildiz",
+    "id": "trtsporyildiz",
     "title": "TRT Spor Yıldız",
+    "group": "TV",
     "url": "https://trt.daioncdn.net/trtspor-yildiz/master.m3u8",
     "poster": null,
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": false
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "trtspor2",
+    "id": "trtspor2",
     "title": "TRT Spor 2",
-    "active": true,
-    "poster": "",
+    "group": "TV",
     "url": "https://tv-trtspor2.medya.trt.com.tr/master.m3u8",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "poster": "",
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "tv360",
+    "id": "tv360",
     "title": "TV360",
+    "group": "TV",
     "url": "https://turkmedya-live.ercdn.net/tv360/tv360.m3u8",
     "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_360tv.png",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.turkmedya.com.tr/",
+      "Origin": "https://www.turkmedya.com.tr"
+    }
   },
   {
-    "key": "tv4",
+    "id": "tv4",
     "title": "TV4",
+    "group": "TV",
     "url": "https://turkmedya-live.ercdn.net/tv4/tv4.m3u8",
     "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_tv4_yeni_2.png",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.turkmedya.com.tr/",
+      "Origin": "https://www.turkmedya.com.tr"
+    }
   },
   {
-    "key": "teve2",
+    "id": "teve2",
     "title": "Teve2",
+    "group": "TV",
     "url": "https://demiroren-live.daioncdn.net/teve2/teve2.m3u8",
     "poster": "https://brandfetch.com/teve2.com.tr/logo",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.teve2.com.tr/",
+      "Origin": "https://www.teve2.com.tr"
+    }
   },
   {
-    "key": "a2",
+    "id": "a2",
     "title": "A2",
+    "group": "TV",
     "url": "https://trkvz-live.daioncdn.net/a2tv/a2tv.m3u8",
     "poster": "https://www.atv.com.tr/a2tv/logo.png",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": true
+    "type": "tv",
+    "headers": {
+      "Referer": "https://www.atv.com.tr/",
+      "Origin": "https://www.atv.com.tr"
+    }
   },
   {
-    "key": "trt-fm",
+    "id": "trt-fm",
     "title": "TRT FM",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467418.jpeg",
+    "group": "Radio",
     "url": "https://trt.radyotvonline.net/trt_fm.aac",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467418.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "metro-fm",
+    "id": "metro-fm",
     "title": "Metro FM",
+    "group": "Radio",
     "url": "https://25583.live.streamtheworld.com/METRO_FM128AAC.aac",
     "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "kral-fm",
+    "id": "kral-fm",
     "title": "Kral FM",
-    "active": true,
-    "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/17/kralfm.png",
+    "group": "Radio",
     "url": "https://dygedge2.radyotvonline.net/kralfm/playlist.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/17/kralfm.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "kral-pop",
+    "id": "kral-pop",
     "title": "Kral Pop",
-    "active": true,
-    "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/20/kralpop.png",
+    "group": "Radio",
     "url": "https://dygedge.radyotvonline.net/kralpop/playlist.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/20/kralpop.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "trt-radyo-1",
+    "id": "trt-radyo-1",
     "title": "TRT Radyo 1",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467415.jpeg",
+    "group": "Radio",
     "url": "https://trt.radyotvonline.net/trt_1.aac",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467415.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "trt-nagme",
+    "id": "trt-nagme",
     "title": "TRT Nağme",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467465.jpeg",
+    "group": "Radio",
     "url": "https://rd-trtnagme.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467465.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "trt-turku",
+    "id": "trt-turku",
     "title": "TRT Türkü",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467466.jpeg",
+    "group": "Radio",
     "url": "https://rd-trtturku.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467466.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "memleketim-fm",
+    "id": "memleketim-fm",
     "title": "Memleketim FM",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467512.jpeg",
+    "group": "Radio",
     "url": "https://radio-trtmemleketimfm.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467512.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "trt-radyo-haber",
+    "id": "trt-radyo-haber",
     "title": "TRT Radyo Haber",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12530424_0-0-2048-1536.jpeg",
+    "group": "Radio",
     "url": "https://trt.radyotvonline.net/trt_haber.aac",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12530424_0-0-2048-1536.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "trt-radyo-3",
+    "id": "trt-radyo-3",
     "title": "TRT Radyo 3",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
+    "group": "Radio",
     "url": "https://rd-trtradyo3.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "erzurum-radyosu",
+    "id": "erzurum-radyosu",
     "title": "Erzurum Radyosu",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
+    "group": "Radio",
     "url": "https://radio-trterzurum.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "antalya-radyosu",
+    "id": "antalya-radyosu",
     "title": "Antalya Radyosu",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467521.jpeg",
+    "group": "Radio",
     "url": "https://radio-trtantalya.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467521.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "cukurova-radyosu",
+    "id": "cukurova-radyosu",
     "title": "Çukurova Radyosu",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467486.jpeg",
+    "group": "Radio",
     "url": "https://radio-trtcukurova.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467486.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "trabzon-radyosu",
+    "id": "trabzon-radyosu",
     "title": "Trabzon Radyosu",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
+    "group": "Radio",
     "url": "https://radio-trttrabzon.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "gap-radyosu",
+    "id": "gap-radyosu",
     "title": "Gap Radyosu",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467503.jpeg",
+    "group": "Radio",
     "url": "https://radio-trtgap.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467503.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "trt-kurdi",
+    "id": "trt-kurdi",
     "title": "TRT Kurdi",
-    "active": true,
-    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467484.jpeg",
+    "group": "Radio",
     "url": "https://radio-trtradyo6.medya.trt.com.tr/master_128.m3u8",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467484.jpeg",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "super-fm",
+    "id": "super-fm",
     "title": "Süper FM",
+    "group": "Radio",
     "url": "https://27823.live.streamtheworld.com/SUPER_FM128AAC.aac",
     "poster": "https://superfm.com.tr/wp-content/uploads/2023/05/super-fm-logo.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "alem-fm",
+    "id": "alem-fm",
     "title": "Alem FM",
+    "group": "Radio",
     "url": "https://alemfm.radyotvonline.net/alemfmaac",
     "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_alem_fm.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "power-fm",
+    "id": "power-fm",
     "title": "Power FM",
-    "active": true,
-    "poster": "https://powerfm.com.tr/wp-content/uploads/2023/02/power-fm-logo.png",
+    "group": "Radio",
     "url": "https://live.powerfm.com.tr/;*.mp3",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://powerfm.com.tr/wp-content/uploads/2023/02/power-fm-logo.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "best-fm",
+    "id": "best-fm",
     "title": "Best FM",
-    "active": true,
-    "poster": "https://bestfm.com.tr/wp-content/uploads/2023/03/best-fm-logo.png",
+    "group": "Radio",
     "url": "https://live.bestfm.com.tr/;*.mp3",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://bestfm.com.tr/wp-content/uploads/2023/03/best-fm-logo.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "radyo-1",
+    "id": "radyo-1",
     "title": "Radyo 1",
-    "active": true,
-    "poster": "https://radyo1.com.tr/wp-content/uploads/2024/01/radyo1-logo.png",
+    "group": "Radio",
     "url": "https://live.radyo1.com.tr/;*.mp3",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://radyo1.com.tr/wp-content/uploads/2024/01/radyo1-logo.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "joy-turk",
+    "id": "joy-turk",
     "title": "Joy Türk",
-    "active": true,
-    "poster": "https://joyturk.com/wp-content/uploads/2023/04/joy-turk-logo.png",
+    "group": "Radio",
     "url": "https://live.joyturk.com/;*.mp3",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://joyturk.com/wp-content/uploads/2023/04/joy-turk-logo.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "radyo-7",
+    "id": "radyo-7",
     "title": "Radyo 7",
-    "active": true,
-    "poster": "https://radyo7.com.tr/wp-content/uploads/2023/05/radyo7-logo.png",
+    "group": "Radio",
     "url": "https://live.radyo7.com.tr/;*.mp3",
-    "requiresReferer": false,
-    "streamType": "radio"
+    "poster": "https://radyo7.com.tr/wp-content/uploads/2023/05/radyo7-logo.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "number1fm",
+    "id": "number1fm",
     "title": "Number 1 FM",
+    "group": "Radio",
     "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "number1Best",
+    "id": "number1Best",
     "title": "Number1 Best Of",
-    "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
+    "group": "Radio",
     "url": "https://eustr75.mediatriple.net/Number1Media/29_Number1_BEST_OF.stream/playlist.m3u8",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "number1Slow",
+    "id": "number1Slow",
     "title": "Number1 Slow",
+    "group": "Radio",
     "url": "https://eustr75.mediatriple.net/Number1Media/16_Number1_Slow.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Slow-1.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "number1Lounge",
+    "id": "number1Lounge",
     "title": "Number1 Lounge",
+    "group": "Radio",
     "url": "https://eustr75.mediatriple.net/Number1Media/12_Number1_Lounge.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2016/03/nr1lounge-300x300.jpg",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "number1Dance",
+    "id": "number1Dance",
     "title": "Number1 Dance",
+    "group": "Radio",
     "url": "https://eustr75.mediatriple.net/Number1Media/06_Number1_Dance.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Dance-1.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "number1Heart",
+    "id": "number1Heart",
     "title": "Number1 Heart",
+    "group": "Radio",
     "url": "https://eustr75.mediatriple.net/Number1Media/10_Number1_Heart.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Heart-1.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
+    "type": "radio",
+    "headers": {}
   },
   {
-    "key": "Nr1Tv",
+    "id": "Nr1Tv",
     "title": "Nr1 TV",
+    "group": "TV",
     "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e17cd59e8b.smil/playlist.m3u8?md5=d2YLTWbheiukRfMtHsE2Dw",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/nr1-tv-logo.jpg",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": false
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "Nr1TvAsk",
+    "id": "Nr1TvAsk",
     "title": "Number1 Aşk Tv",
+    "group": "TV",
     "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e18f9c54e6.smil/playlist.m3u8?md5=tk4gzHZAybQOxGgzavddHA",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/10/ask-tv-web.jpg",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": false
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "Nr1TurkTv",
+    "id": "Nr1TurkTv",
     "title": "Nr1 Türk Tv",
+    "group": "TV",
     "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e187770143.smil/playlist.m3u8?md5=kFLJQfFHiuG9a_6N1_Rdug",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/turk-tv-logo.jpg",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": false
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "Nr1RapTV",
+    "id": "Nr1RapTV",
     "title": "Number1 Rap TV",
+    "group": "TV",
     "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e19877b340.smil/playlist.m3u8?md5=ahnQby7bxYCogFTrF--h2A",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/10/damar-tv-web.jpg",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": false
+    "type": "tv",
+    "headers": {}
   },
   {
-    "key": "Nr1DanceTV",
+    "id": "Nr1DanceTV",
     "title": "Number1 Dance TV",
+    "group": "TV",
     "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e2aa89e721.smil/playlist.m3u8?md5=Qxx6nus_YV2ixEdEXdztJQ",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/10/dance-tv-web.jpg",
-    "streamType": "tv",
-    "active": true,
-    "requiresReferer": false
-  },
-  {
-    "key": "new_stream_1765300069466",
-    "title": "New Stream",
-    "active": true,
-    "poster": "",
-    "url": "https://",
-    "requiresReferer": false,
-    "streamType": "tv"
+    "type": "tv",
+    "headers": {}
   }
 ]
