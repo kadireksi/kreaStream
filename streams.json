@@ -387,6 +387,15 @@
     "requiresReferer": false
   },
   {
+    "key": "number-one-fm",
+    "title": "Number One FM",
+    "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
+    "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
     "key": "power-fm",
     "title": "Power FM",
     "active": true,
@@ -432,19 +441,10 @@
     "streamType": "radio"
   },
   {
-    "key": "number-one-fm",
-    "title": "Number One FM",
-    "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
-    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
-    "streamType": "radio",
-    "active": true,
-    "requiresReferer": false
-  },
-  {
     "key": "number1Best",
     "title": "Number1 Best Of",
-    "url": "https://eustr75.mediatriple.net/Number1Media/29_Number1_BEST_OF.stream/playlist.m3u8",
-    "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
+    "url": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
+    "poster": "https://eustr75.mediatriple.net/Number1Media/29_Number1_BEST_OF.stream/playlist.m3u8",
     "streamType": "radio",
     "active": true,
     "requiresReferer": false
@@ -452,7 +452,7 @@
   {
     "key": "number1Slow",
     "title": "Number1 Slow",
-    "url": "https://eustr75.mediatriple.net/Number1Media/16_Number1_Slow.stream/playlist.m3u8",
+    "url": "\thttps://eustr75.mediatriple.net/Number1Media/16_Number1_Slow.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Slow-1.png",
     "streamType": "radio",
     "active": true,
@@ -461,7 +461,7 @@
   {
     "key": "number1Lounge",
     "title": "Number1 Lounge",
-    "url": "https://eustr75.mediatriple.net/Number1Media/12_Number1_Lounge.stream/playlist.m3u8",
+    "url": "\thttps://eustr75.mediatriple.net/Number1Media/12_Number1_Lounge.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2016/03/nr1lounge-300x300.jpg",
     "streamType": "radio",
     "active": true,
@@ -470,7 +470,7 @@
   {
     "key": "number1Dance",
     "title": "Number1 Dance",
-    "url": "https://eustr75.mediatriple.net/Number1Media/06_Number1_Dance.stream/playlist.m3u8",
+    "url": "https://eustr75.mediatriple.net/Number1Media/06_Number1_Dance.stream/playlist.m3u8?listeningSessionID=69330d27764d7449_344574_thwO6u3Q__00000004zwW&downloadSessionID=0",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Dance-1.png",
     "streamType": "radio",
     "active": true,
@@ -482,6 +482,51 @@
     "url": "https://eustr75.mediatriple.net/Number1Media/10_Number1_Heart.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Heart-1.png",
     "streamType": "radio",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "Nr1Tv",
+    "title": "Nr1 TV",
+    "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e17cd59e8b.smil/playlist.m3u8?md5=d2YLTWbheiukRfMtHsE2Dw",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/nr1-tv-logo.jpg",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "Nr1TvAsk",
+    "title": "Number1 Aşk Tv",
+    "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e18f9c54e6.smil/playlist.m3u8?md5=tk4gzHZAybQOxGgzavddHA",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/10/ask-tv-web.jpg",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "Nr1TurkTv",
+    "title": "Nr1 Türk Tv",
+    "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e187770143.smil/playlist.m3u8?md5=kFLJQfFHiuG9a_6N1_Rdug",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/turk-tv-logo.jpg",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "Nr1RapTV",
+    "title": "Number1 Rap TV",
+    "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e19877b340.smil/playlist.m3u8?md5=ahnQby7bxYCogFTrF--h2A",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/10/damar-tv-web.jpg",
+    "streamType": "tv",
+    "active": true,
+    "requiresReferer": false
+  },
+  {
+    "key": "Nr1DanceTV",
+    "title": "Number1 Dance TV",
+    "url": "https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e2aa89e721.smil/playlist.m3u8?md5=Qxx6nus_YV2ixEdEXdztJQ",
+    "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/10/dance-tv-web.jpg",
+    "streamType": "tv",
     "active": true,
     "requiresReferer": false
   }
