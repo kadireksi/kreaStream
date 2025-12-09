@@ -280,7 +280,7 @@
         "baseUrl": "https://www.kanald.com.tr",
         "active": true,
         "seriesPageActive": "/diziler",
-        "seriesPageArchive": null,
+        "seriesPageArchive": "/diziler/arsiv",
         "episodesPageSuffix": "/bolumler",
         "seriesList": {
             "container": "div.item",
