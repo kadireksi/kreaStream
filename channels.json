@@ -138,7 +138,7 @@
         },
         "seriesListArchive": {
             "container": ".list-item",
-            "title": ".program-name strong",
+            "title": ".program-name > strong",
             "link": "a",
             "poster": "img",
             "year": "",
