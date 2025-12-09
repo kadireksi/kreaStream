@@ -16,7 +16,8 @@
           "container": "div.item",
           "title": "img@alt",
           "url": "a@href",
-          "poster": "img@data-src"
+          "poster": "img@data-src",
+          "ishorizontal": false
         }
       },
       {
@@ -26,7 +27,8 @@
           "container": "div.item",
           "title": "img@alt",
           "url": "a@href",
-          "poster": "img.lazy-common@data-src"
+          "poster": "img.lazy-common@data-src",
+          "ishorizontal": false
         }
       }
     ],
@@ -78,7 +80,8 @@
           "container": "div.grid_grid-wrapper__elAnh > div",
           "title": "div.card_card-title__IJ9af@text",
           "url": "a@href",
-          "poster": "img@src"
+          "poster": "img@src",
+          "ishorizontal": true
         }
       },
       {
@@ -88,7 +91,8 @@
           "container": "div.grid_grid-wrapper__elAnh > div",
           "title": "div.card_card-title__IJ9af@text",
           "url": "a@href",
-          "poster": "img@src"
+          "poster": "img@src",
+          "ishorizontal": true
         }
       }
     ],
