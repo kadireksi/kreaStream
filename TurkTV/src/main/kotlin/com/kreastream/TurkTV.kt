@@ -89,14 +89,14 @@ class TurkTV : MainAPI() {
 
         val pages = mutableListOf<HomePageList>()
 
-        val tvStreams = streams.filter { !it.is_audio }
-        val radioStreams = streams.filter { it.is_audio }
+        val tvStreams = streams.filter { it.group == "TV" }
+        val radioStreams = streams.filter { it.group == "Radio" }
 
         if (tvStreams.isNotEmpty()) {
-            pages.add(HomePageList("📺 Canlı TV", tvStreams.map { it.toSearchResponse() }, listing.ishorizontal))
+            pages.add(HomePageList("📺 Canlı TV", tvStreams.map { it.toSearchResponse() }, true))
         }
         if (radioStreams.isNotEmpty()) {
-            pages.add(HomePageList("📻 Radyo", radioStreams.map { it.toSearchResponse() }, listing.ishorizontal))
+            pages.add(HomePageList("📻 Radyo", radioStreams.map { it.toSearchResponse() }, true))
         }
 
         channels.filter { it.active }.forEach { channel ->
