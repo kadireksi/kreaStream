@@ -1,128 +1,131 @@
 [
-    {
-        "id": "kanald",
-        "name": "Kanal D",
-        "base_url": "https://www.kanald.com.tr",
-        "active": true,
-        "headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
-            "Referer": "https://www.kanald.com.tr/"
-        },
-        "listings": [
-            {
-                "title": "Güncel Diziler",
-                "path": "/diziler",
-                "selectors": {
-                    "container": "div.item",
-                    "title": "img@alt",
-                    "url": "a@href",
-                    "poster": "img@data-src"
-                },
-                "ishorizontal": false
-            },
-            {
-                "title": "Arşiv",
-                "path": "/diziler/arsiv",
-                "selectors": {
-                    "container": "div.item",
-                    "title": "img@alt",
-                    "url": "a@href",
-                    "poster": "img.lazy-common@data-src"
-                },
-                "ishorizontal": false
-            }
-        ],
-        "detail_page": {
-            "selectors": {
-                "title": "h1.dizi-isim@text",
-                "description": ".sinopsis-text@text",
-                "poster": "img.afis@src",
-                "year": ".yil-deger@text",
-                "tags": ".janr-etiket a@text"
-            }
-        },
-        "episode_page": {
-            "path_suffix": "/bolumler",
-            "selectors": {
-                "container": "#bolum-combobox option",
-                "name": "self@text",
-                "url": "self@value",
-                "reverse_order": true
-            }
-        },
-        "video_extraction": {
-            "methods": [
-                {
-                    "type": "iframe",
-                    "selector": "iframe[src*='youtube']"
-                },
-                {
-                    "type": "iframe",
-                    "selector": "iframe[src*='kanald']"
-                },
-                {
-                    "type": "regex",
-                    "pattern": "file: \"(.*?)\""
-                }
-            ]
+  {
+    "id": "trt1",
+    "name": "TRT 1",
+    "base_url": "https://www.trt1.com.tr",
+    "active": true,
+    "listings": [
+      {
+        "title": "Güncel Diziler",
+        "path": "/diziler?archive=false&order=title_asc",
+        "selectors": {
+          "container": "div.grid_grid-wrapper__elAnh > div",
+          "title": "div.card_card-title__IJ9af@text",
+          "url": "a@href",
+          "poster": "img@src"
         }
+      },
+      {
+        "title": "Arşiv Diziler",
+        "path": "/diziler?archive=true&order=title_asc",
+        "selectors": {
+          "container": "div.grid_grid-wrapper__elAnh > div",
+          "title": "div.card_card-title__IJ9af@text",
+          "url": "a@href",
+          "poster": "img@src"
+        }
+      }
+    ],
+    "detail_page": {
+      "selectors": {
+        "title": "p.text_title__UMoMd",
+        "description": "meta[name=description]@content",
+        "poster": "img.card_card-image__T64bP",
+        "tags": "",
+        "year": "div.basic-dot_badge__1nsQT"
+      }
     },
-    {
-        "id": "trt1",
-        "name": "TRT 1",
-        "base_url": "https://www.trt1.com.tr",
-        "active": true,
-        "listings": [
-            {
-                "title": "Güncel Diziler",
-                "path": "/diziler?archive=false",
-                "selectors": {
-                    "container": "div.grid_grid-wrapper__elAnh > div",
-                    "title": "div.card_card-title__IJ9af@text",
-                    "url": "a@href",
-                    "poster": "img@src"
-                },
-                "ishorizontal": true
-            },
-            {
-                "title": "Arşiv Diziler",
-                "path": "/diziler?archive=true",
-                "selectors": {
-                    "container": "div.grid_grid-wrapper__elAnh > div",
-                    "title": "div.card_card-title__IJ9af@text",
-                    "url": "a@href",
-                    "poster": "img@src"
-                },
-                "ishorizontal": true
-            }
-        ],
-        "detail_page": {
-            "selectors": {
-                "title": "h1",
-                "description": "meta[name=description]",
-                "poster": "picture.card_card-image__T64bP img",
-                "tags": "div.basic-dot_badge__1nsQT"
-            }
+    "episode_page": {
+      "path_suffix": "/bolum",
+      "reverse_order": true,
+      "selectors": {
+        "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
+        "name": "div.card_card-title__IJ9af",
+        "url": "href"
+      }
+    },
+    "video_extraction": {
+      "methods": [
+        {
+          "type": "iframe",
+          "selector": "iframe[src*='https']"
         },
-        "episode_page": {
-            "path_suffix": "/bolum",
-            "selectors": {
-                "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
-                "name": "div.card_card-title__IJ9af",
-                "url": "href"
-            },
-            "reverse_order": true
+        {
+          "type": "direct_m3u8"
         },
-        "video_extraction": {
-            "methods": [
-                {
-                    "type": "iframe",
-                    "selector": "iframe[src*='https']"
-                },
-                {
-                    "type": "direct_m3u8"
-                }
-            ]
+        {
+          "type": "regex",
+          "pattern": "youtube"
         }
+      ]
     }
+  },
+  {
+    "id": "kanald",
+    "name": "Kanal D",
+    "base_url": "https://www.kanald.com.tr",
+    "active": true,
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
+      "Referer": "https://www.kanald.com.tr/"
+    },
+    "listings": [
+      {
+        "title": "Güncel Diziler",
+        "path": "/diziler",
+        "selectors": {
+          "container": "div.item",
+          "title": "img@alt",
+          "url": "a@href",
+          "poster": "img@data-src"
+        },
+        "ishorizontal": false
+      },
+      {
+        "title": "Arşiv",
+        "path": "/diziler/arsiv",
+        "selectors": {
+          "container": "div.item",
+          "title": "img@alt",
+          "url": "a@href",
+          "poster": "img.lazy-common@data-src"
+        },
+        "ishorizontal": false
+      }
+    ],
+    "detail_page": {
+      "selectors": {
+        "title": "h1.dizi-isim@text",
+        "description": ".sinopsis-text@text",
+        "poster": "img.afis@src",
+        "year": ".yil-deger@text",
+        "tags": ".janr-etiket a@text"
+      }
+    },
+    "episode_page": {
+      "path_suffix": "/bolumler",
+      "reverse_order": true,
+      "selectors": {
+        "container": "#bolum-combobox option",
+        "name": "self@text",
+        "url": "self@value"
+      }
+    },
+    "video_extraction": {
+      "methods": [
+        {
+          "type": "iframe",
+          "selector": "iframe[src*='youtube']"
+        },
+        {
+          "type": "iframe",
+          "selector": "iframe[src*='kanald']"
+        },
+        {
+          "type": "regex",
+          "pattern": "file: \"(.*?)\""
+        }
+      ]
+    }
+  }
 ]
