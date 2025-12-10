@@ -464,52 +464,39 @@ class HDFilmCehennemi : MainAPI() {
             return sb.toString()
         }
     }
-    
+
     private object VideoJsDecrypter {
 
         fun decrypt(encryptedFragments: List<String>): String {
             if (encryptedFragments.isEmpty()) return ""
 
-            // Step 1: Join all fragments
             val joined = encryptedFragments.joinToString("")
-
-            // Step 2: Reverse the string
             val reversed = joined.reversed()
 
-            // Step 3: Base64 decode TWICE
-            val once = try {
-                Base64.decode(reversed, Base64.NO_PADDING)
-            } catch (e: Exception) { return "" }
+            val once = try { Base64.decode(reversed, Base64.NO_PADDING) } catch (e: Exception) { return "" }
+            val twice = try { Base64.decode(once, Base64.NO_PADDING) } catch (e: Exception) { return "" }
 
-            val twice = try {
-                Base64.decode(once, Base64.NO_PADDING)
-            } catch (e: Exception) { return "" }
-
-            // Step 4: Custom per-character shift (the "unmix" loop)
-            val sb = StringBuilder()
+            val sb = StringBuilder(twice.size)
             for (i in twice.indices) {
                 val cc = twice[i].toInt() and 0xFF
-                val shift = 256 % (i + 5)
+                val shift = 256 % (i + 5)                    // Now compiles fine
                 val finalChar = (cc - shift + 256) % 256
                 sb.append(finalChar.toChar())
             }
             return sb.toString().trim()
         }
 
-        // Fallback: try single base64 + reverse + shift (some older variants)
-        fun decryptFallback(joined: String): String {
-            return try {
-                val reversed = joined.reversed()
-                val decoded = Base64.decode(reversed, Base64.NO_PADDING)
-                val sb = StringBuilder()
-                for (i in decoded.indices) {
-                    val cc = decoded[i].toInt() and 0xFF
-                    val shift = 256 % (i + 5)
-                    sb.append((cc - shift + 256) % 256.toChar())
-                }
-                sb.toString()
-            } catch (e: Exception) { "" }
-        }
+        fun decryptFallback(joined: String): String = try {
+            val reversed = joined.reversed()
+            val decoded = Base64.decode(reversed, Base64.NO_PADDING)
+            val sb = StringBuilder(decoded.size)
+            for (i in decoded.indices) {
+                val cc = decoded[i].toInt() and 0xFF
+                val shift = 256 % (i + 5)
+                sb.append((cc - shift + 256) % 256.toChar())
+            }
+            sb.toString().trim()
+        } catch (e: Exception) { "" }
     }
 
     private suspend fun extractFromPlayerScript(
