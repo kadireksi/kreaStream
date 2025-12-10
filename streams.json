@@ -48,14 +48,14 @@
       "methods": [
         {
           "type": "iframe",
-          "selector": "iframe[src*='youtube']"
+          "selector": "iframe[src*='https']"
         },
         {
           "type": "direct_m3u8"
         },
         {
-          "type": "regex",
-          "pattern": "youtube"
+          "type": "iframe",
+          "selector": "iframe[src*='youtube']"
         }
       ]
     }
