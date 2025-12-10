@@ -296,6 +296,18 @@ class TurkTV : MainAPI() {
                                 }
                             )
                         }
+                    },
+                    "direct_m3u8" -> {
+                        callback(
+                            newExtractorLink(
+                                source = channel.name,
+                                name = "M3U8",
+                                url = data
+                            ) {
+                                this.type = ExtractorLinkType.M3U8
+                                this.quality = Qualities.Unknown.value
+                            }
+                        )
                     }
                 }
             }
