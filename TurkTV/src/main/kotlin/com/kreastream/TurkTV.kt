@@ -18,6 +18,8 @@ class TurkTV : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live, TvType.Movie)
 
+    private val dummyTvUrl = "${mainUrl}/tv"
+    private val dummyRadioUrl = "${mainUrl}/radio"
     // Remote Configuration URLs
     private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
     private val streamsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
@@ -53,7 +55,7 @@ class TurkTV : MainAPI() {
         val title: String,
         val path: String,
         val selectors: Map<String, String>,
-        val ishorizontal: Boolean = false
+        val ishorizontal: Boolean
     )
 
     data class DetailConfig(
@@ -63,7 +65,7 @@ class TurkTV : MainAPI() {
     data class EpisodePageConfig(
         val path_suffix: String = "",
         val selectors: Map<String, String>,
-        val reverse_order: Boolean = false
+        val reverse_order: Boolean
     )
 
     data class VideoExtractionConfig(
