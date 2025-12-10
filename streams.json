@@ -323,6 +323,15 @@
     "is_audio": true
   },
   {
+    "id": "pop90",
+    "title": "Pop 90",
+    "url": "https://27953.live.streamtheworld.com/POP90128AAC.aac?dist=https%3A%2F%2Fkarnaval.com%2Fradyolar%2Fjoyturk&tdsdk=js-2.9&swm=false&pname=TDSdk&pversion=2.9&banners=300x250&gender=F&age=34_45%2C45%2B&ses=AB%2CC1&title=B%2CMK%2CSM%2CE%2CEH&burst-time=15&sbmid=4c1695ad-b9e8-413e-cc1e-14a27a090349",
+    "group": "Radio",
+    "poster": "https://mediacdns.karnaval.com/media/station_media/41/logos/android_default_logo.png?v=041022033335",
+    "is_audio": true,
+    "headers": {}
+  },
+  {
     "id": "metrofm",
     "title": "Metro FM",
     "group": "Radio",
@@ -336,10 +345,11 @@
     "id": "power-fm",
     "title": "Power FM",
     "group": "Radio",
-    "url": "https://live.powerfm.com.tr/;*.mp3",
-    "poster": "https://powerfm.com.tr/wp-content/uploads/2023/02/power-fm-logo.png",
+    "url": "https://live.powerapp.com.tr/powerfmadver/abr/playlist.m3u8",
+    "poster": "https://cdn.powergroup.com.tr/powerapp/channels/big/powerFM.png?v=932",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "number1fm",
@@ -348,7 +358,8 @@
     "url": "https://eustr75.mediatriple.net//Number1Media/01_Number1Fm.stream/playlist.m3u8",
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_FM-1.png",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "kral-fm",
@@ -367,16 +378,18 @@
     "url": "https://dygedge.radyotvonline.net/kralpop/playlist.m3u8",
     "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/20/kralpop.png",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "super-fm",
     "title": "Süper FM",
     "group": "Radio",
     "url": "https://27823.live.streamtheworld.com/SUPER_FM128AAC.aac",
-    "poster": "https://superfm.com.tr/wp-content/uploads/2023/05/super-fm-logo.png",
+    "poster": "https://mediacdns.karnaval.com/media/station_media/1/logos/android_default_logo.png?v=301024040744",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "alem-fm",
@@ -391,19 +404,21 @@
     "id": "best-fm",
     "title": "Best FM",
     "group": "Radio",
-    "url": "https://live.bestfm.com.tr/;*.mp3",
-    "poster": "https://bestfm.com.tr/wp-content/uploads/2023/03/best-fm-logo.png",
+    "url": "https://ssldyg.radyotvonline.com/best/bestfm.stream/playlist.m3u8",
+    "poster": "https://www.bestfm.com.tr/wp-content/uploads/2024/12/LOGOWHITE-2-1.png",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "joy-turk",
     "title": "Joy Türk",
     "group": "Radio",
-    "url": "https://live.joyturk.com/;*.mp3",
-    "poster": "https://joyturk.com/wp-content/uploads/2023/04/joy-turk-logo.png",
+    "url": "https://28933.live.streamtheworld.com/VIRGIN_RADIO128AAC.aac?dist=https%3A%2F%2Fkarnaval.com%2Fradyolar%2Fjoyturk&tdsdk=js-2.9&swm=false&pname=TDSdk&pversion=2.9&banners=300x250&gender=M&age=12_34&ses=C1&title=B%2CNW%2CS%2CGAM%2CSME%2CANR%2CCAF%2CSH%2CHF%2CSF&burst-time=15&sbmid=eecdf31b-4e01-453b-f89f-199ea30d77e2",
+    "poster": "https://mediacdns.karnaval.com/media/station_media/4/logos/android_default_logo.png?v=290425114642",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "trt-turku",
