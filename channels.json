@@ -41,7 +41,7 @@
       "selectors": {
         "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
         "name": "div.card_card-title__IJ9af",
-        "url": "href"
+        "url": "a"
       }
     },
     "video_extraction": {
@@ -77,9 +77,8 @@
           "container": "div.item",
           "title": "img@alt",
           "url": "a@href",
-          "poster": "img@data-src"
-        },
-        "ishorizontal": false
+          "poster": "img.lazy-common@data-src"
+        }
       },
       {
         "title": "Arşiv",
@@ -89,8 +88,7 @@
           "title": "img@alt",
           "url": "a@href",
           "poster": "img.lazy-common@data-src"
-        },
-        "ishorizontal": false
+        }
       }
     ],
     "detail_page": {
