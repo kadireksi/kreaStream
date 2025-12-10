@@ -296,7 +296,7 @@ class TurkTV : MainAPI() {
                                 }
                             )
                         }
-                    },
+                    }
                     "direct_m3u8" -> {
                         callback(
                             newExtractorLink(
