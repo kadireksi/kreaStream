@@ -64,135 +64,150 @@
     "title": "TRT Türk",
     "group": "TV",
     "url": "https://tv-trtturk.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-turk-televizyon-kanali.188e2ef.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trthaber",
     "title": "TRT Haber",
     "group": "TV",
     "url": "https://tv-trthaber.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-haber-televizyon-kanali.3fee2de.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtcocuk",
     "title": "TRT Çocuk",
     "group": "TV",
     "url": "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-cocuk-televizyon-kanali.aa78d7b.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtmuzik",
     "title": "TRT Müzik",
     "group": "TV",
     "url": "https://tv-trtmuzik.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-muzik-televizyon-kanali.4fe1e86.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trt1",
     "title": "TRT 1",
     "group": "TV",
     "url": "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-1-televizyon-kanali.4c9c3dd.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtspor1",
     "title": "TRT Spor 1",
     "group": "TV",
     "url": "https://tv-trtspor1.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-spor-televizyon-kanali.0fcf904.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtdiyanetcocuk",
     "title": "TRT Diyanet Çocuk",
     "group": "TV",
     "url": "https://tv-trtdiyanetcocuk.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-diyanet-cocuk.06e24aa.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtavaz",
     "title": "TRT Avaz",
     "group": "TV",
     "url": "https://tv-trtavaz.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-avaz-televizyon-kanali.d1a84fd.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtarabi",
     "title": "TRT Arabi",
     "group": "TV",
     "url": "https://tv-trtarabi.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-arabi-televizyon-kanali.e9524cc.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtworld",
     "title": "TRT World",
     "group": "TV",
     "url": "https://tv-trtworld.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-world-televizyon-kanali.3b79eeb.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtkurdi",
     "title": "TRT Kurdi",
     "group": "TV",
     "url": "https://tv-trtkurdi.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-kurdi-televizyon-kanali.3f1cba4.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trt2",
     "title": "TRT 2",
     "group": "TV",
     "url": "https://tv-trt2.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-2-televizyon-kanali.ca9ed7b.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtbelgesel",
     "title": "TRT Belgesel",
     "group": "TV",
     "url": "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8",
-    "poster": "",
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-belgesel-televizyon-kanali.0baaa5a.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trt1alt",
     "title": "TRT 1 (24 saat)",
     "group": "TV",
     "url": "https://trt.daioncdn.net/trt-1/master.m3u8",
-    "poster": null,
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-1-televizyon-kanali.4c9c3dd.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtsporyildiz",
     "title": "TRT Spor Yıldız",
     "group": "TV",
     "url": "https://trt.daioncdn.net/trtspor-yildiz/master.m3u8",
-    "poster": null,
+    "poster": "https://www.trt.net.tr/_nuxt/img/trt-spor-yildiz-televizyon-kanali.588596f.png",
     "type": "tv",
-    "headers": {}
+    "headers": {},
+    "is_audio": false
   },
   {
     "id": "trtspor2",
@@ -258,16 +273,18 @@
     "url": "https://trt.radyotvonline.net/trt_fm.aac",
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467418.jpeg",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
-    "id": "metro-fm",
+    "id": "metrofm",
     "title": "Metro FM",
     "group": "Radio",
     "url": "https://25583.live.streamtheworld.com/METRO_FM128AAC.aac",
     "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "kral-fm",
@@ -276,7 +293,8 @@
     "url": "https://dygedge2.radyotvonline.net/kralfm/playlist.m3u8",
     "poster": "https://cdn1.kralmuzik.com.tr/media/content/19-05/17/kralfm.png",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": true
   },
   {
     "id": "kral-pop",
