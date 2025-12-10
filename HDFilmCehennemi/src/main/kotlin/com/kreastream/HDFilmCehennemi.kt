@@ -477,9 +477,9 @@ class HDFilmCehennemi : MainAPI() {
             val twice = try { Base64.decode(once, Base64.NO_PADDING) } catch (e: Exception) { return "" }
 
             val sb = StringBuilder(twice.size)
-            for (i in twice.indices) {
-                val cc = twice[i].toInt() and 0xFF
-                val shift = 256 % (i + 5)                    // Now compiles fine
+            for (i in decoded.indices) {
+                val cc = decoded[i].toInt() and 0xFF
+                val shift = 256 % (i + 5)
                 val finalChar = (cc - shift + 256) % 256
                 sb.append(finalChar.toChar())
             }
