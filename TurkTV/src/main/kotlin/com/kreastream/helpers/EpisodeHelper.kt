@@ -6,8 +6,8 @@ import com.kreastream.*
 object EpisodeHelper {
     suspend fun loadDetails(api: MainAPI, ch: ChannelConfig, url: String): LoadResponse {
         val doc = api.app.get(url, headers = ch.headers).document
-        val titleSelector = ch.detail_page?.selectors?.get("title") ?: ""
-        val title = if (titleSelector.isNotEmpty()) doc.selectFirst(titleSelector)?.text() ?: ch.name else ch.name
+        val titleSel = ch.detail_page?.selectors?.get("title") ?: ""
+        val title = if (titleSel.isNotEmpty()) doc.selectFirst(titleSel)?.text()?.trim() ?: ch.name else ch.name
 
         val episodes = loadEpisodes(api, ch, url)
         return api.newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
@@ -35,7 +35,7 @@ object EpisodeHelper {
                 if (href.isBlank()) continue
                 val full = UrlHelper.join(ch.base_url, href)
                 if (seen.add(full)) {
-                    eps.add(Episode(full, name))
+                    eps.add(api.newEpisode(full) { this.name = name })
                 }
             }
         }

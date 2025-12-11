@@ -1,11 +1,13 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.kreastream.helpers.ListingHelper
 import com.kreastream.helpers.LiveHelper
 import com.kreastream.helpers.EpisodeHelper
 import com.kreastream.helpers.StreamHelper
+import com.kreastream.extractors.VideoExtractor
 
 class TurkTV : MainAPI() {
     override var name = "Türk TV"
@@ -24,7 +26,6 @@ class TurkTV : MainAPI() {
     private suspend fun ensureConfig() {
         if (loaded) return
 
-        // remote-first, fallback to asset/local
         try {
             val chText = try { app.get(channelsUrl).text } catch (_: Exception) { AppUtils.readAllText("channels.json") }
             channels = parseJson(chText)
@@ -47,7 +48,7 @@ class TurkTV : MainAPI() {
 
         val pages = mutableListOf<HomePageList>()
 
-        // 1) Live dynamic groups by stream.group
+        // Dynamic live groups
         val grouped = streams.groupBy { it.group ?: "TV" }
         grouped.forEach { (groupName, list) ->
             val header = when (groupName.lowercase()) {
@@ -55,27 +56,23 @@ class TurkTV : MainAPI() {
                 else -> "📺 Canlı TV"
             }
 
-            // extract unique genres (split by comma in the JSON)
             val genres = list.flatMap { it.genres.split(",") }
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .distinct()
 
-            // Build SearchResponse items explicitly (avoid ambiguous lambda type inference)
             val items = mutableListOf<SearchResponse>()
             for (genre in genres) {
-                // create an id-like url that our load() will recognise: "<header>_genre::<group>::<genre>"
                 val fakeUrl = "${header}_genre::${groupName}::${genre}"
                 items.add(newSearchResponse(genre, fakeUrl, TvType.TvSeries) {
                     this.posterUrl = ""
                     this.description = "Canlı: $genre"
                 })
             }
-
             if (items.isNotEmpty()) pages.add(HomePageList(header, items, true))
         }
 
-        // 2) Normal channel listings defined in channels.json
+        // Channel listings from channels.json
         for (ch in channels.filter { it.active }) {
             for (listing in ch.listings) {
                 val items = ListingHelper.loadListing(this, ch, listing)
@@ -90,14 +87,14 @@ class TurkTV : MainAPI() {
         ensureConfig()
         val results = mutableListOf<SearchResponse>()
 
-        // Search streams (live)
+        // streams
         for (s in streams.filter { it.title.contains(query, true) }) {
             results.add(newSearchResponse(s.title, s.url, TvType.Live) {
                 this.posterUrl = s.poster
             })
         }
 
-        // Search channel listings
+        // channel listings
         for (ch in channels) {
             for (listing in ch.listings) {
                 results += ListingHelper.searchListing(this, ch, listing, query)
@@ -110,7 +107,7 @@ class TurkTV : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         ensureConfig()
 
-        // Live genre: format "<header>_genre::<group>::<genre>"
+        // Genre fake URL: "<header>_genre::<group>::<genre>"
         if (url.contains("_genre::")) {
             val parts = url.split("::")
             if (parts.size >= 3) {
@@ -120,7 +117,7 @@ class TurkTV : MainAPI() {
             }
         }
 
-        // direct stream URL
+        // direct stream url
         streams.firstOrNull { it.url == url }?.let { si ->
             return StreamHelper.loadStreamSingle(this, si)
         }
@@ -131,7 +128,7 @@ class TurkTV : MainAPI() {
             return EpisodeHelper.loadDetails(this, ch, url)
         }
 
-        throw Error("Unknown url format")
+        throw ErrorLoadingException("Unknown url format: $url")
     }
 
     override suspend fun loadLinks(
@@ -142,15 +139,21 @@ class TurkTV : MainAPI() {
     ): Boolean {
         ensureConfig()
 
-        // if data is a stream url
+        // stream url
         streams.firstOrNull { it.url == data }?.let { si ->
             StreamHelper.loadStreamLinks(si, callback)
             return true
         }
 
-        // if data belongs to channel
+        // channel extraction
         val ch = channels.firstOrNull { data.startsWith(it.base_url) }
-        if (ch != null) return com.kreastream.extractors.VideoExtractor.extract(this, ch, data, subtitleCallback, callback)
+        if (ch != null) return VideoExtractor.extract(this, ch, data, subtitleCallback, callback)
+
+        // fallback: maybe direct m3u8
+        if (data.contains(".m3u8", ignoreCase = true)) {
+            M3u8Helper.generateM3u8(source = name, streamUrl = data, referer = mainUrl).forEach(callback)
+            return true
+        }
 
         return false
     }
