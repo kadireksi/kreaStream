@@ -14,7 +14,7 @@
     "id": "atv_live",
     "title": "ATV",
     "group": "TV",
-    "url": "https://trkvz.daioncdn.net/atv/atv.m3u8",
+    "url": "https://trkvz.daioncdn.net/atv/atv.m3u8?ce=3&app=d1ce2d40-5256-4550-b02e-e73c185a314e&st=2vSnp6WUP4-9MWnZF39HLw&e=1765453029&ppid=21d804be91b8e91f11bb3789ff83f0b4",
     "poster": "https://iatv.tmgrup.com.tr/site/v2/i/atv-logo.png",
     "type": "Live",
     "headers": {
@@ -67,14 +67,15 @@
     "id": "nowtv",
     "title": "NOW TV",
     "group": "TV",
-    "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=alc1fE2gxymjUwt9fz_1mw&e=1765036148",
+    "url": "https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=hQavnOrdag9DcU0kDZHntQ&e=1765453349",
     "poster": "https://images.seeklogo.com/logo-png/51/1/now-tv-turkey-logo-png_seeklogo-519520.png",
     "type": "tv",
     "headers": {
       "Referer": "https://www.nowtv.com.tr/",
       "Origin": "https://www.nowtv.com.tr"
     },
-    "genres": "Ulusal"
+    "genres": "Ulusal",
+    "is_audio": false
   },
   {
     "id": "tv360",
@@ -106,14 +107,15 @@
     "id": "teve2",
     "title": "Teve2",
     "group": "TV",
-    "url": "https://demiroren-live.daioncdn.net/teve2/teve2.m3u8",
-    "poster": "https://brandfetch.com/teve2.com.tr/logo",
+    "url": "https://demiroren.daioncdn.net/teve2/teve2.m3u8?ce=3&app=6aab838a-437e-4a1b-bbd0-e30f79cdbbbd&ppid=e936547d1ced8f112aa026ae1a3883d0",
+    "poster": "https://static.teve2.com.tr/assets/img/teve2logo.png",
     "type": "tv",
     "headers": {
       "Referer": "https://www.teve2.com.tr/",
       "Origin": "https://www.teve2.com.tr"
     },
-    "genres": "Ulusal"
+    "genres": "Ulusal",
+    "is_audio": false
   },
   {
     "id": "a2",
