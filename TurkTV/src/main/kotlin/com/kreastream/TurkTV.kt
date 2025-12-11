@@ -75,7 +75,7 @@ class TurkTV : MainAPI() {
     )
 
     data class ExtractionMethod(
-        val type: String, // "iframe", "regex", "direct_m3u8", "css"
+        val type: String, // "iframe", "regex", "direct_m3u8", "css", "youtube"
         val selector: String? = null,
         val pattern: String? = null,
         val attribute: String? = null
@@ -106,7 +106,7 @@ class TurkTV : MainAPI() {
         channels.filter { it.active }.forEach { channel ->
             channel.listings.forEach { listing ->
                 try {
-                    val url = fixUrl(listing.path, channel.base_url)
+                    val url = buildListingUrl(listing.path, channel.base_url, page)
                     val doc = app.get(url, headers = channel.headers).document
                     
                     val items = extractItems(doc, listing.selectors, channel.base_url)
@@ -122,6 +122,18 @@ class TurkTV : MainAPI() {
         }
 
         return newHomePageResponse(pages)
+    }
+
+    // build listing URL with basic pagination support:
+    private fun buildListingUrl(path: String, baseUrl: String, page: Int): String {
+        var p = path
+        if (p.contains("{page}")) {
+            p = p.replace("{page}", page.toString())
+        } else if (page > 1) {
+            // append page param
+            p = if (p.contains("?")) "$p&page=$page" else "$p?page=$page"
+        }
+        return fixUrl(p, baseUrl)
     }
 
     // =========================================================================
@@ -176,32 +188,50 @@ class TurkTV : MainAPI() {
         val episodes = mutableListOf<Episode>()
         
         val suffix = channel.episode_page?.path_suffix ?: ""
-        val episodeDoc = if (suffix.isNotEmpty()) {
-             val cleanUrl = if (url.endsWith("/")) url.dropLast(1) else url
-             app.get("$cleanUrl$suffix", headers = channel.headers).document
-        } else {
-             doc
-        }
-
         val epSelectors = channel.episode_page?.selectors
+
         if (epSelectors != null) {
-            val container = epSelectors["container"] ?: ""
-            val rows = episodeDoc.select(container)
-            
-            rows.forEachIndexed { index, row ->
-                val epName = row.smartSelect(epSelectors["name"]) ?: "Bölüm ${index + 1}"
-                val epUrl = row.smartSelect(epSelectors["url"])
-                
-                if (!epUrl.isNullOrBlank()) {
-                    val fullEpUrl = fixUrl(epUrl, channel.base_url)
-                    episodes.add(newEpisode(fullEpUrl) {
-                        this.name = epName
-                        this.episode = index + 1
-                        this.posterUrl = poster
-                    })
+            // Attempt to gather episodes possibly across paginated pages (basic approach)
+            val seenUrls = mutableSetOf<String>()
+            for (pIndex in 1..5) { // try up to 5 pages
+                try {
+                    val episodeDoc = if (suffix.isNotEmpty()) {
+                        val cleanUrl = if (url.endsWith("/")) url.dropLast(1) else url
+                        val pageSuffix = if (pIndex == 1) suffix else "$suffix${if (suffix.contains("?")) "&" else "?"}page=$pIndex"
+                        app.get("$cleanUrl$pageSuffix", headers = channel.headers).document
+                    } else {
+                        val pageUrl = if (pIndex == 1) url else "$url${if (url.contains("?")) "&" else "?"}page=$pIndex"
+                        app.get(pageUrl, headers = channel.headers).document
+                    }
+
+                    val container = epSelectors["container"] ?: ""
+                    val rows = episodeDoc.select(container)
+
+                    if (rows.isEmpty()) {
+                        // no further pages
+                        break
+                    }
+
+                    rows.forEachIndexed { index, row ->
+                        val epName = row.smartSelect(epSelectors["name"]) ?: "Bölüm ${episodes.size + 1}"
+                        val epUrlRaw = row.smartSelect(epSelectors["url"])
+                        if (!epUrlRaw.isNullOrBlank()) {
+                            val fullEpUrl = fixUrl(epUrlRaw, channel.base_url)
+                            if (seenUrls.add(fullEpUrl)) {
+                                episodes.add(newEpisode(fullEpUrl) {
+                                    this.name = epName
+                                    this.episode = episodes.size + 1
+                                    this.posterUrl = poster
+                                })
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("TurkTV", "Episode pagination fetch error: ${e.message}")
+                    break
                 }
             }
-            
+
             if (channel.episode_page.reverse_order) {
                 episodes.reverse()
             }
@@ -216,7 +246,7 @@ class TurkTV : MainAPI() {
     }
 
     // =========================================================================
-    // 6. LOAD LINKS (VIDEO EXTRACTION) - FIXED
+    // 6. LOAD LINKS (VIDEO EXTRACTION)
     // =========================================================================
 
     override suspend fun loadLinks(
@@ -226,6 +256,8 @@ class TurkTV : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         fetchConfiguration()
+
+        var found = false
 
         // -- A. Direct Live Stream --
         val live = streams.find { it.url == data }
@@ -259,10 +291,17 @@ class TurkTV : MainAPI() {
                 when (method.type) {
                     "iframe" -> {
                         doc.select(method.selector ?: "iframe").forEach { iframe ->
-                            val src = iframe.attr("src")
+                            var src = iframe.attr("src")
                             if (src.isNotEmpty()) {
-                                // FIXED: loadExtractor requires subtitleCallback as 2nd arg (or 3rd if referer included)
-                                loadExtractor(src, subtitleCallback, callback)
+                                src = fixUrl(src, channel.base_url)
+                                // loadExtractor signature may accept (url, referer?, subtitleCallback, callback)
+                                try {
+                                    loadExtractor(src, subtitleCallback, callback)
+                                } catch (e: Exception) {
+                                    // fallback with referer param if plugin expects it
+                                    try { loadExtractor(src, channel.base_url, subtitleCallback, callback) } catch (_: Exception) {}
+                                }
+                                found = true
                             }
                         }
                     }
@@ -277,32 +316,35 @@ class TurkTV : MainAPI() {
                                     name = "Source",
                                     url = cleanLink
                                 ){
-                                    this.referer = ""
+                                    this.referer = channel.base_url
                                     this.quality = Qualities.Unknown.value
-                                    this.type = ExtractorLinkType.VIDEO
+                                    this.type = if (cleanLink.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                                 }
                             )
+                            found = true
                         }
                     }
                     "css" -> {
                         val link = doc.select(method.selector ?: "").attr(method.attribute ?: "src")
                         if(link.isNotEmpty()) {
-                            val type = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                            val fixed = fixUrl(link, channel.base_url)
+                            val type = if (fixed.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                             callback(
                                 newExtractorLink(
                                     source = "Source",
                                     name = "Source",
-                                    url = link
+                                    url = fixed
                                 ){
-                                    this.referer = ""
+                                    this.referer = channel.base_url
                                     this.quality = Qualities.Unknown.value
                                     this.type = type
                                 }
                             )
+                            found = true
                         }
                     }
                     "direct_m3u8" -> {
-                        val doc = app.get(data, timeout = 10).document
+                        // Search scripts for embedded JSON/player config containing m3u8
                         val scripts = doc.select("script")
                         for (script in scripts) {
                             val scriptContent = script.html()
@@ -317,7 +359,8 @@ class TurkTV : MainAPI() {
                                             "Referer" to channel.base_url,
                                             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                                         )
-                                    ).forEach(callback)
+                                    ).forEach { callback(it) }
+                                    found = true
                                     return true
                                 }
                             }
@@ -332,7 +375,12 @@ class TurkTV : MainAPI() {
                                 ?.let { "https://www.youtube.com/watch?v=$it" }
 
                         if (yt != null) {
-                            loadExtractor(yt, channel.base_url, subtitleCallback, callback)
+                            try {
+                                loadExtractor(yt, subtitleCallback, callback)
+                            } catch (e: Exception) {
+                                try { loadExtractor(yt, channel.base_url, subtitleCallback, callback) } catch (_: Exception) {}
+                            }
+                            found = true
                             return true
                         }
                     }
@@ -342,7 +390,7 @@ class TurkTV : MainAPI() {
             Log.e("TurkTV", "Error extracting links: ${e.message}")
         }
         
-        return true
+        return found
     }
 
     // =========================================================================
@@ -365,6 +413,11 @@ class TurkTV : MainAPI() {
 
     private fun Element.smartSelect(selectorStr: String?): String? {
         if (selectorStr.isNullOrEmpty()) return null
+        // support self@<attr> generically
+        if (selectorStr.startsWith("self@")) {
+            val attr = selectorStr.substringAfter("self@")
+            return if (attr == "text") this.text().trim() else this.attr(attr).trim()
+        }
         if (selectorStr == "self@text") return this.text()
         if (selectorStr == "self@value") return this.attr("value")
         
@@ -384,6 +437,10 @@ class TurkTV : MainAPI() {
     
     private fun Element.smartSelect(selectorStr: String?, all: Boolean): List<String> {
         if (selectorStr.isNullOrEmpty()) return emptyList()
+        if (selectorStr.startsWith("self@")) {
+            val attr = selectorStr.substringAfter("self@")
+            return listOf(if (attr == "text") this.text().trim() else this.attr(attr).trim()).filter { it.isNotEmpty() }
+        }
         val parts = selectorStr.split("@")
         val css = parts[0]
         val attr = if (parts.size > 1) parts[1] else "text"
@@ -393,7 +450,7 @@ class TurkTV : MainAPI() {
                 "text" -> el.text().trim()
                 else -> el.attr(attr).trim()
             }
-        }
+        }.filter { it.isNotEmpty() }
     }
 
     private fun extractItems(doc: Document, selectors: Map<String, String>, baseUrl: String): List<SearchResponse> {
