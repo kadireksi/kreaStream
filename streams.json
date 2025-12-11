@@ -121,14 +121,15 @@
     "id": "a2",
     "title": "A2",
     "group": "TV",
-    "url": "https://trkvz-live.daioncdn.net/a2tv/a2tv.m3u8",
-    "poster": "https://www.atv.com.tr/a2tv/logo.png",
+    "url": "https://trkvz.daioncdn.net/a2tv/a2tv.m3u8?ce=3&app=59363a60-be96-4f73-9eff-355d0ff2c758&st=xLA_Zq8mMDEaDR5z7b1YPQ&e=1765485064&ppid=21d4112e81c7911b93794107903433f1",
+    "poster": "https://iatv.tmgrup.com.tr/site/v2/a2tv/i/a2tv-logo.png",
     "type": "tv",
     "headers": {
       "Referer": "https://www.atv.com.tr/",
       "Origin": "https://www.atv.com.tr"
     },
-    "genres": "Ulusal"
+    "genres": "Ulusal",
+    "is_audio": false
   },
   {
     "id": "trtcocuk",
@@ -349,6 +350,26 @@
     "type": "tv",
     "headers": {},
     "genres": "Müzik"
+  },
+  {
+    "id": "minikago",
+    "title": "Minika GO",
+    "url": "https://trkvz.daioncdn.net/minikago/minikago.m3u8?app=web&ce=3&st=waBfw0pqgvAYQ0tuNJD_Dw&e=1765485182&ppid=21d4112e81c7911b93794107903433f1",
+    "group": "TV",
+    "genres": "Çocuk",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/852040/64/64/0/0/64/64?u=https://i.tmgrup.com.tr/724izle/2023/06/14/1686755550790.png",
+    "is_audio": false
+  },
+  {
+    "id": "minikacocuk",
+    "title": "Minika Çocuk",
+    "url": "https://trkvz.daioncdn.net/minikago_cocuk/minikago_cocuk.m3u8?app=web&ce=3&st=z3SA3tUfn86dxHwBKxTNMg&e=1765485367&ppid=21d4112e81c7911b93794107903433f1",
+    "group": "TV",
+    "genres": "Çocuk",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/b8b0e1/64/64/0/0/64/64?u=https://i.tmgrup.com.tr/724izle/2023/06/14/1686755575352.png",
+    "is_audio": false
   },
   {
     "id": "trt-fm",
@@ -657,5 +678,35 @@
     "type": "radio",
     "headers": {},
     "genres": "Müzik"
+  },
+  {
+    "id": "cizgifilmtv",
+    "title": "Çizgi Film TV",
+    "url": "https://playlist.fasttvcdn.com/pl/rfrk9821hdy9dayo8wfyha/cizgi-film-tv/playlist.m3u8?st=fBSPUlk8x1U2UaKhSQyd9A&e=1765485438",
+    "group": "TV",
+    "genres": "Çocuk",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/e7cdaa/64/64/0/0/282/282?u=https://i.tmgrup.com.tr/rt/2023/05/08/1683553211327.png",
+    "is_audio": false
+  },
+  {
+    "id": "dizitv",
+    "title": "Dizi TV",
+    "url": "https://playlist.fasttvcdn.com/pl/rfrk9821hdy9dayo8wfyha/dizi-tv/playlist.m3u8?st=nJ-WND2vt019iNTi_TAwpQ&e=1765485512",
+    "group": "TV",
+    "genres": "Dizi",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/71ce44/64/64/0/0/336/336?u=https://i.tmgrup.com.tr/rt/2023/06/02/1685720299762.png",
+    "is_audio": false
+  },
+  {
+    "id": "belgeseltv",
+    "title": "Belgesel TV",
+    "url": "https://playlist.fasttvcdn.com/pl/rfrk9821hdy9dayo8wfyha/belgesel-tv/playlist.m3u8?st=PaMJMHFkTKHlhU6hko4y0Q&e=1765485598",
+    "group": "TV",
+    "genres": "Belgesel",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/b33f11/64/64/0/0/542/542?u=https://i.tmgrup.com.tr/rt/2023/09/11/1694412613091.png",
+    "is_audio": false
   }
 ]
