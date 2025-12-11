@@ -5,6 +5,8 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import org.json.JSONObject
+import org.json.JSONArray
 import android.util.Log
 
 class TurkTV : MainAPI() {
