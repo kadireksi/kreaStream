@@ -300,16 +300,39 @@ class TurkTV : MainAPI() {
                         }
                     }
                     "direct_m3u8" -> {
-                        callback(
-                            newExtractorLink(
-                                source = channel.name,
-                                name = "M3U8",
-                                url = data
-                            ) {
-                                this.type = ExtractorLinkType.M3U8
-                                this.quality = Qualities.Unknown.value
+                        val doc = app.get(data, timeout = 10).document
+                        val scripts = doc.select("script")
+                        for (script in scripts) {
+                            val scriptContent = script.html()
+                            if (scriptContent.contains("playerConfig", ignoreCase = true) || scriptContent.contains("streamUrl", ignoreCase = true)) {
+                                val m3u8Url = extractM3u8FromJson(scriptContent)
+                                if (m3u8Url != null) {
+                                    M3u8Helper.generateM3u8(
+                                        source = name,
+                                        streamUrl = m3u8Url,
+                                        referer = channel.base_url,
+                                        headers = mapOf(
+                                            "Referer" to channel.base_url,
+                                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                        )
+                                    ).forEach(callback)
+                                    return true
+                                }
                             }
-                        )
+                        }
+                    }
+                    "youtube" -> {
+                        val yt = doc.selectFirst("iframe[src*='youtube.com/embed']")
+                            ?.attr("src")
+                            ?.let { "https://www.youtube.com/watch?v=${it.substringAfter("embed/").substringBefore("?")}" }
+                            ?: Regex("""https://www\.youtube\.com/watch\?v=([a-zA-Z0-9_-]+)""")
+                                .find(doc.html())?.groupValues?.get(1)
+                                ?.let { "https://www.youtube.com/watch?v=$it" }
+
+                        if (yt != null) {
+                            loadExtractor(yt, channel.base_url, subtitleCallback, callback)
+                            return true
+                        }
                     }
                 }
             }
@@ -390,6 +413,61 @@ class TurkTV : MainAPI() {
             }
         }
         return list
+    }
+
+    private fun extractM3u8FromJson(jsonStr: String): String? {
+        return try {
+            var cleanJson = jsonStr.trim()
+            if (cleanJson.startsWith("var ") || cleanJson.startsWith("let ") || cleanJson.startsWith("const ")) {
+                cleanJson = cleanJson.substringAfterLast("= ").trim().trimEnd(';')
+            }
+            if (cleanJson.startsWith("{") && cleanJson.endsWith("}")) {
+                val config = JSONObject(cleanJson)
+                var streamUrl = config.optString("streamUrl")
+                if (streamUrl.contains(".m3u8")) return streamUrl
+
+                fun findInJson(obj: JSONObject): String? {
+                    if (obj.has("streamUrl")) {
+                        val url = obj.getString("streamUrl")
+                        if (url.contains(".m3u8")) return url
+                    }
+                    if (obj.has("sources")) {
+                        val sources = obj.getJSONArray("sources")
+                        for (i in 0 until sources.length()) {
+                            val src = sources.getJSONObject(i)
+                            if (src.optString("type") == "application/x-mpegURL" || src.optString("file").contains(".m3u8")) {
+                                return src.optString("file", src.optString("src", src.optString("url")))
+                            }
+                        }
+                    }
+                    if (obj.has("media") || obj.has("playlist")) {
+                        val arr = if (obj.has("media")) obj.getJSONArray("media") else obj.getJSONArray("playlist")
+                        for (i in 0 until arr.length()) {
+                            val item = arr.getJSONObject(i)
+                            if (item.optString("type") == "hls" || item.optString("format") == "hls") {
+                                return item.optString("url", item.optString("src", item.optString("streamUrl")))
+                            }
+                        }
+                    }
+                    val keys = obj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val value = obj.get(key)
+                        if (value is JSONObject) {
+                            val found = findInJson(value)
+                            if (found != null) return found
+                        }
+                    }
+                    return null
+                }
+
+                return findInJson(config)
+            }
+            null
+        } catch (e: Exception) {
+            Regex("""["']?streamUrl["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']""", RegexOption.IGNORE_CASE)
+                .find(jsonStr)?.groupValues?.get(1)
+        }
     }
 
     private fun fixUrl(url: String, baseUrl: String): String {
