@@ -1,4 +1,4 @@
-version = 251206
+version = 251211
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
@@ -11,6 +11,6 @@ cloudstream {
     description = "Türk Tv"
     status  = 1
     tvTypes = listOf("TvSeries", "Live")
-    iconUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV_logo.png"
+    iconUrl = "https://m.media-amazon.com/images/I/41fJO1NxFxL.png"
 }
 
