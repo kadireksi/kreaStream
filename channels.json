@@ -30,11 +30,11 @@
     ],
     "detail_page": {
       "selectors": {
-        "title": "p.text_title__UMoMd",
+        "title": "p.text_title__UMoMd@text",
         "description": "meta[name=description]@content",
-        "poster": "img.card_card-image__T64bP",
+        "poster": "img.card_card-image__T64bP@src",
         "tags": "",
-        "year": "div.basic-dot_badge__1nsQT"
+        "year": "div.basic-dot_badge__1nsQT@text"
       }
     },
     "episode_page": {
@@ -42,8 +42,8 @@
       "reverse_order": true,
       "selectors": {
         "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
-        "name": "div.card_card-title__IJ9af",
-        "url": "a"
+        "name": "div.card_card-title__IJ9af@text",
+        "url": "self@href"
       }
     },
     "video_extraction": {
@@ -54,7 +54,7 @@
         },
         {
           "type": "youtube",
-          "selector": ""
+          "selector": "iframe[src*='youtube']"
         },
         {
           "type": "direct_m3u8"
