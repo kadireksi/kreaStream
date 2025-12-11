@@ -708,5 +708,45 @@
     "headers": {},
     "poster": "https://ia.tmgrup.com.tr/b33f11/64/64/0/0/542/542?u=https://i.tmgrup.com.tr/rt/2023/09/11/1694412613091.png",
     "is_audio": false
+  },
+  {
+    "id": "turkuvaznostalji",
+    "title": "Turkuvaz Nostalji",
+    "url": "https://trkvz-radyolar.ercdn.net/turkuvaznostalji/playlist.m3u8",
+    "group": "Radio",
+    "genres": "Müzik",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/7b2ecf/510/510/0/0/567/567?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612856386331.jpg",
+    "is_audio": false
+  },
+  {
+    "id": "radyoenerji",
+    "title": "Radyo Enerji",
+    "url": "https://trkvz-radyolar.ercdn.net/radyoenergy/playlist.m3u8",
+    "group": "Radio",
+    "genres": "Müzik",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/b99853/510/510/0/0/567/567?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612856191355.jpg",
+    "is_audio": false
+  },
+  {
+    "id": "tukuvazanadolu",
+    "title": "Turkuvaz Anadolu",
+    "url": "https://trkvz-radyolar.ercdn.net/turkuvazanadolu/playlist.m3u8",
+    "group": "Radio",
+    "genres": "Müzik",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/bda3a2/510/510/0/0/1020/1020?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612856249170.png",
+    "is_audio": false
+  },
+  {
+    "id": "radyoturkuvaz",
+    "title": "Radyo Turkuvaz",
+    "url": "https://trkvz-radyolar.ercdn.net/radyoturkuvaz/playlist.m3u8",
+    "group": "Radio",
+    "genres": "Müzik",
+    "headers": {},
+    "poster": "https://ia.tmgrup.com.tr/a8ef94/510/510/0/0/567/567?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612850622106.jpg",
+    "is_audio": false
   }
 ]
