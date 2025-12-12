@@ -11,9 +11,6 @@ import android.util.Log
 
 class TurkTV : MainAPI() {
 
-    // =========================================================================
-    // 1. PLUGIN CONFIGURATION
-    // =========================================================================
     override var name = "Türk TV"
     override var mainUrl = "https://turktv.local" // Virtual URL
     override var lang = "tr"
@@ -22,13 +19,9 @@ class TurkTV : MainAPI() {
 
     private val dummyTvUrl = "${mainUrl}/tv"
     private val dummyRadioUrl = "${mainUrl}/radio"
-    // Remote Configuration URLs
+
     private val channelsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/channels.json"
     private val streamsJsonUrl = "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/streams.json"
-
-    // =========================================================================
-    // 2. DYNAMIC DATA CLASSES
-    // =========================================================================
     
     data class StreamItem(
         val id: String,
@@ -86,93 +79,43 @@ class TurkTV : MainAPI() {
     private var channels: List<ChannelConfig> = emptyList()
     private var streams: List<StreamItem> = emptyList()
 
-    // =========================================================================
-    // 3. MAIN PAGE GENERATOR
-    // =========================================================================
     
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         if (page == 1) fetchConfiguration()
 
         val pages = mutableListOf<HomePageList>()
 
-        // ───────────────────────────────────────────────────────────────
-        // 1. GROUP STREAMS BY GROUP (TV / Radio)
-        // ───────────────────────────────────────────────────────────────
+        // GROUP → GENRES → STREAM LISTS
         val grouped = streams.groupBy { it.group.ifBlank { "TV" } }
 
-        for ((groupName, streamList) in grouped) {
+        for ((groupName, list) in grouped) {
 
             val header = when (groupName.lowercase()) {
-                "radio", "radyo" -> "📻 Canlı Radyo"
-                else -> "📺 Canlı TV"
+                "radio", "radyo" -> "📻 $groupName"
+                else -> "📺 $groupName"
             }
 
-            // ---- A) Live Stream Items ---------------------------------
-            val streamItems = streamList.map { s ->
-                newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
-                    this.posterUrl = s.poster
-                }
-            }
-
-            if (streamItems.isNotEmpty()) {
-                pages.add(HomePageList(header, streamItems, true))
-            }
-
-            // ───────────────────────────────────────────────────────────
-            // 2. GENRE FILTER SECTION (Optional, only if genres exist)
-            // ───────────────────────────────────────────────────────────
-            val genres = streamList
+            // GROUP GENRES INSIDE THIS GROUP
+            val genres = list
                 .filter { it.genres.isNotBlank() }
                 .groupBy { it.genres }
 
-            if (genres.isNotEmpty()) {
-                val genreItems = genres.map { (genreName, _) ->
-                    newTvSeriesSearchResponse("🎭 $genreName", "genre://${groupName}/${genreName}", TvType.TvSeries) {
-                        this.posterUrl = ""
-                    }
-                }
+            val genreItems = genres.map { (genreName, _) ->
+                val url = "genre://${groupName}/${genreName}"
 
-                pages.add(
-                    HomePageList(
-                        "$header – Türler",
-                        genreItems,
-                        true
-                    )
-                )
+                newTvSeriesSearchResponse(genreName, url, TvType.TvSeries) {
+                    this.posterUrl = ""
+                }
             }
-        }
 
-        // ───────────────────────────────────────────────────────────────
-        // 3. CHANNEL CONFIG LISTINGS (FROM REMOTE JSON)
-        // ───────────────────────────────────────────────────────────────
-        channels.filter { it.active }.forEach { channel ->
-            channel.listings.forEach { listing ->
-                try {
-                    val url = buildListingUrl(listing.path, channel.base_url, page)
-                    val doc = app.get(url, headers = channel.headers).document
-
-                    val items = extractItems(doc, listing.selectors, channel.base_url)
-
-                    if (items.isNotEmpty()) {
-                        pages.add(
-                            HomePageList(
-                                "${channel.name} - ${listing.title}",
-                                items,
-                                listing.ishorizontal
-                            )
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.e("TurkTV", "Error loading ${channel.name}: ${e.message}")
-                }
+            if (genreItems.isNotEmpty()) {
+                pages.add(HomePageList(header, genreItems, true))
             }
         }
 
         return newHomePageResponse(pages)
     }
 
-
-    // build listing URL with basic pagination support:
     private fun buildListingUrl(path: String, baseUrl: String, page: Int): String {
         var p = path
         if (p.contains("{page}")) {
@@ -183,10 +126,6 @@ class TurkTV : MainAPI() {
         }
         return fixUrl(p, baseUrl)
     }
-
-    // =========================================================================
-    // 4. SEARCH
-    // =========================================================================
 
     override suspend fun search(query: String): List<SearchResponse> {
         fetchConfiguration()
@@ -199,12 +138,36 @@ class TurkTV : MainAPI() {
         return results
     }
 
-    // =========================================================================
-    // 5. LOAD (DETAILS & EPISODES)
-    // =========================================================================
-
     override suspend fun load(url: String): LoadResponse {
         fetchConfiguration()
+
+        // ========== GENRE HANDLER: genre://GROUP/GENRE ==========
+        if (url.startsWith("genre://")) {
+            fetchConfiguration()
+
+            val parts = url.removePrefix("genre://").split("/")
+            val groupName = parts.getOrNull(0) ?: return newTvSeriesLoadResponse("Hata", url, TvType.TvSeries, emptyList())
+            val genreName = parts.getOrNull(1) ?: return newTvSeriesLoadResponse("Hata", url, TvType.TvSeries, emptyList())
+
+            // Filter streams matching this group + genre
+            val filtered = streams.filter {
+                it.group.equals(groupName, true) &&
+                it.genres.equals(genreName, true)
+            }
+
+            // Convert each stream to an episode
+            val episodes = filtered.mapIndexed { index, stream ->
+                newEpisode(stream.url) {
+                    this.name = stream.title
+                    this.episode = index + 1
+                    this.posterUrl = stream.poster
+                }
+            }
+
+            return newTvSeriesLoadResponse("$groupName • $genreName", url, TvType.TvSeries, episodes) {
+                this.plot = "$groupName kategorisi altında '$genreName' türü içerikler."
+            }
+        }
 
         // Handle Live Streams
         val streamItem = streams.find { it.url == url }
@@ -294,10 +257,6 @@ class TurkTV : MainAPI() {
             this.tags = tags
         }
     }
-
-    // =========================================================================
-    // 6. LOAD LINKS (VIDEO EXTRACTION)
-    // =========================================================================
 
     override suspend fun loadLinks(
         data: String,
@@ -442,10 +401,6 @@ class TurkTV : MainAPI() {
         
         return found
     }
-
-    // =========================================================================
-    // 7. HELPER FUNCTIONS
-    // =========================================================================
 
     private suspend fun fetchConfiguration() {
         if (channels.isEmpty() || streams.isEmpty()) {
