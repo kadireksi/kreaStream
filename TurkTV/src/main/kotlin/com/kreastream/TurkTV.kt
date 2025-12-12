@@ -108,11 +108,11 @@ class TurkTV : MainAPI() {
             val genres = streams.groupBy { it.genres }
 
             val items = mutableListOf<SearchResponse>()
-            for (genre in genres) {
-                val fakeUrl = "${header}_genre::${groupName}::${genre}"
-                items.add(newTvSeriesSearchResponse(genre, fakeUrl, TvType.TvSeries) {
+            for ((genreName, genreList) in genres) {
+                val fakeUrl = "${header}_genre::${groupName}::${genreName}"
+
+                items.add(newTvSeriesSearchResponse(genreName, fakeUrl, TvType.TvSeries) {
                     this.posterUrl = ""
-                    //this.year = "Canlı: $genre"
                 })
             }
             if (items.isNotEmpty()) pages.add(HomePageList(header, items, true))
