@@ -164,7 +164,7 @@ class TurkTV : MainAPI() {
         // Handle Live Streams
         val streamItem = streams.find { it.url == url }
         if (streamItem != null) {
-            return LiveStreamLoadResponse(streamItem.title, url, TvType.Live, 
+            return newLiveStreamLoadResponse(streamItem.title, url, TvType.Live, 
                 listOf(newEpisode(url) {
                     this.name = streamItem.title
                     this.posterUrl = streamItem.poster
