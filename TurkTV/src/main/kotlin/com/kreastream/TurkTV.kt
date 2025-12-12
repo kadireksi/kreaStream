@@ -78,15 +78,15 @@ class TurkTV : MainAPI() {
 
     private var channels: List<ChannelConfig> = emptyList()
     private var streams: List<StreamItem> = emptyList()
-
-    
+  
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         if (page == 1) fetchConfiguration()
 
         val pages = mutableListOf<HomePageList>()
 
-        // GROUP BY STREAM GROUP (TV, Radio, etc.)
+        // GROUP STREAMS BY GROUP NAME (TV / Radio etc.)
         val grouped = streams.groupBy { it.group.ifBlank { "TV" } }
+            .toSortedMap(String.CASE_INSENSITIVE_ORDER)
 
         for ((groupName, list) in grouped) {
 
@@ -95,39 +95,45 @@ class TurkTV : MainAPI() {
                 else -> "📺 $groupName"
             }
 
-            // GENRE MAP
+            // AUTO-GENRE DETECTION
             val genres = list
-                .filter { it.genres.isNotBlank() }
-                .groupBy { it.genres }
+                .groupBy { detectGenre(it.title, it.genres) }
+                .toSortedMap(String.CASE_INSENSITIVE_ORDER)
 
+            // ──────────────────────────────────────────────────────
+            // IF GENRES EXIST → SHOW GENRES AS SERIES
+            // ELSE → SHOW STREAMS DIRECTLY
+            // ──────────────────────────────────────────────────────
             if (genres.isNotEmpty()) {
-                // ────────────────────────────────────────────
-                // A) ADD GENRE LISTS
-                // ────────────────────────────────────────────
-                val genreItems = genres.map { (genreName, _) ->
+
+                val items = genres.entries.mapIndexed { idx, (genreName, streamsInGenre) ->
+
+                    val color = genreColors[idx % genreColors.size]
+                    val poster = genrePosterSvg(genreName.uppercase(), color)
+
                     newTvSeriesSearchResponse(genreName, "genre://${groupName}/${genreName}", TvType.TvSeries) {
-                        this.posterUrl = ""
+                        this.posterUrl = poster
                     }
                 }
 
-                pages.add(HomePageList(header, genreItems, true))
+                pages.add(HomePageList(header, items, true))
+
             } else {
-                // ────────────────────────────────────────────
-                // B) NO GENRES → SHOW STREAMS DIRECTLY
-                // ────────────────────────────────────────────
-                val streamItems = list.map { s ->
-                    newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
-                        this.posterUrl = s.poster
+                // NO GENRES → SHOW STREAMS
+                val items = list
+                    .sortedBy { it.title.lowercase() }
+                    .map { s ->
+                        newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
+                            this.posterUrl = s.poster
+                        }
                     }
-                }
 
-                pages.add(HomePageList(header, streamItems, true))
+                pages.add(HomePageList(header, items, true))
             }
         }
 
         return newHomePageResponse(pages)
     }
-
 
     private fun buildListingUrl(path: String, baseUrl: String, page: Int): String {
         var p = path
@@ -559,4 +565,43 @@ class TurkTV : MainAPI() {
             this.posterUrl = this@toSearchResponse.poster
         }
     }
+
+    private fun genrePosterSvg(text: String, color: String): String {
+        val svg = """
+            <svg xmlns="http://www.w3.org/2000/svg" width="400" height="600">
+            <rect width="100%" height="100%" fill="$color"/>
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+                    font-size="60" fill="white" font-family="Arial" font-weight="bold">
+                $text
+            </text>
+            </svg>
+        """.trimIndent()
+
+        return "data:image/svg+xml;base64," + android.util.Base64.encodeToString(
+            svg.toByteArray(),
+            android.util.Base64.NO_WRAP
+        )
+    }
+
+    private fun detectGenre(title: String, raw: String?): String {
+        if (!raw.isNullOrBlank()) return raw.trim()
+
+        val lower = title.lowercase()
+
+        return when {
+            "spor" in lower || "sport" in lower -> "Sports"
+            "haber" in lower || "news" in lower -> "News"
+            "çocuk" in lower || "kids" in lower -> "Kids"
+            "muzik" in lower || "music" in lower -> "Music"
+            "film" in lower || "movie" in lower -> "Movies"
+            else -> "Diğer"
+        }
+    }
+
+    private val genreColors = listOf(
+        "#E63946", "#457B9D", "#2A9D8F", "#F4A261", "#E9C46A",
+        "#8A4FFF", "#FF6B6B", "#4ECDC4", "#1A535C", "#B56576"
+    )
+
+
 }
