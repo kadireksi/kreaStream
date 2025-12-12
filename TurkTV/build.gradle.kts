@@ -1,9 +1,4 @@
-version = 251211
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-}
+version = 251212
 
 cloudstream {
     authors     = listOf("kreastream")
