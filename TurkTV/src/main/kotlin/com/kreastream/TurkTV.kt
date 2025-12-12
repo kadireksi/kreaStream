@@ -111,7 +111,6 @@ class TurkTV : MainAPI() {
             val streamItems = streamList.map { s ->
                 newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
                     this.posterUrl = s.poster
-                    this.backgroundPosterUrl = if (s.is_audio) s.poster else null
                 }
             }
 
