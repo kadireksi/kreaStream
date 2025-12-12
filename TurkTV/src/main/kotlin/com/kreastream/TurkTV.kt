@@ -94,8 +94,8 @@ class TurkTV : MainAPI() {
 
         val pages = mutableListOf<HomePageList>()
 
-        val tvStreams = streams.filter { it.group == "TV" }
-        val radioStreams = streams.filter { it.group == "Radio" }
+        //val tvStreams = streams.filter { it.group == "TV" }
+        //val radioStreams = streams.filter { it.group == "Radio" }
 
         val grouped = streams.groupBy { it.group ?: "TV" }
         for ((groupName, list) in grouped) {
