@@ -139,7 +139,6 @@ class TurkTV : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        fetchConfiguration()
 
         // ========== GENRE HANDLER: genre://GROUP/GENRE ==========
         if (url.startsWith("genre://")) {
