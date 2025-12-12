@@ -3,7 +3,7 @@
         "iconUrl": "https://m.media-amazon.com/images/I/41fJO1NxFxL.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 34518,
+        "fileSize": 36166,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -13,7 +13,7 @@
             "TvSeries",
             "Live"
         ],
-        "version": 251211,
+        "version": 251212,
         "internalName": "TurkTV",
         "description": "T\u00fcrk Tv",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
