@@ -111,8 +111,8 @@ class TurkTV : MainAPI() {
 
     // ---------- PNG Generator helpers ----------
     private fun createPosterPngBase64(title: String, icon: String?, colorHex: String): String {
-        val width = 400
-        val height = 600
+        val width = 600
+        val height = 340
         val radius = 32f
 
         val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -161,8 +161,8 @@ class TurkTV : MainAPI() {
     }
 
     private fun createWaveformPosterPngBase64(title: String, colorHex: String): String {
-        val width = 360
-        val height = 360
+        val width = 400
+        val height = 200
         val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
 
@@ -372,7 +372,7 @@ class TurkTV : MainAPI() {
                 newEpisode(s.url) {
                     name = s.title
                     episode = idx + 1
-                    posterUrl = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
+                    posterUrl = s.poster
                 }
             }
 
