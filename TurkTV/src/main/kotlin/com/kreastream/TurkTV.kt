@@ -105,7 +105,7 @@ class TurkTV : MainAPI() {
                 else -> "📺 Canlı TV"
             }
 
-            val genres = list.flatMap { it.genres.split(",") }
+            val genres = list.flatMap { it.genres }
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .distinct()
