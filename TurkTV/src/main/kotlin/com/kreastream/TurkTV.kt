@@ -39,7 +39,8 @@ class TurkTV : MainAPI() {
         val type: String = "Live",
         val is_audio: Boolean = false,
         val backgroundPosterUrl: String? = null,
-        val headers: Map<String, String> = emptyMap()
+        val headers: Map<String, String> = emptyMap(),
+        val genres: String = ""
     )
 
     data class ChannelConfig(
@@ -114,7 +115,7 @@ class TurkTV : MainAPI() {
                 val fakeUrl = "${header}_genre::${groupName}::${genre}"
                 items.add(newTvSeriesSearchResponse(genre, fakeUrl, TvType.TvSeries) {
                     this.posterUrl = ""
-                    this.description = "Canlı: $genre"
+                    this.plot = "Canlı: $genre"
                 })
             }
             if (items.isNotEmpty()) pages.add(HomePageList(header, items, true))
