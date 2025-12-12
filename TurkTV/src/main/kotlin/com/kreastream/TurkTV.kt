@@ -167,7 +167,7 @@ class TurkTV : MainAPI() {
                 listOf(newEpisode(url) {
                     this.name = streamItem.title
                     this.posterUrl = streamItem.poster
-                    this.backgroundPosterUrl = if(streamItem.is_audio === true) streamItem.poster else null
+                    //this.backgroundPosterUrl = if(streamItem.is_audio === true) streamItem.poster else null
                 })
             ) {
                 this.posterUrl = streamItem.poster
