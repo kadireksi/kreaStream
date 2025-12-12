@@ -105,10 +105,7 @@ class TurkTV : MainAPI() {
                 else -> "📺 Canlı TV"
             }
 
-            val genres = list.flatMap { it.genres }
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .distinct()
+            val genres = streams.groupBy { it.genres }
 
             val items = mutableListOf<SearchResponse>()
             for (genre in genres) {
