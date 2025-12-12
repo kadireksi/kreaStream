@@ -115,7 +115,7 @@ class TurkTV : MainAPI() {
                 val fakeUrl = "${header}_genre::${groupName}::${genre}"
                 items.add(newTvSeriesSearchResponse(genre, fakeUrl, TvType.TvSeries) {
                     this.posterUrl = ""
-                    this.plot = "Canlı: $genre"
+                    this.year = "Canlı: $genre"
                 })
             }
             if (items.isNotEmpty()) pages.add(HomePageList(header, items, true))
