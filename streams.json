@@ -173,9 +173,7 @@
     "type": "tv",
     "headers": {},
     "is_audio": false,
-    "genres": [
-      "Haberler"
-    ]
+    "genres": "Haber"
   },
   {
     "id": "trtmuzik",
@@ -273,9 +271,7 @@
     "type": "tv",
     "headers": {},
     "is_audio": false,
-    "genres": [
-      "Haberler"
-    ]
+    "genres": "Haber"
   },
   {
     "id": "trtworld",
@@ -286,9 +282,7 @@
     "type": "tv",
     "headers": {},
     "is_audio": false,
-    "genres": [
-      "Haberler"
-    ]
+    "genres": "Haber"
   },
   {
     "id": "trtkurdi",
@@ -537,7 +531,9 @@
     "url": "https://trt.radyotvonline.net/trt_haber.aac",
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12530424_0-0-2048-1536.jpeg",
     "type": "radio",
-    "headers": {}
+    "headers": {},
+    "is_audio": false,
+    "genres": "Haber"
   },
   {
     "id": "trt-radyo-3",
