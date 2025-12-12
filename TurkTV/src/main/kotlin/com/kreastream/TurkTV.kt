@@ -7,6 +7,13 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.json.JSONObject
 import android.util.Log
+import android.util.Base64
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import java.io.ByteArrayOutputStream
 
 class TurkTV : MainAPI() {
 
@@ -79,30 +86,143 @@ class TurkTV : MainAPI() {
     private var channels: List<ChannelConfig> = emptyList()
     private var streams: List<StreamItem> = emptyList()
 
-    // ---------- Helpers: colors / posters / genre detection ----------
+    // ---------- Pastel palette (option C) ----------
     private val genreColors = listOf(
-        "#E63946", "#457B9D", "#2A9D8F", "#F4A261", "#E9C46A",
-        "#8A4FFF", "#FF6B6B", "#4ECDC4", "#1A535C", "#B56576"
+        "#A8DADC", "#F1FAEE", "#E9C46A", "#F2D7EE", "#FFDDD2",
+        "#ECD5E3", "#DCD6F7", "#B9FBC0", "#C1FBA4", "#FFE5B4"
     )
 
-    private fun genrePosterSvg(text: String, color: String): String {
-        val safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        val svg = """
-            <svg xmlns="http://www.w3.org/2000/svg" width="400" height="600">
-              <rect width="100%" height="100%" fill="$color"/>
-              <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
-                    font-size="56" fill="white" font-family="Arial" font-weight="700">
-                $safe
-              </text>
-            </svg>
-        """.trimIndent()
+    // ---------- Icon map (emoji used as drawable text) ----------
+    private val genreIcon = mapOf(
+        "News" to "\uD83D\uDCF0",     // 📰
+        "Haber" to "\uD83D\uDCF0",
+        "Sports" to "\uD83C\uDFC5",   // 🏅
+        "Spor" to "\uD83C\uDFC5",
+        "Kids" to "\uD83E\uDE78",     // 🧸
+        "Çocuk" to "\uD83E\uDE78",
+        "Music" to "\uD83C\uDFB5",    // 🎵
+        "Müzik" to "\uD83C\uDFB5",
+        "Movies" to "\uD83C\uDFAC",   // 🎬
+        "Film" to "\uD83C\uDFAC",
+        "TV" to "\uD83D\uDCFA",       // 📺
+        "Radio" to "\uD83D\uDCFB",    // 📻
+        "Diğer" to "\u2B50"          // ⭐
+    )
 
-        return "data:image/svg+xml;base64," + android.util.Base64.encodeToString(
-            svg.toByteArray(),
-            android.util.Base64.NO_WRAP
-        )
+    // ---------- PNG Generator helpers ----------
+    private fun createPosterPngBase64(title: String, icon: String?, colorHex: String): String {
+        val width = 400
+        val height = 600
+        val radius = 32f
+
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+
+        // Background
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.style = Paint.Style.FILL
+        paint.color = parseColorSafe(colorHex)
+        val rect = RectF(0f, 0f, width.toFloat(), height.toFloat())
+        canvas.drawRoundRect(rect, radius, radius, paint)
+
+        // Icon (emoji) - draw near top
+        if (!icon.isNullOrEmpty()) {
+            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            iconPaint.textAlign = Paint.Align.CENTER
+            iconPaint.textSize = 92f
+            iconPaint.typeface = Typeface.DEFAULT
+            iconPaint.color = 0xFFFFFFFF.toInt()
+            canvas.drawText(icon, width / 2f, height * 0.28f, iconPaint)
+        }
+
+        // Title text - bottom area
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textPaint.color = 0xFFFFFFFF.toInt()
+
+        // Fit text size to width
+        var textSize = 46f
+        textPaint.textSize = textSize
+        val maxWidth = width * 0.88f
+        while (textPaint.measureText(title) > maxWidth && textSize > 18f) {
+            textSize -= 2f
+            textPaint.textSize = textSize
+        }
+        canvas.drawText(title, width / 2f, height * 0.78f, textPaint)
+
+        // Convert to PNG base64
+        val baos = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos)
+        val bytes = baos.toByteArray()
+        baos.close()
+        bmp.recycle()
+        return "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
     }
 
+    private fun createWaveformPosterPngBase64(title: String, colorHex: String): String {
+        val width = 360
+        val height = 360
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        bgPaint.style = Paint.Style.FILL
+        bgPaint.color = parseColorSafe("#111111")
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+
+        // Wave bars
+        val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        barPaint.style = Paint.Style.FILL
+        barPaint.color = parseColorSafe(colorHex)
+
+        val cols = 20
+        val spacing = 12
+        val barWidth = 12
+        val startX = 16
+        for (i in 0 until cols) {
+            val h = 20 + ((i * 7) % 120)
+            val x = startX + i * (barWidth + spacing)
+            val top = (height / 2f) - (h / 2f)
+            canvas.drawRoundRect(RectF(x.toFloat(), top, (x + barWidth).toFloat(), top + h), 6f, 6f, barPaint)
+        }
+
+        // Title text
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textPaint.color = 0xFFFFFFFF.toInt()
+        textPaint.textSize = 22f
+        canvas.drawText(title, width / 2f, height - 28f, textPaint)
+
+        // Convert to PNG base64
+        val baos = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos)
+        val bytes = baos.toByteArray()
+        baos.close()
+        bmp.recycle()
+        return "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+    }
+
+    // safe parse color from hex like "#RRGGBB"
+    private fun parseColorSafe(hex: String): Int {
+        return try {
+            val clean = hex.trim().removePrefix("#")
+            val colorInt = when (clean.length) {
+                6 -> (0xFF shl 24) or (clean.substring(0, 2).toInt(16) shl 16) or
+                        (clean.substring(2, 4).toInt(16) shl 8) or clean.substring(4, 6).toInt(16)
+                8 -> (clean.substring(0, 2).toInt(16) shl 24) or
+                        (clean.substring(2, 4).toInt(16) shl 16) or
+                        (clean.substring(4, 6).toInt(16) shl 8) or clean.substring(6, 8).toInt(16)
+                else -> 0xFF000000.toInt()
+            }
+            colorInt
+        } catch (e: Exception) {
+            0xFF000000.toInt()
+        }
+    }
+
+    // ---------- Genre detection ----------
     private fun detectGenre(title: String, raw: String?): String {
         if (!raw.isNullOrBlank()) return raw.trim()
         val lower = title.lowercase()
@@ -160,7 +280,8 @@ class TurkTV : MainAPI() {
             if (genres.isNotEmpty()) {
                 val items = genres.entries.mapIndexed { idx, (genreName, streamsInGenre) ->
                     val color = genreColors[idx % genreColors.size]
-                    val poster = genrePosterSvg(genreName.uppercase(), color)
+                    val icon = genreIcon[genreName] ?: genreIcon["Diğer"]
+                    val poster = createPosterPngBase64(genreName.uppercase(), icon, color)
                     // Use a custom scheme that Cloudstream will not rewrite
                     val genreUrl = "csgenre://${groupName}/${genreName}"
                     newTvSeriesSearchResponse(genreName, genreUrl, TvType.TvSeries) {
@@ -171,7 +292,7 @@ class TurkTV : MainAPI() {
             } else {
                 // No genres -> show streams directly
                 val items = list.sortedBy { it.title.lowercase() }.map { s ->
-                    val poster = if (s.is_audio) audioWavePosterDataUrl(s.title) else s.poster
+                    val poster = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
                     newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
                         this.posterUrl = poster
                     }
@@ -251,7 +372,7 @@ class TurkTV : MainAPI() {
                 newEpisode(s.url) {
                     name = s.title
                     episode = idx + 1
-                    posterUrl = if (s.is_audio) audioWavePosterDataUrl(s.title) else s.poster
+                    posterUrl = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
                 }
             }
 
@@ -266,7 +387,7 @@ class TurkTV : MainAPI() {
             val episodes = tvStreams.mapIndexed { i, s ->
                 newEpisode(s.url) {
                     name = s.title
-                    posterUrl = if (s.is_audio) audioWavePosterDataUrl(s.title) else s.poster
+                    posterUrl = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
                     episode = i + 1
                 }
             }
@@ -280,7 +401,7 @@ class TurkTV : MainAPI() {
             val episodes = radioStreams.mapIndexed { i, s ->
                 newEpisode(s.url) {
                     name = s.title
-                    posterUrl = if (s.is_audio) audioWavePosterDataUrl(s.title) else s.poster
+                    posterUrl = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
                     episode = i + 1
                 }
             }
@@ -295,10 +416,10 @@ class TurkTV : MainAPI() {
             return newTvSeriesLoadResponse(streamItem.title, url, TvType.Live,
                 listOf(newEpisode(url) {
                     this.name = streamItem.title
-                    this.posterUrl = if (streamItem.is_audio) audioWavePosterDataUrl(streamItem.title) else streamItem.poster
+                    this.posterUrl = if (streamItem.is_audio) createWaveformPosterPngBase64(streamItem.title, genreColors[0]) else streamItem.poster
                 })
             ) {
-                this.posterUrl = if (streamItem.is_audio) audioWavePosterDataUrl(streamItem.title) else streamItem.poster
+                this.posterUrl = if (streamItem.is_audio) createWaveformPosterPngBase64(streamItem.title, genreColors[0]) else streamItem.poster
                 this.backgroundPosterUrl = if (streamItem.is_audio) streamItem.poster else streamItem.backgroundPosterUrl
                 this.plot = if (streamItem.is_audio) "Canlı Radyo Yayını" else "Canlı TV Yayını"
             }
@@ -582,23 +703,5 @@ class TurkTV : MainAPI() {
         return newTvSeriesSearchResponse(this.title, this.url, TvType.Live) {
             this.posterUrl = this@toSearchResponse.poster
         }
-    }
-
-    // ---------- Small audio waveform poster (data URL) for player/poster when stream is audio-only ----------
-    private fun audioWavePosterDataUrl(title: String): String {
-        val safe = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        val bars = (0 until 20).joinToString("") { i ->
-            val h = (20 + (i * 3) % 80) // deterministic but varied heights (no RNG)
-            val x = 10 + i * 18
-            """<rect x="$x" y="${140 - h/2}" width="12" height="$h" rx="2" fill="white" opacity="${0.6 + (i % 3) * 0.1}"/>"""
-        }
-        val svg = """
-            <svg xmlns="http://www.w3.org/2000/svg" width="360" height="360">
-              <rect width="100%" height="100%" fill="#111"/>
-              <g transform="translate(20,90)">$bars</g>
-              <text x="50%" y="320" text-anchor="middle" fill="white" font-size="22" font-family="Arial">$safe</text>
-            </svg>
-        """.trimIndent()
-        return "data:image/svg+xml;base64," + android.util.Base64.encodeToString(svg.toByteArray(), android.util.Base64.NO_WRAP)
     }
 }
