@@ -85,7 +85,7 @@ class TurkTV : MainAPI() {
 
         val pages = mutableListOf<HomePageList>()
 
-        // GROUP → GENRES → STREAM LISTS
+        // GROUP BY STREAM GROUP (TV, Radio, etc.)
         val grouped = streams.groupBy { it.group.ifBlank { "TV" } }
 
         for ((groupName, list) in grouped) {
@@ -95,26 +95,39 @@ class TurkTV : MainAPI() {
                 else -> "📺 $groupName"
             }
 
-            // GROUP GENRES INSIDE THIS GROUP
+            // GENRE MAP
             val genres = list
                 .filter { it.genres.isNotBlank() }
                 .groupBy { it.genres }
 
-            val genreItems = genres.map { (genreName, _) ->
-                val url = "genre://${groupName}/${genreName}"
-
-                newTvSeriesSearchResponse(genreName, url, TvType.TvSeries) {
-                    this.posterUrl = ""
+            if (genres.isNotEmpty()) {
+                // ────────────────────────────────────────────
+                // A) ADD GENRE LISTS
+                // ────────────────────────────────────────────
+                val genreItems = genres.map { (genreName, _) ->
+                    newTvSeriesSearchResponse(genreName, "genre://${groupName}/${genreName}", TvType.TvSeries) {
+                        this.posterUrl = ""
+                    }
                 }
-            }
 
-            if (genreItems.isNotEmpty()) {
                 pages.add(HomePageList(header, genreItems, true))
+            } else {
+                // ────────────────────────────────────────────
+                // B) NO GENRES → SHOW STREAMS DIRECTLY
+                // ────────────────────────────────────────────
+                val streamItems = list.map { s ->
+                    newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
+                        this.posterUrl = s.poster
+                    }
+                }
+
+                pages.add(HomePageList(header, streamItems, true))
             }
         }
 
         return newHomePageResponse(pages)
     }
+
 
     private fun buildListingUrl(path: String, baseUrl: String, page: Int): String {
         var p = path
@@ -139,6 +152,7 @@ class TurkTV : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
+        fetchConfiguration()
 
         // ========== GENRE HANDLER: genre://GROUP/GENRE ==========
         if (url.startsWith("genre://")) {
