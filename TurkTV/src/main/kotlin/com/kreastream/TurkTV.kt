@@ -95,40 +95,73 @@ class TurkTV : MainAPI() {
 
         val pages = mutableListOf<HomePageList>()
 
-        //val tvStreams = streams.filter { it.group == "TV" }
-        //val radioStreams = streams.filter { it.group == "Radio" }
+        // ───────────────────────────────────────────────────────────────
+        // 1. GROUP STREAMS BY GROUP (TV / Radio)
+        // ───────────────────────────────────────────────────────────────
+        val grouped = streams.groupBy { it.group.ifBlank { "TV" } }
 
-        val grouped = streams.groupBy { it.group ?: "TV" }
-        for ((groupName, list) in grouped) {
+        for ((groupName, streamList) in grouped) {
+
             val header = when (groupName.lowercase()) {
                 "radio", "radyo" -> "📻 Canlı Radyo"
                 else -> "📺 Canlı TV"
             }
 
-            val genres = streams.groupBy { it.genres }
-
-            val items = mutableListOf<SearchResponse>()
-            for ((genreName, genreList) in genres) {
-                val fakeUrl = "${header}_genre::${groupName}::${genreName}"
-
-                items.add(newTvSeriesSearchResponse(genreName, fakeUrl, TvType.TvSeries) {
-                    this.posterUrl = ""
-                })
+            // ---- A) Live Stream Items ---------------------------------
+            val streamItems = streamList.map { s ->
+                newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
+                    this.posterUrl = s.poster
+                    this.backgroundPosterUrl = if (s.is_audio) s.poster else null
+                }
             }
-            if (items.isNotEmpty()) pages.add(HomePageList(header, items, true))
+
+            if (streamItems.isNotEmpty()) {
+                pages.add(HomePageList(header, streamItems, true))
+            }
+
+            // ───────────────────────────────────────────────────────────
+            // 2. GENRE FILTER SECTION (Optional, only if genres exist)
+            // ───────────────────────────────────────────────────────────
+            val genres = streamList
+                .filter { it.genres.isNotBlank() }
+                .groupBy { it.genres }
+
+            if (genres.isNotEmpty()) {
+                val genreItems = genres.map { (genreName, _) ->
+                    newTvSeriesSearchResponse("🎭 $genreName", "genre://${groupName}/${genreName}", TvType.TvSeries) {
+                        this.posterUrl = ""
+                    }
+                }
+
+                pages.add(
+                    HomePageList(
+                        "$header – Türler",
+                        genreItems,
+                        true
+                    )
+                )
+            }
         }
 
+        // ───────────────────────────────────────────────────────────────
+        // 3. CHANNEL CONFIG LISTINGS (FROM REMOTE JSON)
+        // ───────────────────────────────────────────────────────────────
         channels.filter { it.active }.forEach { channel ->
             channel.listings.forEach { listing ->
                 try {
                     val url = buildListingUrl(listing.path, channel.base_url, page)
                     val doc = app.get(url, headers = channel.headers).document
-                    
+
                     val items = extractItems(doc, listing.selectors, channel.base_url)
-                    
+
                     if (items.isNotEmpty()) {
-                        val header = "${channel.name} - ${listing.title}"
-                        pages.add(HomePageList(header, items, listing.ishorizontal))
+                        pages.add(
+                            HomePageList(
+                                "${channel.name} - ${listing.title}",
+                                items,
+                                listing.ishorizontal
+                            )
+                        )
                     }
                 } catch (e: Exception) {
                     Log.e("TurkTV", "Error loading ${channel.name}: ${e.message}")
@@ -138,6 +171,7 @@ class TurkTV : MainAPI() {
 
         return newHomePageResponse(pages)
     }
+
 
     // build listing URL with basic pagination support:
     private fun buildListingUrl(path: String, baseUrl: String, page: Int): String {
