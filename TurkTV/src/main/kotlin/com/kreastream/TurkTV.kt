@@ -40,6 +40,7 @@ class TurkTV : MainAPI() {
         val poster: String? = null,
         val type: String = "Live",
         val is_audio: Boolean = false,
+        val backgroundPosterUrl: String? = null,
         val headers: Map<String, String> = emptyMap()
     )
 
@@ -163,7 +164,7 @@ class TurkTV : MainAPI() {
         // Handle Live Streams
         val streamItem = streams.find { it.url == url }
         if (streamItem != null) {
-            return newTvSeriesLoadResponse(streamItem.title, url, TvType.Live, 
+            return LiveStreamLoadResponse(streamItem.title, url, TvType.Live, 
                 listOf(newEpisode(url) {
                     this.name = streamItem.title
                     this.posterUrl = streamItem.poster
