@@ -171,7 +171,7 @@ class TurkTV : MainAPI() {
                 })
             ) {
                 this.posterUrl = streamItem.poster
-                this.backgroundPosterUrl = if(streamItem.is_audio === true) streamItem.poster else null
+                this.backgroundPosterUrl = if(streamItem.is_audio) streamItem.poster else null
                 this.plot = if(streamItem.is_audio) "Canlı Radyo Yayını" else "Canlı TV Yayını"
             }
         }
