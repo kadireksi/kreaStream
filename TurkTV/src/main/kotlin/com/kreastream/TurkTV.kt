@@ -132,6 +132,28 @@ class TurkTV : MainAPI() {
             }
         }
 
+        // ================== CHANNEL CONFIG SECTIONS ==================
+        channels.filter { it.active }.forEach { channel ->
+            channel.listings.forEach { listing ->
+                try {
+                    val url = buildListingUrl(listing.path, channel.base_url, page)
+                    val doc = app.get(url, headers = channel.headers).document
+
+                    val items = extractItems(doc, listing.selectors, channel.base_url)
+
+                    if (items.isNotEmpty()) {
+                        pages.add(
+                            HomePageList("${channel.name} - ${listing.title}", items, listing.ishorizontal)
+                        )
+                    }
+
+                } catch (e: Exception) {
+                    Log.e("TurkTV", "Error loading ${channel.name}: ${e.message}")
+                }
+            }
+        }
+
+
         return newHomePageResponse(pages)
     }
 
@@ -159,32 +181,39 @@ class TurkTV : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
        
-        if (url.startsWith("genre://")) {
+       // ======================= GENRE HANDLER =======================
+        if (url.contains("genre://")) {
+
+            val genrePart = url.substringAfter("genre://")
+            val parts = genrePart.split("/")
+
+            val groupName = parts.getOrNull(0) ?: return newTvSeriesLoadResponse(
+                "Hata", url, TvType.TvSeries, emptyList()
+            )
+
+            val genreName = parts.getOrNull(1) ?: return newTvSeriesLoadResponse(
+                "Hata", url, TvType.TvSeries, emptyList()
+            )
+
             fetchConfiguration()
 
-            val parts = url.removePrefix("genre://").split("/")
-            val groupName = parts.getOrNull(0) ?: return newTvSeriesLoadResponse("Hata", url, TvType.TvSeries, emptyList())
-            val genreName = parts.getOrNull(1) ?: return newTvSeriesLoadResponse("Hata", url, TvType.TvSeries, emptyList())
-
-            // Filter streams matching this group + genre
             val filtered = streams.filter {
                 it.group.equals(groupName, true) &&
                 it.genres.equals(genreName, true)
-            }
+            }.sortedBy { it.title.lowercase() }
 
-            // Convert each stream to an episode
-            val episodes = filtered.mapIndexed { index, stream ->
-                newEpisode(stream.url) {
-                    this.name = stream.title
-                    this.episode = index + 1
-                    this.posterUrl = stream.poster
+            val episodes = filtered.mapIndexed { index, s ->
+                newEpisode(s.url) {
+                    name = s.title
+                    episode = index + 1
+                    posterUrl = s.poster
                 }
             }
 
-            return newTvSeriesLoadResponse("$groupName • $genreName", url, TvType.TvSeries, episodes) {
-                this.plot = "$groupName kategorisi altında '$genreName' türü içerikler."
-            }
+            return newTvSeriesLoadResponse("$groupName • $genreName", url, TvType.TvSeries, episodes)
         }
+
+
 
         // Handle Live Streams
         val streamItem = streams.find { it.url == url }
