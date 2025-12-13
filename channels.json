@@ -108,9 +108,10 @@
       "path_suffix": "/bolumler",
       "reverse_order": true,
       "selectors": {
-        "container": "#bolum-combobox option",
-        "name": "self@text",
-        "url": "self@value"
+        "container": "div.item",
+        "name": "img@alt",
+        "url": "a@href",
+        "poster": "img.lazy-common@data-src"
       }
     },
     "video_extraction": {
