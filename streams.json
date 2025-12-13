@@ -374,7 +374,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yerli Müzik"
   },
   {
     "id": "pop90",
@@ -384,7 +384,7 @@
     "poster": "https://mediacdns.karnaval.com/media/station_media/41/logos/android_default_logo.png?v=041022033335",
     "is_audio": true,
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik"
   },
   {
     "id": "metrofm",
@@ -395,7 +395,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik"
   },
   {
     "id": "power-fm",
@@ -406,7 +406,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik"
   },
   {
     "id": "number1fm",
@@ -417,7 +417,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik"
   },
   {
     "id": "kral-fm",
@@ -428,7 +428,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yerli Müzik"
   },
   {
     "id": "kral-pop",
@@ -439,7 +439,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yerli Müzik"
   },
   {
     "id": "super-fm",
@@ -450,7 +450,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yerli Müzik"
   },
   {
     "id": "alem-fm",
@@ -460,7 +460,8 @@
     "poster": "https://www.turkmedya.com.tr/assets/img/logo/logo_alem_fm.png",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "best-fm",
@@ -471,7 +472,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yerli Müzik"
   },
   {
     "id": "joy-turk",
@@ -482,7 +483,7 @@
     "type": "radio",
     "headers": {},
     "is_audio": true,
-    "genres": "Müzik"
+    "genres": "Yerli Müzik"
   },
   {
     "id": "trt-turku",
@@ -492,7 +493,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467466.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "memleketim-fm",
@@ -502,7 +504,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467512.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "trt-radyo-1",
@@ -512,7 +515,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467415.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "trt-nagme",
@@ -522,7 +526,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467465.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "trt-radyo-haber",
@@ -532,7 +537,7 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12530424_0-0-2048-1536.jpeg",
     "type": "radio",
     "headers": {},
-    "is_audio": false,
+    "is_audio": true,
     "genres": "Haber"
   },
   {
@@ -543,7 +548,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467462.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "erzurum-radyosu",
@@ -553,7 +559,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467502.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "antalya-radyosu",
@@ -563,7 +570,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467521.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "cukurova-radyosu",
@@ -573,7 +581,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467486.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "trabzon-radyosu",
@@ -583,7 +592,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467470.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "gap-radyosu",
@@ -593,7 +603,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467503.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "trt-kurdi",
@@ -603,7 +614,8 @@
     "poster": "https://cdn-i.pr.trt.com.tr/trtdinle/w480/h360/q70/12467484.jpeg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "radyo-1",
@@ -613,7 +625,8 @@
     "poster": "https://radyo1.com.tr/wp-content/uploads/2024/01/radyo1-logo.png",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "radyo-7",
@@ -623,7 +636,8 @@
     "poster": "https://radyo7.com.tr/wp-content/uploads/2023/05/radyo7-logo.png",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yerli Müzik",
+    "is_audio": true
   },
   {
     "id": "number1Best",
@@ -633,7 +647,8 @@
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2017/08/N1_BestOf.png",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik",
+    "is_audio": true
   },
   {
     "id": "number1Slow",
@@ -643,7 +658,8 @@
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Slow-1.png",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik",
+    "is_audio": true
   },
   {
     "id": "number1Lounge",
@@ -653,7 +669,8 @@
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2016/03/nr1lounge-300x300.jpg",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik",
+    "is_audio": true
   },
   {
     "id": "number1Dance",
@@ -663,7 +680,8 @@
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Dance-1.png",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik",
+    "is_audio": true
   },
   {
     "id": "number1Heart",
@@ -673,7 +691,8 @@
     "poster": "https://www.numberone.com.tr/wp-content/uploads/2015/12/N1_Heart-1.png",
     "type": "radio",
     "headers": {},
-    "genres": "Müzik"
+    "genres": "Yabancı Müzik",
+    "is_audio": true
   },
   {
     "id": "cizgifilmtv",
@@ -710,10 +729,10 @@
     "title": "Turkuvaz Nostalji",
     "url": "https://trkvz-radyolar.ercdn.net/turkuvaznostalji/playlist.m3u8",
     "group": "Radio",
-    "genres": "Müzik",
+    "genres": "Yerli Müzik",
     "headers": {},
     "poster": "https://ia.tmgrup.com.tr/7b2ecf/510/510/0/0/567/567?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612856386331.jpg",
-    "is_audio": false
+    "is_audio": true
   },
   {
     "id": "radyoenerji",
@@ -723,26 +742,26 @@
     "genres": "Müzik",
     "headers": {},
     "poster": "https://ia.tmgrup.com.tr/b99853/510/510/0/0/567/567?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612856191355.jpg",
-    "is_audio": false
+    "is_audio": true
   },
   {
     "id": "tukuvazanadolu",
     "title": "Turkuvaz Anadolu",
     "url": "https://trkvz-radyolar.ercdn.net/turkuvazanadolu/playlist.m3u8",
     "group": "Radio",
-    "genres": "Müzik",
+    "genres": "Yerli Müzik",
     "headers": {},
     "poster": "https://ia.tmgrup.com.tr/bda3a2/510/510/0/0/1020/1020?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612856249170.png",
-    "is_audio": false
+    "is_audio": true
   },
   {
     "id": "radyoturkuvaz",
     "title": "Radyo Turkuvaz",
     "url": "https://trkvz-radyolar.ercdn.net/radyoturkuvaz/playlist.m3u8",
     "group": "Radio",
-    "genres": "Müzik",
+    "genres": "Yerli Müzik",
     "headers": {},
     "poster": "https://ia.tmgrup.com.tr/a8ef94/510/510/0/0/567/567?u=https://i.tmgrup.com.tr/724dinle/2021/02/09/1612850622106.jpg",
-    "is_audio": false
+    "is_audio": true
   }
 ]
