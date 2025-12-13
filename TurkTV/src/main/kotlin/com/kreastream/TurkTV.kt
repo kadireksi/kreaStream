@@ -134,7 +134,7 @@ class TurkTV : MainAPI() {
             iconPaint.textSize = 200f
             iconPaint.typeface = Typeface.DEFAULT
             iconPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawText(icon, width / 2f, height * 0.10f, iconPaint)
+            canvas.drawText(icon, width / 2f, height / 2f, iconPaint)
         }
 
         // // Title text - bottom area
