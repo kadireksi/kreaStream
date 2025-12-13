@@ -560,7 +560,7 @@ class TurkTV : MainAPI() {
                         val scripts = doc.select("script")
                         for (script in scripts) {
                             val scriptContent = script.html()
-                            if (scriptContent.contains("playerConfig", ignoreCase = true) || scriptContent.contains("streamUrl", ignoreCase = true)) {
+                            if (scriptContent.contains("playerConfig", ignoreCase = true) || scriptContent.contains("streamUrl", ignoreCase = true || scriptContent.contains("contentUrl", ignoreCase = true)) {
                                 val m3u8Url = extractM3u8FromJson(scriptContent)
                                 if (m3u8Url != null) {
                                     M3u8Helper.generateM3u8(source = name, streamUrl = m3u8Url, referer = channel.base_url).forEach { callback(it) }
@@ -653,7 +653,7 @@ class TurkTV : MainAPI() {
             if (cleanJson.startsWith("{") && cleanJson.endsWith("}")) {
                 val config = JSONObject(cleanJson)
                 fun findInJson(obj: JSONObject): String? {
-                    if (obj.has("streamUrl")) {
+                    if (obj.has("streamUrl") || obj.has("contentUrl")) {
                         val url = obj.getString("streamUrl")
                         if (url.contains(".m3u8")) return url
                     }
