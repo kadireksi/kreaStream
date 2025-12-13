@@ -97,8 +97,8 @@
     ],
     "detail_page": {
       "selectors": {
-        "title": "img@alt",
-        "description": "h1.listing-title",
+        "title": "li.breadcrumb-list > img@alt",
+        "description": "div.date > span@text",
         "poster": "img@src",
         "year": ".yil-deger@text",
         "tags": ".janr-etiket a@text"
