@@ -98,7 +98,7 @@ class TurkTV : MainAPI() {
         "Haber" to "\uD83D\uDCF0",
         "Sports" to "\uD83C\uDFC5",   // 🏅
         "Spor" to "\uD83C\uDFC5",
-        "Kids" to "\ud83e\uddd2",     // 🧸
+        "Kids" to "\uD83E\uDE78",     // 🧸
         "Çocuk" to "\uD83E\uDE78",
         "Music" to "\uD83C\uDFB5",    // 🎵
         "Müzik" to "\uD83C\uDFB5",
@@ -129,7 +129,7 @@ class TurkTV : MainAPI() {
         if (!icon.isNullOrEmpty()) {
             val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             iconPaint.textAlign = Paint.Align.CENTER
-            iconPaint.textSize = 120f
+            iconPaint.textSize = 92f
             iconPaint.typeface = Typeface.DEFAULT
             iconPaint.color = 0xFFFFFFFF.toInt()
             canvas.drawText(icon, width / 2f, height * 0.28f, iconPaint)
@@ -149,7 +149,7 @@ class TurkTV : MainAPI() {
             textSize -= 2f
             textPaint.textSize = textSize
         }
-        canvas.drawText(title, width / 2f, height * 0.78f, textPaint)
+        canvas.drawText(title, width / 2f, height * 0.50f, textPaint)
 
         // Convert to PNG base64
         val baos = ByteArrayOutputStream()
