@@ -114,7 +114,7 @@ class TurkTV : MainAPI() {
     // ---------- PNG Generator helpers ----------
     private fun createPosterPngBase64(title: String, icon: String?, colorHex: String): String {
         val width = 600
-        val height = 340
+        val height = 400
         val radius = 32f
 
         val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
