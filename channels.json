@@ -39,7 +39,7 @@
     },
     "episode_page": {
       "path_suffix": "/bolum",
-      "reverse_order": true,
+      "reverse_order": false,
       "selectors": {
         "container": "div.grid_grid-wrapper__elAnh > div.h-full.w-full > a",
         "name": "div.card_card-title__IJ9af@text",
