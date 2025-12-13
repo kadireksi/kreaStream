@@ -138,10 +138,10 @@
         "path": "/diziler",
         "ishorizontal": false,
         "selectors": {
-          "container": ".category-classic-item.type-02",
+          "container": ".col-6 col-md-4 col-lg-4",
           "title": "h3.title",
           "url": "a@href",
-          "poster": ".wrap-295x410 > img@src"
+          "poster": "img@src"
         }
       },
       {
