@@ -97,7 +97,7 @@
     ],
     "detail_page": {
       "selectors": {
-        "title": "h1.dizi-isim@text",
+        "title": "img@alt",
         "description": ".sinopsis-text@text",
         "poster": "img.afis@src",
         "year": ".yil-deger@text",
