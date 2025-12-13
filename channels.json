@@ -106,7 +106,7 @@
     },
     "episode_page": {
       "path_suffix": "/bolumler",
-      "reverse_order": true,
+      "reverse_order": false,
       "selectors": {
         "container": "div.item",
         "name": "img@alt",
