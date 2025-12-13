@@ -548,7 +548,7 @@ class TurkTV : MainAPI() {
                             if (m != null) {
                                 val found = m.value
                                 M3u8Helper.generateM3u8(
-                                    source = name,
+                                    source = channel.title,
                                     streamUrl = found,
                                     referer = channel.base_url,
                                     headers = mapOf("Referer" to channel.base_url)
