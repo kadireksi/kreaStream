@@ -581,7 +581,7 @@ class TurkTV : MainAPI() {
                                 val m3u8Url = extractM3u8FromJson(scriptContent)
                                 if (m3u8Url != null) {
                                     M3u8Helper.generateM3u8(
-                                        source = name,
+                                        source = channel.name,
                                         streamUrl = m3u8Url,
                                         referer = channel.base_url
                                     ).forEach(callback)
