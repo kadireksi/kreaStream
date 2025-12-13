@@ -117,16 +117,8 @@
     "video_extraction": {
       "methods": [
         {
-          "type": "iframe",
-          "selector": "iframe[src*='youtube']"
-        },
-        {
-          "type": "iframe",
-          "selector": "iframe[src*='kanald']"
-        },
-        {
           "type": "regex",
-          "pattern": "file: \"(.*?)\""
+          "pattern": "contentUrl: \"(.*?)\""
         }
       ]
     }
