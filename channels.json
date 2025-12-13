@@ -141,7 +141,7 @@
           "container": ".category-classic-item.type-02",
           "title": "h3.title",
           "url": "a@href",
-          "poster": "img@src"
+          "poster": "img@data-src"
         }
       },
       {
@@ -152,7 +152,7 @@
           "container": "div.col-12 col-sm-6 col-md-4 col-lg-3",
           "title": "h2.title",
           "url": "a@href",
-          "poster": "img@src"
+          "poster": "img@data-src"
         }
       }
     ],
@@ -160,7 +160,7 @@
       "selectors": {
         "title": "h1, h2, h3.title, .page-title",
         "description": "article.post-info-content > p:first-of-type, .summary p",
-        "poster": "img@src",
+        "poster": "img@data-src",
         "tags": "div.post-info-genres a",
         "year": "div.post-info-year-country a:first-child"
       }
