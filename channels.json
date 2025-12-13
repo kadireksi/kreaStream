@@ -97,7 +97,7 @@
     ],
     "detail_page": {
       "selectors": {
-        "title": "a > li.breadcrumb-list > img@alt",
+        "title": "ol.breadcrumb-list > a > li.breadcrumb-item > img@alt",
         "description": "div.date > span@text",
         "poster": "span.bg",
         "year": ".yil-deger@text",
