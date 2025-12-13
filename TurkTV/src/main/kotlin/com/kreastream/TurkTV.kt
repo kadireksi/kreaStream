@@ -131,17 +131,17 @@ class TurkTV : MainAPI() {
         if (!icon.isNullOrEmpty()) {
             val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             iconPaint.textAlign = Paint.Align.CENTER
-            iconPaint.textSize = 92f
+            iconPaint.textSize = 200f
             iconPaint.typeface = Typeface.DEFAULT
             iconPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawText(icon, width / 2f, height * 0.50f, iconPaint)
+            canvas.drawText(icon, width / 2f, height * 0.10f, iconPaint)
         }
 
         // Title text - bottom area
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         textPaint.textAlign = Paint.Align.CENTER
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textPaint.color = 0x00000000.toInt()
+        textPaint.color = 0xFFFFFFFF.toInt()
 
         // Fit text size to width
         var textSize = 46f
@@ -152,50 +152,6 @@ class TurkTV : MainAPI() {
             textPaint.textSize = textSize
         }
         canvas.drawText(title, width / 2f, height * 0.70f, textPaint)
-
-        // Convert to PNG base64
-        val baos = ByteArrayOutputStream()
-        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos)
-        val bytes = baos.toByteArray()
-        baos.close()
-        bmp.recycle()
-        return "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-    }
-
-    private fun createWaveformPosterPngBase64(title: String, colorHex: String): String {
-        val width = 400
-        val height = 200
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-
-        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        bgPaint.style = Paint.Style.FILL
-        bgPaint.color = parseColorSafe("#111111")
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-
-        // Wave bars
-        val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        barPaint.style = Paint.Style.FILL
-        barPaint.color = parseColorSafe(colorHex)
-
-        val cols = 20
-        val spacing = 12
-        val barWidth = 12
-        val startX = 16
-        for (i in 0 until cols) {
-            val h = 20 + ((i * 7) % 120)
-            val x = startX + i * (barWidth + spacing)
-            val top = (height / 2f) - (h / 2f)
-            canvas.drawRoundRect(RectF(x.toFloat(), top, (x + barWidth).toFloat(), top + h), 6f, 6f, barPaint)
-        }
-
-        // Title text
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        textPaint.textAlign = Paint.Align.CENTER
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textPaint.color = 0xFFFFFFFF.toInt()
-        textPaint.textSize = 22f
-        canvas.drawText(title, width / 2f, height - 28f, textPaint)
 
         // Convert to PNG base64
         val baos = ByteArrayOutputStream()
@@ -294,7 +250,7 @@ class TurkTV : MainAPI() {
             } else {
                 // No genres -> show streams directly
                 val items = list.sortedBy { it.title.lowercase() }.map { s ->
-                    val poster = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
+                    val poster = s.poster
                     newTvSeriesSearchResponse(s.title, s.url, TvType.Live) {
                         this.posterUrl = poster
                     }
@@ -389,7 +345,7 @@ class TurkTV : MainAPI() {
             val episodes = tvStreams.mapIndexed { i, s ->
                 newEpisode(s.url) {
                     name = s.title
-                    posterUrl = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
+                    posterUrl = s.poster
                     episode = i + 1
                 }
             }
@@ -403,7 +359,7 @@ class TurkTV : MainAPI() {
             val episodes = radioStreams.mapIndexed { i, s ->
                 newEpisode(s.url) {
                     name = s.title
-                    posterUrl = if (s.is_audio) createWaveformPosterPngBase64(s.title, genreColors[0]) else s.poster
+                    posterUrl = s.poster
                     episode = i + 1
                 }
             }
@@ -418,11 +374,11 @@ class TurkTV : MainAPI() {
             return newTvSeriesLoadResponse(streamItem.title, url, TvType.Live,
                 listOf(newEpisode(url) {
                     this.name = streamItem.title
-                    this.posterUrl = if (streamItem.is_audio) createWaveformPosterPngBase64(streamItem.title, genreColors[0]) else streamItem.poster
+                    this.posterUrl = streamItem.poster
                 })
             ) {
-                this.posterUrl = if (streamItem.is_audio) createWaveformPosterPngBase64(streamItem.title, genreColors[0]) else streamItem.poster
-                this.backgroundPosterUrl = if (streamItem.is_audio) streamItem.poster else streamItem.backgroundPosterUrl
+                this.posterUrl = streamItem.poster
+                this.backgroundPosterUrl = streamItem.backgroundPosterUrl
                 this.plot = if (streamItem.is_audio) "Canlı Radyo Yayını" else "Canlı TV Yayını"
             }
         }
