@@ -134,7 +134,7 @@ class TurkTV : MainAPI() {
             iconPaint.textSize = 200f
             iconPaint.typeface = Typeface.DEFAULT
             iconPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawText(icon, width / 2f, height / 2f, iconPaint)
+            canvas.drawText(icon, width / 2f, height 3f, iconPaint)
         }
 
         // // Title text - bottom area
@@ -435,7 +435,7 @@ class TurkTV : MainAPI() {
                     break
                 }
             }
-            if (channel.episode_page.reverse_order) episodes.reverse()
+            if (channel.episode_page.reverse_order === true ) episodes.reverse()
         }
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
