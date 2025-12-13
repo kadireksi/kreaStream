@@ -518,6 +518,7 @@ class TurkTV : MainAPI() {
 
         try {
             val doc = app.get(data, headers = channel.headers).document
+            val scripts = doc.select("script")
             methods.forEach { method ->
                 when (method.type) {
                     "iframe" -> {
@@ -539,12 +540,11 @@ class TurkTV : MainAPI() {
                             val m = Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""", RegexOption.IGNORE_CASE).find(html)
                             if (m != null) {
                                 val found = m.value
-                                Log.d("TRT", "Found m3u8 via regex: $found")
                                 M3u8Helper.generateM3u8(
                                     source = name,
                                     streamUrl = found,
-                                    referer = trt1Url,
-                                    headers = mapOf("Referer" to trt1Url)
+                                    referer = channel.base_url,
+                                    headers = mapOf("Referer" to channel.base_url)
                                 ).forEach(callback)
                                 return true
                             }
