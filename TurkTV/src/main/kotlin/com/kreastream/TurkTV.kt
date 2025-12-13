@@ -522,14 +522,17 @@ class TurkTV : MainAPI() {
             methods.forEach { method ->
                 when (method.type) {
                     "iframe" -> {
-                        doc.select(method.selector ?: "iframe").forEach { iframe ->
+                        val iframes = doc.select(method.selector ?: "iframe")
+                        for (iframe in iframes) {
                             var src = iframe.attr("src")
                             if (src.isNotEmpty()) {
                                 src = fixUrl(src, channel.base_url)
                                 try {
                                     loadExtractor(src, subtitleCallback, callback)
                                 } catch (e: Exception) {
-                                    try { loadExtractor(src, channel.base_url, subtitleCallback, callback) } catch (_: Exception) {}
+                                    try {
+                                        loadExtractor(src, channel.base_url, subtitleCallback, callback)
+                                    } catch (_: Exception) {}
                                 }
                             }
                         }
@@ -537,7 +540,11 @@ class TurkTV : MainAPI() {
                     "regex" -> {
                         for (script in scripts) {
                             val html = script.html()
-                            val m = Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""", RegexOption.IGNORE_CASE).find(html)
+                            val m = Regex(
+                                """https?://[^"'\s]+?\.m3u8[^"'\s]*""",
+                                RegexOption.IGNORE_CASE
+                            ).find(html)
+
                             if (m != null) {
                                 val found = m.value
                                 M3u8Helper.generateM3u8(
@@ -546,6 +553,7 @@ class TurkTV : MainAPI() {
                                     referer = channel.base_url,
                                     headers = mapOf("Referer" to channel.base_url)
                                 ).forEach(callback)
+
                                 return true
                             }
                         }
@@ -562,13 +570,22 @@ class TurkTV : MainAPI() {
                         }
                     }
                     "direct_m3u8" -> {
-                        val scripts = doc.select("script")
                         for (script in scripts) {
                             val scriptContent = script.html()
-                            if (scriptContent.contains("playerConfig", ignoreCase = true) || scriptContent.contains("streamUrl", ignoreCase = true || scriptContent.contains("contentUrl", ignoreCase = true)) {
+
+                            if (
+                                scriptContent.contains("playerConfig", ignoreCase = true) ||
+                                scriptContent.contains("streamUrl", ignoreCase = true) ||
+                                scriptContent.contains("contentUrl", ignoreCase = true)
+                            ) {
                                 val m3u8Url = extractM3u8FromJson(scriptContent)
                                 if (m3u8Url != null) {
-                                    M3u8Helper.generateM3u8(source = name, streamUrl = m3u8Url, referer = channel.base_url).forEach { callback(it) }
+                                    M3u8Helper.generateM3u8(
+                                        source = name,
+                                        streamUrl = m3u8Url,
+                                        referer = channel.base_url
+                                    ).forEach(callback)
+
                                     return true
                                 }
                             }
