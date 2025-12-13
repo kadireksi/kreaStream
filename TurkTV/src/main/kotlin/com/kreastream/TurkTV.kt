@@ -98,10 +98,12 @@ class TurkTV : MainAPI() {
         "Haber" to "\uD83D\uDCF0",
         "Sports" to "\uD83C\uDFC5",   // 🏅
         "Spor" to "\uD83C\uDFC5",
-        "Kids" to "\uD83E\uDE78",     // 🧸
+        "Kids" to "\ud83e\uddd2",     // 🧸
         "Çocuk" to "\uD83E\uDE78",
         "Music" to "\uD83C\uDFB5",    // 🎵
         "Müzik" to "\uD83C\uDFB5",
+        "Yerli Müzik" to "\ud83c\uddf9\ud83c\uddf7 \uD83C\uDFB5",
+        "Yabancı Müzik" to "\ud83c\uddfa\ud83c\uddf8 \uD83C\uDFB5",
         "Movies" to "\uD83C\uDFAC",   // 🎬
         "Film" to "\uD83C\uDFAC",
         "TV" to "\uD83D\uDCFA",       // 📺
