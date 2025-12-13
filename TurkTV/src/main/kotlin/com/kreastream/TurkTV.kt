@@ -94,21 +94,21 @@ class TurkTV : MainAPI() {
 
     // ---------- Icon map (emoji used as drawable text) ----------
     private val genreIcon = mapOf(
-        "News" to "\uD83D\uDCF0",     // 📰
-        "Haber" to "\uD83D\uDCF0",
-        "Sports" to "\uD83C\uDFC5",   // 🏅
-        "Spor" to "\uD83C\uDFC5",
-        "Kids" to "\uD83E\uDDD2",     // 🧒
-        "Çocuk" to "\uD83E\uDE78",
-        "Music" to "\uD83C\uDFB5",    // 🎵
-        "Müzik" to "\uD83C\uDFB5",
-        "Yerli Müzik" to "\ud83c\uddf9\ud83c\uddf7 \uD83C\uDFB5",
+        "News"          to "\uD83D\uDCF0",     // 📰
+        "Haber"         to "\uD83D\uDCF0",
+        "Sports"        to "\uD83C\uDFC5",   // 🏅
+        "Spor"          to "\uD83C\uDFC5",
+        "Kids"          to "\uD83E\uDDD2",     // 🧒
+        "Çocuk"         to "\uD83E\uDE78",
+        "Music"         to "\uD83C\uDFB5",    // 🎵
+        "Müzik"         to "\uD83C\uDFB5",
+        "Yerli Müzik"   to "\ud83c\uddf9\ud83c\uddf7 \uD83C\uDFB5",
         "Yabancı Müzik" to "\ud83c\uddfa\ud83c\uddf8 \uD83C\uDFB5",
-        "Movies" to "\uD83C\uDFAC",   // 🎬
-        "Film" to "\uD83C\uDFAC",
-        "TV" to "\uD83D\uDCFA",       // 📺
-        "Radio" to "\uD83D\uDCFB",    // 📻
-        "Diğer" to "\u2B50"          // ⭐
+        "Movies"        to "\uD83C\uDFAC",   // 🎬
+        "Film"          to "\uD83C\uDFAC",
+        "TV"            to "\uD83D\uDCFA",       // 📺
+        "Radio"         to "\uD83D\uDCFB",    // 📻
+        "Diğer"         to "\u2B50"          // ⭐
     )
 
     // ---------- PNG Generator helpers ----------
@@ -130,11 +130,16 @@ class TurkTV : MainAPI() {
         // Icon (emoji) - draw near top
         if (!icon.isNullOrEmpty()) {
             val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            iconPaint.textAlign = Paint.Align.CENTER
+            iconPaint.textAlign = Paint.Align.CENTER  // horizontal center
             iconPaint.textSize = 200f
             iconPaint.typeface = Typeface.DEFAULT
-            iconPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawText(icon, width / 2f, height / 3f, iconPaint)
+            iconPaint.color = 0xFFFFFFFF.toInt()  // white
+
+            // Vertical centering: baseline adjustment
+            val x = width / 2f
+            val y = height / 2f - ((iconPaint.descent() + iconPaint.ascent()) / 2)
+
+            canvas.drawText(icon, x, y, iconPaint)
         }
 
         // // Title text - bottom area
