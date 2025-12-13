@@ -390,7 +390,7 @@ class TurkTV : MainAPI() {
 
         val selectors = channel.detail_page?.selectors ?: emptyMap()
         val title = doc.smartSelect(selectors["title"]) ?: "Bilinmeyen Başlık"
-        val plot = doc.smartSelect(selectors["description"])
+        val plot = doc.smartSelect(selectors["description"]) ?: channel.name
         val poster = doc.smartSelect(selectors["poster"])?.let { fixUrl(it, channel.base_url) }
         val year = doc.smartSelect(selectors["year"])?.filter { it.isDigit() }?.toIntOrNull()
         val tags = doc.smartSelect(selectors["tags"], all = true)
