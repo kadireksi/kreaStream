@@ -534,15 +534,20 @@ class TurkTV : MainAPI() {
                         }
                     }
                     "regex" -> {
-                        val html = doc.html()
-                        val regex = method.pattern?.toRegex()
-                        regex?.find(html)?.groupValues?.get(1)?.let { link ->
-                            val cleanLink = link.replace("\\/", "/")
-                            callback(newExtractorLink(source = "Source", name = "Source", url = cleanLink) {
-                                this.referer = channel.base_url
-                                this.quality = Qualities.Unknown.value
-                                this.type = if (cleanLink.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                            })
+                        for (script in scripts) {
+                            val html = script.html()
+                            val m = Regex("""https?://[^"'\s]+?\.m3u8[^"'\s]*""", RegexOption.IGNORE_CASE).find(html)
+                            if (m != null) {
+                                val found = m.value
+                                Log.d("TRT", "Found m3u8 via regex: $found")
+                                M3u8Helper.generateM3u8(
+                                    source = name,
+                                    streamUrl = found,
+                                    referer = trt1Url,
+                                    headers = mapOf("Referer" to trt1Url)
+                                ).forEach(callback)
+                                return true
+                            }
                         }
                     }
                     "css" -> {
