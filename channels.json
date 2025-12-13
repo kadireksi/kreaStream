@@ -138,7 +138,7 @@
         "path": "/diziler",
         "ishorizontal": false,
         "selectors": {
-          "container": ".col-6 col-md-4 col-lg-4",
+          "container": ".col-6.col-md-4.col-lg-4",
           "title": "h3.title",
           "url": "a@href",
           "poster": "img@src"
@@ -149,10 +149,10 @@
         "path": "/eski-diziler",
         "ishorizontal": true,
         "selectors": {
-          "container": "div.col-12.col-sm-6.col-md-4.col-lg-3",
+          "container": ".col-12.col-sm-6.col-md-4.col-lg-3",
           "title": "h2.title",
           "url": "a@href",
-          "poster": "a > picture > img@src"
+          "poster": "img@src"
         }
       }
     ],
