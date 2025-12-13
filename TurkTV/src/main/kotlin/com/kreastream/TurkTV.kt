@@ -134,7 +134,7 @@ class TurkTV : MainAPI() {
             iconPaint.textSize = 92f
             iconPaint.typeface = Typeface.DEFAULT
             iconPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawText(icon, width / 2f, height * 0.28f, iconPaint)
+            canvas.drawText(icon, width / 2f, height * 0.50f, iconPaint)
         }
 
         // Title text - bottom area
@@ -151,7 +151,7 @@ class TurkTV : MainAPI() {
             textSize -= 2f
             textPaint.textSize = textSize
         }
-        canvas.drawText(title, width / 2f, height * 0.50f, textPaint)
+        canvas.drawText(title, width / 2f, height * 0.70f, textPaint)
 
         // Convert to PNG base64
         val baos = ByteArrayOutputStream()
