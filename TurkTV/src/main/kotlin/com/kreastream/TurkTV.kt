@@ -98,7 +98,7 @@ class TurkTV : MainAPI() {
         "Haber" to "\uD83D\uDCF0",
         "Sports" to "\uD83C\uDFC5",   // 🏅
         "Spor" to "\uD83C\uDFC5",
-        "Kids" to "\ud83e\uddd2",     // 🧒
+        "Kids" to "\uD83E\uDDD2",     // 🧒
         "Çocuk" to "\uD83E\uDE78",
         "Music" to "\uD83C\uDFB5",    // 🎵
         "Müzik" to "\uD83C\uDFB5",
@@ -137,21 +137,21 @@ class TurkTV : MainAPI() {
             canvas.drawText(icon, width / 2f, height * 0.10f, iconPaint)
         }
 
-        // Title text - bottom area
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        textPaint.textAlign = Paint.Align.CENTER
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textPaint.color = 0xFFFFFFFF.toInt()
+        // // Title text - bottom area
+        // val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        // textPaint.textAlign = Paint.Align.CENTER
+        // textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        // textPaint.color = 0xFFFFFFFF.toInt()
 
-        // Fit text size to width
-        var textSize = 46f
-        textPaint.textSize = textSize
-        val maxWidth = width * 0.88f
-        while (textPaint.measureText(title) > maxWidth && textSize > 18f) {
-            textSize -= 2f
-            textPaint.textSize = textSize
-        }
-        canvas.drawText(title, width / 2f, height * 0.70f, textPaint)
+        // // Fit text size to width
+        // var textSize = 46f
+        // textPaint.textSize = textSize
+        // val maxWidth = width * 0.88f
+        // while (textPaint.measureText(title) > maxWidth && textSize > 18f) {
+        //     textSize -= 2f
+        //     textPaint.textSize = textSize
+        // }
+        // canvas.drawText(title, width / 2f, height * 0.70f, textPaint)
 
         // Convert to PNG base64
         val baos = ByteArrayOutputStream()
