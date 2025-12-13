@@ -98,7 +98,7 @@ class TurkTV : MainAPI() {
         "Haber" to "\uD83D\uDCF0",
         "Sports" to "\uD83C\uDFC5",   // 🏅
         "Spor" to "\uD83C\uDFC5",
-        "Kids" to "\ud83e\uddd2",     // 🧸
+        "Kids" to "\ud83e\uddd2",     // 🧒
         "Çocuk" to "\uD83E\uDE78",
         "Music" to "\uD83C\uDFB5",    // 🎵
         "Müzik" to "\uD83C\uDFB5",
