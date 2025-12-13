@@ -99,7 +99,7 @@
       "selectors": {
         "title": "ol.breadcrumb-list > a > li.breadcrumb-item > img@alt",
         "description": "div.date > span@text",
-        "poster": "span.bg",
+        "poster": "span.bg@data-bg",
         "year": ".yil-deger@text",
         "tags": ".janr-etiket a@text"
       }
