@@ -141,7 +141,7 @@
           "container": ".category-classic-item.type-02",
           "title": "h3.title",
           "url": "a@href",
-          "poster": ".wrap-295x410 > img@src"
+          "poster": ".wrap-295x410 > img"
         }
       },
       {
