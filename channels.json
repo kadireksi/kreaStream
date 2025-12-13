@@ -138,9 +138,9 @@
         "path": "/diziler",
         "ishorizontal": false,
         "selectors": {
-          "container": ".category-classic-item.type-02 > a",
+          "container": ".category-classic-item.type-02",
           "title": "h3.title",
-          "url": "href",
+          "url": "a@href",
           "poster": ".wrap-295x410 > img@src"
         }
       },
@@ -149,9 +149,9 @@
         "path": "/eski-diziler",
         "ishorizontal": true,
         "selectors": {
-          "container": "div.col-12.col-sm-6.col-md-4.col-lg-3 > a",
+          "container": "div.col-12.col-sm-6.col-md-4.col-lg-3",
           "title": "h2.title",
-          "url": "href",
+          "url": "a@href",
           "poster": "a > picture > img@src"
         }
       }
