@@ -440,7 +440,7 @@ class TurkTV : MainAPI() {
                     break
                 }
             }
-            if (channel.episode_page.reverse_order === true ) episodes.reverse()
+            //if (channel.episode_page.reverse_order === true ) episodes.reverse()
         }
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
