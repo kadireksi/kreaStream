@@ -160,16 +160,16 @@
       "selectors": {
         "title": "h1, h2, h3.title, .page-title",
         "description": "article.post-info-content > p:first-of-type, .summary p",
-        "poster": "img@data-src",
-        "tags": "div.post-info-genres a",
-        "year": "div.post-info-year-country a:first-child"
+        "poster": "a > img@src",
+        "tags": "div.post-info-genres a@text",
+        "year": "div.post-info-year-country a:first-child@text"
       }
     },
     "episode_page": {
       "path_suffix": "/bolumler",
       "reverse_order": false,
       "selectors": {
-        "container": "#videoepisodecombobox option@value)",
+        "container": "#videoepisodecombobox@option@value)",
         "name": "option@value)",
         "url": "option@value)"
       }
