@@ -654,10 +654,13 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        var iframeD = document.selectFirst("iframe[data-src*='']")?.attr("data-src")?: ""
+        var iframeD = document.selectFirst("iframe.rapidrame")?.attr("data-src")?: ""
         if (iframeD.isNotEmpty()) {
-            rapidrameId = iframeD.substringAfter("?rapidrame_id=").takeIf { it.isNotEmpty() }
-            
+           rapidrameId = iframeD
+                .substringAfter("/rplayer/")
+                .removeSuffix("/")
+                .takeIf { it.isNotEmpty() }
+                
             if (!rapidrameId.isNullOrEmpty()) {
                 extractDownloadLinks(rapidrameId, callback)
             }
