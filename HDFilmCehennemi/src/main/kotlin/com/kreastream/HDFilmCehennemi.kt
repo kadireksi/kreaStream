@@ -654,7 +654,7 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        var iframeD = document.Regex("""data-src=\\"([^"]+)""")?: ""
+        var iframeD = document.selectFirst("iframe[data-src*='']")?: ""
         if (iframeD.isNotEmpty()) {
             rapidrameId = iframeD.substringAfter("?rapidrame_id=").takeIf { it.isNotEmpty() }
             
