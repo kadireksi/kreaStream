@@ -654,6 +654,12 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
+        val apiGet = app.get(
+            "${mainUrl}/video/$videoID/",
+            headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
+            referer = data
+        ).text
+
         var iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.get(1)?.replace("\\", "") ?: ""
         if (iframe.isNotEmpty()) {
             rapidrameId = iframe.substringAfter("?rapidrame_id=").takeIf { it.isNotEmpty() }
