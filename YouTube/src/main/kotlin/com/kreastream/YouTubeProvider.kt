@@ -1,94 +1,96 @@
 package com.kreastream
 
-import android.content.SharedPreferences
-import com.lagradost.cloudstream3.HomePageList
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.utils.AppUtils.parseJson
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.amap
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.AppUtils.toJson
+import com.lagradost.cloudstream3.utils.newMovieSearchResponse
 
-class YouTubeProvider(language: String, private val sharedPrefs: SharedPreferences?) : MainAPI() {
-    override var mainUrl = MAIN_URL
+class YouTubeProvider : MainAPI() {
+
+    override var mainUrl = "https://www.youtube.com"
     override var name = "YouTube"
     override val supportedTypes = setOf(TvType.Others)
     override val hasMainPage = true
-    override var lang = language
 
-    private val ytParser = YouTubeParser(this, this.name)
+    private val parser = YouTubeParser()
 
-    companion object {
-        const val MAIN_URL = "https://www.youtube.com"
-    }
+    /* ---------------- HOME ---------------- */
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val isTrendingEnabled = sharedPrefs?.getBoolean("trending", true) ?: true
-        val sections = mutableListOf<HomePageList>()
-        if (isTrendingEnabled) {
-            val videos = ytParser.getTrendingVideoUrls(page)
-            videos?.let { sections.add(it) }
-        }
-        val playlistsData = sharedPrefs?.getStringSet("playlists", emptySet()) ?: emptySet()
-        if (playlistsData.isNotEmpty()) {
-            val triples = playlistsData.map { parseJson<Triple<String, String, Long>>(it) }
-            val list = triples.amap { data ->
-                val playlistUrl = data.first
-                val urlPath = playlistUrl.substringAfter("youtu").substringAfter("/")
-                val isPlaylist = urlPath.startsWith("playlist?list=")
-                val isChannel = urlPath.startsWith("@") || urlPath.startsWith("channel")
-                val customSections = if (isPlaylist && !isChannel) {
-                    ytParser.playlistToSearchResponseList(playlistUrl, page)
-                } else if (!isPlaylist && isChannel) {
-                    ytParser.channelToSearchResponseList(playlistUrl, page)
-                } else {
-                    null
-                }
-                customSections to data.third
+    override suspend fun getMainPage(
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
+
+        val items = parser.getTrendingVideos().map {
+            newMovieSearchResponse(
+                it.name,
+                it.url,
+                TvType.Others
+            ) {
+                posterUrl = it.thumbnailUrl
             }
-            list.sortedBy { it.second }.forEach {
-                val homepageSection = it.first
-                if (homepageSection != null) {
-                    sections.add(homepageSection)
-                }
-            }
-
         }
-        if (sections.isEmpty()) {
-            sections.add(
+
+        return HomePageResponse(
+            listOf(
                 HomePageList(
-                    "All sections are disabled. Go to the settings to enable them",
-                    emptyList()
+                    name = "Trending",
+                    list = items
                 )
             )
-        }
-        return newHomePageResponse(
-            sections, true
         )
     }
 
+    /* ---------------- SEARCH ---------------- */
+
     override suspend fun search(query: String): List<SearchResponse> {
-        return ytParser.search(query)
+        val results = mutableListOf<SearchResponse>()
+
+        parser.searchVideos(query).forEach {
+            results += newMovieSearchResponse(
+                it.name,
+                it.url,
+                TvType.Others
+            ) {
+                posterUrl = it.thumbnailUrl
+            }
+        }
+
+        parser.searchChannels(query).forEach {
+            results += newMovieSearchResponse(
+                it.name,
+                it.url,
+                TvType.Others
+            ) {
+                posterUrl = it.thumbnailUrl
+            }
+        }
+
+        parser.searchPlaylists(query).forEach {
+            results += newMovieSearchResponse(
+                it.name,
+                it.url,
+                TvType.Others
+            ) {
+                posterUrl = it.thumbnailUrl
+            }
+        }
+
+        return results
     }
+
+    /* ---------------- LOAD ---------------- */
 
     override suspend fun load(url: String): LoadResponse {
-        val video = ytParser.videoToLoadResponse(url)
-        return video
-    }
+        val info = parser.getVideo(url)
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit,
-    ): Boolean {
-        val hls = sharedPrefs?.getBoolean("hls", true) ?: true
-        YouTubeExtractor(hls).getUrl(data, "", subtitleCallback, callback)
-        return true
+        return newMovieLoadResponse(
+            info.name,
+            info.url,
+            TvType.Others,
+            info.url
+        ) {
+            posterUrl = info.thumbnailUrl
+            plot = info.description?.content
+        }
     }
 }

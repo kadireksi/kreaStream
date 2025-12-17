@@ -1,43 +1,67 @@
 package com.kreastream
 
-import com.lagradost.cloudstream3.LoadResponse
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.newTvSeriesLoadResponse
+import com.lagradost.cloudstream3.utils.newTvSeriesSearchResponse
+import com.lagradost.cloudstream3.utils.newEpisode
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.SubtitleFile
 
 class YouTubePlaylistsProvider(language: String) : MainAPI() {
-    override var mainUrl = MAIN_URL
+
+    override var mainUrl = "https://www.youtube.com"
     override var name = "YouTube Playlists"
     override val supportedTypes = setOf(TvType.Others)
     override val hasMainPage = false
     override var lang = language
 
-    private val ytParser = YouTubeParser(this, this.name)
+    private val parser = YouTubeParser()
 
-    companion object{
-        const val MAIN_URL = "https://www.youtube.com"
-    }
+    /* ---------------- SEARCH ---------------- */
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val videoUrls = ytParser.search(query, "playlists")
-        return videoUrls
+        return parser.searchPlaylists(query).map {
+            newTvSeriesSearchResponse(
+                it.name,
+                it.url,
+                TvType.Others
+            ) {
+                posterUrl = it.thumbnailUrl
+            }
+        }
     }
 
+    /* ---------------- LOAD ---------------- */
+
     override suspend fun load(url: String): LoadResponse {
-        val video = ytParser.playlistToLoadResponse(url)
-        return video
+        val playlist = parser.getPlaylist(url)
+
+        val episodes = playlist.videos.map {
+            newEpisode(it.url) {
+                name = it.name
+                posterUrl = it.thumbnailUrl
+            }
+        }
+
+        return newTvSeriesLoadResponse(
+            playlist.name,
+            playlist.url,
+            TvType.Others,
+            episodes
+        ) {
+            posterUrl = playlist.thumbnailUrl
+        }
     }
+
+    /* ---------------- LINKS ---------------- */
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit,
+        callback: (ExtractorLink) -> Unit
     ): Boolean {
-
-        YouTubeExtractor().getUrl(data, "", subtitleCallback, callback)
+        YouTubeExtractor().getUrl(data, null, subtitleCallback, callback)
         return true
     }
 }
