@@ -1,4 +1,4 @@
-package it.dogior.hadEnough
+package com.kreastream
 
 import android.content.SharedPreferences
 import com.lagradost.cloudstream3.HomePageList

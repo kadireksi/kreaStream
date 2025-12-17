@@ -1,4 +1,4 @@
-package it.dogior.hadEnough
+package com.kreastream
 
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.TvType
