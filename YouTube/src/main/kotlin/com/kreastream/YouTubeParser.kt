@@ -1,10 +1,7 @@
 package com.kreastream
 
-import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.LoadResponse.Companion.addDuration
-
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.InfoItem.InfoType
 import org.schabi.newpipe.extractor.ServiceList
@@ -20,297 +17,296 @@ import java.util.Date
 
 class YouTubeParser(private val apiName: String) {
 
-    fun getTrendingVideoUrls(page: Int): HomePageList? {
-        val service = ServiceList.YouTube
-        val kiosks = service.kioskList
-        val trendingsUrl = kiosks.defaultKioskExtractor.url
-        val infoItem = KioskInfo.getInfo(ServiceList.YouTube, trendingsUrl)
+    /* ==============================
+     * TRENDING
+     * ============================== */
 
-        val videos = if (page == 1) {
-            infoItem.relatedItems.toMutableList()
-        } else {
-            mutableListOf<StreamInfoItem>()
-        }
-        if (page > 1) {
-            var hasNext = infoItem.hasNextPage()
-            if (!hasNext) {
-                return null
+    fun getTrendingVideoUrls(page: Int): HomePageList? {
+        val kiosk = ServiceList.YouTube.kioskList.defaultKioskExtractor
+        val info = KioskInfo.getInfo(ServiceList.YouTube, kiosk.url)
+
+        val videos = loadPaged(
+            page = page,
+            first = info.relatedItems,
+            hasNext = { info.hasNextPage() },
+            next = { info.nextPage },
+            loader = { next ->
+                KioskInfo.getMoreItems(ServiceList.YouTube, kiosk.url, next)
             }
-            var count = 1
-            var nextPage = infoItem.nextPage
-            while (count < page && hasNext) {
-                val more = KioskInfo.getMoreItems(ServiceList.YouTube, trendingsUrl, nextPage)
-                if (count == page - 1) {
-                    videos.addAll(more.items)
-                }
-                hasNext = more.hasNextPage()
-                nextPage = more.nextPage
-                count++
-            }
-        }
-        val searchResponses = videos.filter { !it.isShortFormContent }.map {
-            newMovieSearchResponse(
-                name = it.name,
-                url = it.url,
-                posterUrl = it.thumbnails.last().url,
-                type = TvType.Others,
-                apiName = apiName
-            )
-        }
+        )
+
+        val results = videos
+            .filterIsInstance<StreamInfoItem>()
+            .filterNot { it.isShortFormContent }
+            .mapNotNull { it.toMovieSearch() }
+
         return HomePageList(
             name = "Trending",
-            list = searchResponses,
+            list = results,
             isHorizontalImages = true
         )
     }
+
+    /* ==============================
+     * PLAYLIST → SEARCH
+     * ============================== */
 
     fun playlistToSearchResponseList(url: String, page: Int): HomePageList? {
-        val playlistInfo = PlaylistInfo.getInfo(url)
-        val videos = if (page == 1) {
-            playlistInfo.relatedItems.toMutableList()
-        } else {
-            mutableListOf<StreamInfoItem>()
-        }
-        if (page > 1) {
-            var hasNext = playlistInfo.hasNextPage()
-            if (!hasNext) {
-                return null
+        val info = PlaylistInfo.getInfo(url)
+
+        val videos = loadPaged(
+            page = page,
+            first = info.relatedItems,
+            hasNext = { info.hasNextPage() },
+            next = { info.nextPage },
+            loader = { next ->
+                PlaylistInfo.getMoreItems(ServiceList.YouTube, url, next)
             }
-            var count = 1
-            var nextPage = playlistInfo.nextPage
-            while (count < page && hasNext) {
-                val more = PlaylistInfo.getMoreItems(ServiceList.YouTube, url, nextPage)
-                if (count == page - 1) {
-                    videos.addAll(more.items)
-                }
-                hasNext = more.hasNextPage()
-                nextPage = more.nextPage
-                count++
-            }
-        }
-        val searchResponses = videos.map {
-            newMovieSearchResponse(
-                name = it.name,
-                url = it.url,
-                posterUrl = it.thumbnails.last().url,
-                type = TvType.Others,
-                apiName = apiName
-            )
-        }
+        )
+
+        val results = videos
+            .filterIsInstance<StreamInfoItem>()
+            .mapNotNull { it.toMovieSearch() }
+
         return HomePageList(
-            name = "${playlistInfo.uploaderName}: ${playlistInfo.name}",
-            list = searchResponses,
+            name = "${info.uploaderName}: ${info.name}",
+            list = results,
             isHorizontalImages = true
         )
     }
+
+    /* ==============================
+     * CHANNEL → SEARCH
+     * ============================== */
 
     fun channelToSearchResponseList(url: String, page: Int): HomePageList? {
-        val channelInfo = ChannelInfo.getInfo(url)
-        val tabsLinkHandlers = channelInfo.tabs
-        val tabs = tabsLinkHandlers.map { ChannelTabInfo.getInfo(ServiceList.YouTube, it) }
-        val videoTab = tabs.first { it.name == "videos" }
+        val channel = ChannelInfo.getInfo(url)
 
-        val videos = if (page == 1) {
-            videoTab.relatedItems.toMutableList()
-        } else {
-            mutableListOf<InfoItem>()
-        }
+        val videoTabHandler = channel.tabs.firstOrNull {
+            it.url.endsWith("/videos")
+        } ?: return null
 
-        if (page > 1) {
-            var hasNext = videoTab.hasNextPage()
-            if (!hasNext) {
-                return null
+        val videoTab = ChannelTabInfo.getInfo(ServiceList.YouTube, videoTabHandler)
+
+        val videos = loadPaged(
+            page = page,
+            first = videoTab.relatedItems,
+            hasNext = { videoTab.hasNextPage() },
+            next = { videoTab.nextPage },
+            loader = { next ->
+                ChannelTabInfo.getMoreItems(
+                    ServiceList.YouTube,
+                    videoTabHandler,
+                    next
+                )
             }
-            var count = 1
-            var nextPage = videoTab.nextPage
-            while (count < page && hasNext) {
+        )
 
-                val videoTabHandler = tabsLinkHandlers.first{it.url.endsWith("/videos")}
-                val more = ChannelTabInfo.getMoreItems(ServiceList.YouTube, videoTabHandler, nextPage)
-                if (count == page - 1) {
-                    videos.addAll(more.items)
-                }
-                hasNext = more.hasNextPage()
-                nextPage = more.nextPage
-                count++
-            }
-        }
-        val searchResponses = videos.map {
-            newMovieSearchResponse(
-                name = it.name,
-                url = it.url,
-                posterUrl = it.thumbnails.last().url,
-                type = TvType.Others,
-                apiName = apiName
-            )
-        }
+        val results = videos.mapNotNull { it.toMovieSearch() }
+
         return HomePageList(
-            name = channelInfo.name,
-            list = searchResponses,
+            name = channel.name,
+            list = results,
             isHorizontalImages = true
         )
     }
+
+    /* ==============================
+     * SEARCH
+     * ============================== */
 
     fun search(
         query: String,
-        contentFilter: String = "videos",
+        contentFilter: String = "videos"
     ): List<SearchResponse> {
-        val handlerFactory = ServiceList.YouTube.searchQHFactory
-        val searchHandler = handlerFactory.fromQuery(
+
+        val handler = ServiceList.YouTube.searchQHFactory.fromQuery(
             query,
             listOf(contentFilter),
             null
         )
 
-        val searchInfo = SearchInfo.getInfo(ServiceList.YouTube, SearchQueryHandler(searchHandler))
+        val info = SearchInfo.getInfo(
+            ServiceList.YouTube,
+            SearchQueryHandler(handler)
+        )
 
-        val resultSize = searchInfo.relatedItems.size
-        if (resultSize <= 0) {
-            return emptyList()
+        val items = mutableListOf<InfoItem>()
+        items.addAll(info.relatedItems)
+
+        var next = info.nextPage
+        repeat(3) {
+            val more = SearchInfo.getMoreItems(ServiceList.YouTube, handler, next)
+            items.addAll(more.items)
+            if (!more.hasNextPage()) return@repeat
+            next = more.nextPage
         }
 
-        val pageResults = searchInfo.relatedItems.toMutableList()
-        var nextPage = searchInfo.nextPage
-        for (i in 1..3) {
-            val more = SearchInfo.getMoreItems(ServiceList.YouTube, searchHandler, nextPage)
-            pageResults.addAll(more.items)
-            if (!more.hasNextPage()) break
-            nextPage = more.nextPage
-        }
-
-        val finalResults = pageResults.mapNotNull {
-//            Log.d("YouTubeParser", "Related: ${it.name}, type: ${it.infoType}")
+        return items.mapNotNull {
             when (it.infoType) {
-                InfoType.PLAYLIST, InfoType.CHANNEL -> {
-                    TvSeriesSearchResponse(
-                        name = it.name,
-                        url = it.url,
-                        posterUrl = it.thumbnails.last().url,
-                        apiName = apiName
-                    )
-                }
-
-                InfoType.STREAM -> {
-                    newMovieSearchResponse(
-                        name = it.name,
-                        url = it.url,
-                        posterUrl = it.thumbnails.last().url,
-                        apiName = apiName
-                    )
-                }
-
-                else -> {
-//                    Log.d("YouTubeParser", "Other type: ${it.name} \t|\t type: ${it.infoType}")
-                    null
-                }
+                InfoType.STREAM -> it.toMovieSearch()
+                InfoType.PLAYLIST, InfoType.CHANNEL -> it.toSeriesSearch()
+                else -> null
             }
         }
-//        Log.d("YouTubeParser", "Results size: ${finalResults.size}")
-        return finalResults
     }
 
-    fun videoToLoadResponse(videoUrl: String): LoadResponse {
-        val videoInfo = StreamInfo.getInfo(videoUrl)
-        val views = "Views: ${videoInfo.viewCount}"
-        val likes = "Likes: ${videoInfo.likeCount}"
-        val length = videoInfo.duration / 60
-        return MovieLoadResponse(
-            name = videoInfo.name,
-            url = videoUrl,
-            dataUrl = videoUrl,
-            posterUrl = videoInfo.thumbnails.last().url,
-            plot = videoInfo.description.content,
+    /* ==============================
+     * VIDEO → LOAD
+     * ============================== */
+
+    fun videoToLoadResponse(url: String): LoadResponse {
+        val info = StreamInfo.getInfo(url)
+
+        return newMovieLoadResponse(
+            name = info.name,
+            url = url,
             type = TvType.Others,
-            tags = listOf(videoInfo.uploaderName, views, likes),
-            apiName = apiName
-        ).apply {
-            this.duration = length.toInt()
+            dataUrl = url
+        ) {
+            posterUrl = info.thumbnails.lastOrNull()?.url
+            plot = info.description?.content
+            tags = listOfNotNull(
+                info.uploaderName,
+                "Views: ${info.viewCount}",
+                "Likes: ${info.likeCount}"
+            )
+            duration = (info.duration / 60).toInt()
         }
     }
+
+    /* ==============================
+     * CHANNEL → LOAD
+     * ============================== */
 
     fun channelToLoadResponse(url: String): LoadResponse {
-        val channelInfo = ChannelInfo.getInfo(url)
-        val avatars = try {
-            channelInfo.avatars.last().url
-        } catch (e: Exception){
-            null
-        }
-        val banners = try {
-            channelInfo.banners.last().url
-        } catch (e: Exception){
-            null
-        }
-        val tags = mutableListOf("Subscribers: ${channelInfo.subscriberCount}")
-        return TvSeriesLoadResponse(
-            name = channelInfo.name,
+        val channel = ChannelInfo.getInfo(url)
+
+        return newTvSeriesLoadResponse(
+            name = channel.name,
             url = url,
-            posterUrl = avatars,
-            backgroundPosterUrl = banners,
-            plot = channelInfo.description,
             type = TvType.Others,
-            tags = tags,
-            episodes = getChannelVideos(channelInfo),
-            apiName = apiName
-        )
+            episodes = getChannelVideos(channel)
+        ) {
+            posterUrl = channel.avatars.lastOrNull()?.url
+            backgroundPosterUrl = channel.banners.lastOrNull()?.url
+            plot = channel.description
+            tags = listOf("Subscribers: ${channel.subscriberCount}")
+        }
     }
 
-    private fun getChannelVideos(channel: ChannelInfo): List<Episode> {
-        val tabsLinkHandlers = channel.tabs
-        val tabs = tabsLinkHandlers.map { ChannelTabInfo.getInfo(ServiceList.YouTube, it) }
-        val videoTab = tabs.first { it.name == "videos" }
-        val videos = videoTab.relatedItems.mapNotNull {
-            newEpisode(
-                data = it.url,
-                name = it.name,
-                posterUrl = it.thumbnails.last().url
-            )
-        }
-        return videos.reversed()
-    }
+    /* ==============================
+     * PLAYLIST → LOAD
+     * ============================== */
 
     fun playlistToLoadResponse(url: String): LoadResponse {
-        val playlistInfo = PlaylistInfo.getInfo(url)
-        val tags = mutableListOf("Channel: ${playlistInfo.uploaderName}")
-        val banner =
-            if (playlistInfo.banners.isNotEmpty()) playlistInfo.banners.last().url else playlistInfo.thumbnails.last().url
-        val eps = playlistInfo.relatedItems.toMutableList()
-        var hasNext = playlistInfo.hasNextPage()
-        var count = 1
-        var nextPage = playlistInfo.nextPage
-        while (hasNext) {
-            val more = PlaylistInfo.getMoreItems(ServiceList.YouTube, url, nextPage)
-            eps.addAll(more.items)
-            hasNext = more.hasNextPage()
-            nextPage = more.nextPage
-            count++
-            if (count >= 10) break
-//            Log.d("YouTubeParser", "Page ${count + 1}: ${more.items.size}")
+        val info = PlaylistInfo.getInfo(url)
+
+        val videos = mutableListOf<StreamInfoItem>()
+        videos.addAll(info.relatedItems)
+
+        var next = info.nextPage
+        repeat(10) {
+            if (!info.hasNextPage()) return@repeat
+            val more = PlaylistInfo.getMoreItems(ServiceList.YouTube, url, next)
+            videos.addAll(more.items)
+            next = more.nextPage
         }
-        return TvSeriesLoadResponse(
-            name = playlistInfo.name,
+
+        val banner =
+            info.banners.lastOrNull()?.url
+                ?: info.thumbnails.lastOrNull()?.url
+
+        return newTvSeriesLoadResponse(
+            name = info.name,
             url = url,
-            posterUrl = playlistInfo.thumbnails.last().url,
-            backgroundPosterUrl = banner,
-            plot = playlistInfo.description.content,
             type = TvType.Others,
-            tags = tags,
-            episodes = getPlaylistVideos(eps),
-            apiName = apiName
-        )
+            episodes = getPlaylistVideos(videos)
+        ) {
+            posterUrl = info.thumbnails.lastOrNull()?.url
+            backgroundPosterUrl = banner
+            plot = info.description?.content
+            tags = listOf("Channel: ${info.uploaderName}")
+        }
+    }
+
+    /* ==============================
+     * EPISODES
+     * ============================== */
+
+    private fun getChannelVideos(channel: ChannelInfo): List<Episode> {
+        val videoTab = channel.tabs
+            .map { ChannelTabInfo.getInfo(ServiceList.YouTube, it) }
+            .first { it.name == "videos" }
+
+        return videoTab.relatedItems.mapNotNull { it.toEpisode() }.reversed()
     }
 
     private fun getPlaylistVideos(videos: List<StreamInfoItem>): List<Episode> {
-        val episodes = videos.map { video ->
-//            Log.d("YouTubeParser", video.name)
-            newEpisode(
-                data = video.url,
-                name = video.name,
-                posterUrl = video.thumbnails.last().url,
+        return videos.mapNotNull { video ->
+            Episode(
+                data = video.url ?: return@mapNotNull null,
+                name = video.name ?: return@mapNotNull null,
+                posterUrl = video.thumbnails.lastOrNull()?.url,
                 runTime = (video.duration / 60).toInt()
             ).apply {
-                video.uploadDate?.let { addDate(Date(it.date().timeInMillis)) }
+                video.uploadDate?.let {
+                    addDate(Date(it.date().timeInMillis))
+                }
             }
         }
-        return episodes
+    }
+
+    /* ==============================
+     * HELPERS
+     * ============================== */
+
+    private fun InfoItem.toMovieSearch(): SearchResponse? {
+        return newMovieSearchResponse(
+            name = name ?: return null,
+            url = url ?: return null,
+            type = TvType.Others
+        ) {
+            posterUrl = thumbnails.lastOrNull()?.url
+        }
+    }
+
+    private fun InfoItem.toSeriesSearch(): SearchResponse? {
+        return newTvSeriesSearchResponse(
+            name = name ?: return null,
+            url = url ?: return null,
+            type = TvType.Others
+        ) {
+            posterUrl = thumbnails.lastOrNull()?.url
+        }
+    }
+
+    private fun InfoItem.toEpisode(): Episode? {
+        return Episode(
+            data = url ?: return null,
+            name = name ?: return null,
+            posterUrl = thumbnails.lastOrNull()?.url
+        )
+    }
+
+    private fun <T> loadPaged(
+        page: Int,
+        first: List<T>,
+        hasNext: () -> Boolean,
+        next: () -> Any?,
+        loader: (Any?) -> org.schabi.newpipe.extractor.Page<T>
+    ): List<T> {
+        if (page == 1) return first
+
+        if (!hasNext()) return emptyList()
+
+        var current = next()
+        repeat(page - 1) {
+            val more = loader(current)
+            if (it == page - 2) return more.items
+            if (!more.hasNextPage()) return emptyList()
+            current = more.nextPage
+        }
+        return emptyList()
     }
 }
