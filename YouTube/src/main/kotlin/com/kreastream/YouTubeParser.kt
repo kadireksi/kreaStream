@@ -1,20 +1,17 @@
 package com.kreastream
 
 import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
-import org.schabi.newpipe.extractor.search.SearchResult
-import org.schabi.newpipe.extractor.search.SearchExtractor
-import org.schabi.newpipe.extractor.search.SearchInfoItem
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.kiosk.KioskInfo
+import org.schabi.newpipe.extractor.stream.Description
 
 class YouTubeParser {
-
-    /* ---------------- DATA MODELS ---------------- */
 
     data class ParsedItem(
         val name: String,
@@ -40,30 +37,24 @@ class YouTubeParser {
         val name: String,
         val url: String,
         val thumbnailUrl: String?,
-        val description: StreamInfo.Description?
+        val description: Description?
     )
 
-    /* ---------------- SEARCH ---------------- */
+    fun searchVideos(query: String) =
+        search(query, InfoItem.InfoType.STREAM)
 
-    fun searchVideos(query: String): List<ParsedItem> =
-        search(query, SearchExtractor.ITEM_STREAM)
+    fun searchChannels(query: String) =
+        search(query, InfoItem.InfoType.CHANNEL)
 
-    fun searchChannels(query: String): List<ParsedItem> =
-        search(query, SearchExtractor.ITEM_CHANNEL)
+    fun searchPlaylists(query: String) =
+        search(query, InfoItem.InfoType.PLAYLIST)
 
-    fun searchPlaylists(query: String): List<ParsedItem> =
-        search(query, SearchExtractor.ITEM_PLAYLIST)
-
-    private fun search(query: String, type: Int): List<ParsedItem> {
-        val handler = SearchQueryHandlerFactory
-            .getInstance()
-            .fromQuery(query)
-
+    private fun search(query: String, type: InfoItem.InfoType): List<ParsedItem> {
+        val handler = SearchQueryHandlerFactory.getInstance().fromQuery(query)
         val info = SearchInfo.getInfo(ServiceList.YouTube, handler)
 
         return info.relatedItems
-            .filterIsInstance<SearchInfoItem>()
-            .filter { it.type == type }
+            .filter { it.infoType == type }
             .map {
                 ParsedItem(
                     name = it.name,
@@ -73,13 +64,8 @@ class YouTubeParser {
             }
     }
 
-    /* ---------------- TRENDING ---------------- */
-
     fun getTrendingVideos(): List<ParsedItem> {
-        val kiosk = KioskInfo.getInfo(
-            ServiceList.YouTube,
-            "Trending"
-        )
+        val kiosk = KioskInfo.getInfo(ServiceList.YouTube, "Trending")
 
         return kiosk.relatedItems
             .filterIsInstance<StreamInfoItem>()
@@ -92,8 +78,6 @@ class YouTubeParser {
             }
     }
 
-    /* ---------------- LOAD VIDEO ---------------- */
-
     fun getVideo(url: String): ParsedVideo {
         val info = StreamInfo.getInfo(ServiceList.YouTube, url)
 
@@ -104,8 +88,6 @@ class YouTubeParser {
             description = info.description
         )
     }
-
-    /* ---------------- LOAD CHANNEL ---------------- */
 
     fun getChannel(url: String): ParsedChannel {
         val info = ChannelInfo.getInfo(ServiceList.YouTube, url)
@@ -127,8 +109,6 @@ class YouTubeParser {
             videos = videos
         )
     }
-
-    /* ---------------- LOAD PLAYLIST ---------------- */
 
     fun getPlaylist(url: String): ParsedPlaylist {
         val info = PlaylistInfo.getInfo(ServiceList.YouTube, url)

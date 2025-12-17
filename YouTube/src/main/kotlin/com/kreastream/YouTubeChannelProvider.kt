@@ -1,9 +1,6 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.utils.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.newEpisode
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 
@@ -17,43 +14,38 @@ class YouTubeChannelProvider(language: String) : MainAPI() {
 
     private val parser = YouTubeParser()
 
-    /* ---------------- SEARCH ---------------- */
-
     override suspend fun search(query: String): List<SearchResponse> {
         return parser.searchChannels(query).map {
-            newTvSeriesSearchResponse(
-                it.name,
-                it.url,
-                TvType.Others
-            ) {
+            TvSeriesSearchResponse(
+                name = it.name,
+                url = it.url,
+                apiName = this.name,
+                type = TvType.Others,
                 posterUrl = it.thumbnailUrl
-            }
+            )
         }
     }
-
-    /* ---------------- LOAD ---------------- */
 
     override suspend fun load(url: String): LoadResponse {
         val channel = parser.getChannel(url)
 
         val episodes = channel.videos.map {
-            newEpisode(it.url) {
-                name = it.name
+            Episode(
+                data = it.url,
+                name = it.name,
                 posterUrl = it.thumbnailUrl
-            }
+            )
         }
 
-        return newTvSeriesLoadResponse(
-            channel.name,
-            channel.url,
-            TvType.Others,
-            episodes
-        ) {
+        return TvSeriesLoadResponse(
+            name = channel.name,
+            url = channel.url,
+            apiName = this.name,
+            type = TvType.Others,
+            episodes = episodes,
             posterUrl = channel.thumbnailUrl
-        }
+        )
     }
-
-    /* ---------------- LINKS ---------------- */
 
     override suspend fun loadLinks(
         data: String,

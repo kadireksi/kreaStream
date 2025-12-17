@@ -1,9 +1,6 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.utils.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.newEpisode
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 
@@ -17,43 +14,38 @@ class YouTubePlaylistsProvider(language: String) : MainAPI() {
 
     private val parser = YouTubeParser()
 
-    /* ---------------- SEARCH ---------------- */
-
     override suspend fun search(query: String): List<SearchResponse> {
         return parser.searchPlaylists(query).map {
-            newTvSeriesSearchResponse(
-                it.name,
-                it.url,
-                TvType.Others
-            ) {
+            TvSeriesSearchResponse(
+                name = it.name,
+                url = it.url,
+                apiName = this.name,
+                type = TvType.Others,
                 posterUrl = it.thumbnailUrl
-            }
+            )
         }
     }
-
-    /* ---------------- LOAD ---------------- */
 
     override suspend fun load(url: String): LoadResponse {
         val playlist = parser.getPlaylist(url)
 
         val episodes = playlist.videos.map {
-            newEpisode(it.url) {
-                name = it.name
+            Episode(
+                data = it.url,
+                name = it.name,
                 posterUrl = it.thumbnailUrl
-            }
+            )
         }
 
-        return newTvSeriesLoadResponse(
-            playlist.name,
-            playlist.url,
-            TvType.Others,
-            episodes
-        ) {
+        return TvSeriesLoadResponse(
+            name = playlist.name,
+            url = playlist.url,
+            apiName = this.name,
+            type = TvType.Others,
+            episodes = episodes,
             posterUrl = playlist.thumbnailUrl
-        }
+        )
     }
-
-    /* ---------------- LINKS ---------------- */
 
     override suspend fun loadLinks(
         data: String,
