@@ -14,7 +14,7 @@ class YouTubeChannelProvider(language: String) : MainAPI() {
     override val hasMainPage = false
     override var lang = language
 
-    private val ytParser = YouTubeParser(this.name)
+    private val ytParser = YouTubeParser(this, this.name)
 
     companion object{
         const val MAIN_URL = "https://www.youtube.com"

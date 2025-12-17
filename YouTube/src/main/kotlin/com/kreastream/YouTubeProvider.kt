@@ -21,7 +21,7 @@ class YouTubeProvider(language: String, private val sharedPrefs: SharedPreferenc
     override val hasMainPage = true
     override var lang = language
 
-    private val ytParser = YouTubeParser(this.name)
+    private val ytParser = YouTubeParser(this, this.name)
 
     companion object {
         const val MAIN_URL = "https://www.youtube.com"
