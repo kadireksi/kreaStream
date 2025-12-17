@@ -1,17 +1,10 @@
 package com.kreastream
 
 import com.lagradost.api.Log
-import com.lagradost.cloudstream3.Episode
-import com.lagradost.cloudstream3.HomePageList
+import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.LoadResponse.Companion.addDuration
-import com.lagradost.cloudstream3.MovieLoadResponse
-import com.lagradost.cloudstream3.MovieSearchResponse
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.TvSeriesLoadResponse
-import com.lagradost.cloudstream3.TvSeriesSearchResponse
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.addDate
+
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.InfoItem.InfoType
 import org.schabi.newpipe.extractor.ServiceList
@@ -56,7 +49,7 @@ class YouTubeParser(private val apiName: String) {
             }
         }
         val searchResponses = videos.filter { !it.isShortFormContent }.map {
-            MovieSearchResponse(
+            newMovieSearchResponse(
                 name = it.name,
                 url = it.url,
                 posterUrl = it.thumbnails.last().url,
@@ -96,7 +89,7 @@ class YouTubeParser(private val apiName: String) {
             }
         }
         val searchResponses = videos.map {
-            MovieSearchResponse(
+            newMovieSearchResponse(
                 name = it.name,
                 url = it.url,
                 posterUrl = it.thumbnails.last().url,
@@ -143,7 +136,7 @@ class YouTubeParser(private val apiName: String) {
             }
         }
         val searchResponses = videos.map {
-            MovieSearchResponse(
+            newMovieSearchResponse(
                 name = it.name,
                 url = it.url,
                 posterUrl = it.thumbnails.last().url,
@@ -198,7 +191,7 @@ class YouTubeParser(private val apiName: String) {
                 }
 
                 InfoType.STREAM -> {
-                    MovieSearchResponse(
+                    newMovieSearchResponse(
                         name = it.name,
                         url = it.url,
                         posterUrl = it.thumbnails.last().url,
@@ -266,7 +259,7 @@ class YouTubeParser(private val apiName: String) {
         val tabs = tabsLinkHandlers.map { ChannelTabInfo.getInfo(ServiceList.YouTube, it) }
         val videoTab = tabs.first { it.name == "videos" }
         val videos = videoTab.relatedItems.mapNotNull {
-            Episode(
+            newEpisode(
                 data = it.url,
                 name = it.name,
                 posterUrl = it.thumbnails.last().url
@@ -309,7 +302,7 @@ class YouTubeParser(private val apiName: String) {
     private fun getPlaylistVideos(videos: List<StreamInfoItem>): List<Episode> {
         val episodes = videos.map { video ->
 //            Log.d("YouTubeParser", video.name)
-            Episode(
+            newEpisode(
                 data = video.url,
                 name = video.name,
                 posterUrl = video.thumbnails.last().url,
