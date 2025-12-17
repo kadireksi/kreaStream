@@ -11,46 +11,54 @@ import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.search.SearchInfo
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
+import java.util.Date
 
 class YouTubeParser {
 
-    /* =======================
+    /* =====================
      * DATA MODELS
-     * ======================= */
+     * ===================== */
 
-    data class ParsedVideo(
+    data class ParsedSearchItem(
         val name: String,
         val url: String,
         val poster: String?,
-        val duration: Int?,
-        val description: String?,
-        val uploader: String?,
-        val views: Long?,
-        val likes: Long?
+        val type: InfoType
     )
 
     data class ParsedEpisode(
         val name: String,
         val url: String,
         val poster: String?,
-        val duration: Int?,
-        val date: Long?
+        val durationMin: Int?,
+        val uploadDate: Date?
+    )
+
+    data class ParsedVideo(
+        val name: String,
+        val url: String,
+        val poster: String?,
+        val description: String?,
+        val durationMin: Int,
+        val uploader: String,
+        val views: Long,
+        val likes: Long
     )
 
     data class ParsedSeries(
         val name: String,
         val url: String,
         val poster: String?,
-        val background: String?,
+        val banner: String?,
         val description: String?,
         val episodes: List<ParsedEpisode>
     )
 
-    /* =======================
+    /* =====================
      * SEARCH
-     * ======================= */
+     * ===================== */
 
-    fun search(query: String): List<InfoItem> {
+    fun search(query: String): List<ParsedSearchItem> {
         val handler = ServiceList.YouTube.searchQHFactory
             .fromQuery(query, listOf("videos"), null)
 
@@ -59,44 +67,54 @@ class YouTubeParser {
             SearchQueryHandler(handler)
         )
 
-        val results = mutableListOf<InfoItem>()
-        results.addAll(info.relatedItems)
+        val items = mutableListOf<InfoItem>()
+        items.addAll(info.relatedItems)
 
         var next = info.nextPage
         repeat(3) {
             if (!info.hasNextPage()) return@repeat
             val more = SearchInfo.getMoreItems(ServiceList.YouTube, handler, next)
-            results.addAll(more.items)
+            items.addAll(more.items)
             next = more.nextPage
         }
 
-        return results
+        return items.mapNotNull {
+            val name = it.name ?: return@mapNotNull null
+            val url = it.url ?: return@mapNotNull null
+
+            ParsedSearchItem(
+                name = name,
+                url = url,
+                poster = it.thumbnails.lastOrNull()?.url,
+                type = it.infoType
+            )
+        }
     }
 
-    /* =======================
+    /* =====================
      * VIDEO
-     * ======================= */
+     * ===================== */
 
-    fun parseVideo(url: String): ParsedVideo {
+    fun loadVideo(url: String): ParsedVideo {
         val info = StreamInfo.getInfo(url)
 
         return ParsedVideo(
             name = info.name,
             url = url,
             poster = info.thumbnails.lastOrNull()?.url,
-            duration = (info.duration / 60).toInt(),
             description = info.description?.content,
+            durationMin = (info.duration / 60).toInt(),
             uploader = info.uploaderName,
             views = info.viewCount,
             likes = info.likeCount
         )
     }
 
-    /* =======================
+    /* =====================
      * CHANNEL
-     * ======================= */
+     * ===================== */
 
-    fun parseChannel(url: String): ParsedSeries {
+    fun loadChannel(url: String): ParsedSeries {
         val channel = ChannelInfo.getInfo(url)
 
         val videoTab = channel.tabs
@@ -111,17 +129,17 @@ class YouTubeParser {
             name = channel.name,
             url = url,
             poster = channel.avatars.lastOrNull()?.url,
-            background = channel.banners.lastOrNull()?.url,
+            banner = channel.banners.lastOrNull()?.url,
             description = channel.description,
             episodes = episodes
         )
     }
 
-    /* =======================
+    /* =====================
      * PLAYLIST
-     * ======================= */
+     * ===================== */
 
-    fun parsePlaylist(url: String): ParsedSeries {
+    fun loadPlaylist(url: String): ParsedSeries {
         val info = PlaylistInfo.getInfo(url)
 
         val episodes = mutableListOf<ParsedEpisode>()
@@ -139,24 +157,31 @@ class YouTubeParser {
             name = info.name,
             url = url,
             poster = info.thumbnails.lastOrNull()?.url,
-            background = info.banners.lastOrNull()?.url
+            banner = info.banners.lastOrNull()?.url
                 ?: info.thumbnails.lastOrNull()?.url,
             description = info.description?.content,
             episodes = episodes
         )
     }
 
-    /* =======================
-     * EPISODE
-     * ======================= */
+    /* =====================
+     * HELPERS
+     * ===================== */
 
     private fun parseEpisode(item: StreamInfoItem): ParsedEpisode? {
+        val name = item.name ?: return null
+        val url = item.url ?: return null
+
+        val date = item.uploadDate?.let {
+            Date(it.date().timeInMillis)
+        }
+
         return ParsedEpisode(
-            name = item.name ?: return null,
-            url = item.url ?: return null,
+            name = name,
+            url = url,
             poster = item.thumbnails.lastOrNull()?.url,
-            duration = (item.duration / 60).toInt(),
-            date = item.uploadDate?.date()?.timeInMillis
+            durationMin = (item.duration / 60).toInt(),
+            uploadDate = date
         )
     }
 }
