@@ -33,7 +33,7 @@ android {
 
 dependencies {
     implementation("com.google.android.material:material:1.12.0")
-    implementation("com.github.teamnewpipe:NewPipeExtractor:v0.28.0")
+    implementation("com.github.teamnewpipe:NewPipeExtractor:v0.24.5")
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     //noinspection GradleDependency
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.0.4")
