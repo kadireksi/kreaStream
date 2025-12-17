@@ -11,20 +11,23 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import java.util.concurrent.TimeUnit
 
 // Copied from DownloaderTestImpl. I only changed the cookies as the playlists wouldn't show up in search results.
-// Now why is it called downloader if downloading it's not its only job I don't know
 class NewPipeDownloader(builder: OkHttpClient.Builder): Downloader() {
     private val client: OkHttpClient = builder.readTimeout(30, TimeUnit.SECONDS).build()
+    
     override fun execute(request: Request): Response {
         val httpMethod: String = request.httpMethod()
         val url: String = request.url()
         val headers: Map<String, List<String>> = YoutubeParsingHelper.getCookieHeader()
         val dataToSend: ByteArray? = request.dataToSend()
         var requestBody: RequestBody? = null
+        
         if (dataToSend != null) {
             requestBody = dataToSend.toRequestBody(null, 0, dataToSend.size)
         }
+        
         val requestBuilder: okhttp3.Request.Builder = okhttp3.Request.Builder()
-            .method(httpMethod, requestBody).url(url)
+            .method(httpMethod, requestBody)
+            .url(url)
             .addHeader("User-Agent", USER_AGENT)
 
         for ((headerName, headerValueList) in headers) {
@@ -37,14 +40,17 @@ class NewPipeDownloader(builder: OkHttpClient.Builder): Downloader() {
                 requestBuilder.header(headerName, headerValueList[0])
             }
         }
+        
         val response = client.newCall(requestBuilder.build()).execute()
         if (response.code == 429) {
             response.close()
             throw ReCaptchaException("reCaptcha Challenge requested", url)
         }
+        
         val body = response.body
         val responseBodyToReturn: String = body.string()
         val latestUrl = response.request.url.toString()
+        
         return Response(
             response.code, response.message, response.headers.toMultimap(),
             responseBodyToReturn, latestUrl

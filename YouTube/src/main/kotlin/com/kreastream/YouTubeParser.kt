@@ -1,18 +1,25 @@
 package com.kreastream
 
-import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.InfoItem
+import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.StreamingService
 import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
-import org.schabi.newpipe.extractor.services.youtube.YoutubeService
-import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.kiosk.KioskInfo
 import org.schabi.newpipe.extractor.stream.Description
+import org.schabi.newpipe.extractor.services.youtube.YoutubeService
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeChannelLinkHandlerFactory
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubePlaylistLinkHandlerFactory
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeStreamLinkHandlerFactory
 
 class YouTubeParser {
+
+    private val youtubeService: YoutubeService by lazy {
+        NewPipe.getService(YoutubeService::class.java)
+    }
 
     data class ParsedItem(
         val name: String,
@@ -51,11 +58,9 @@ class YouTubeParser {
         search(query, InfoItem.InfoType.PLAYLIST)
 
     private fun search(query: String, type: InfoItem.InfoType): List<ParsedItem> {
-        val youtubeService = ServiceList.YouTube as YoutubeService
-        val handler = youtubeService.searchQHFactory.fromQuery(query)
-        val info = SearchInfo.getInfo(youtubeService, handler)
+        val searchInfo = SearchInfo.getInfo(youtubeService, youtubeService.searchQHFactory, query)
 
-        return info.relatedItems
+        return searchInfo.relatedItems
             .filter { it.infoType == type }
             .map {
                 ParsedItem(
@@ -67,10 +72,9 @@ class YouTubeParser {
     }
 
     fun getTrendingVideos(): List<ParsedItem> {
-        val youtubeService = ServiceList.YouTube as YoutubeService
-        val kiosk = KioskInfo.getInfo(youtubeService, "Trending")
+        val kioskInfo = KioskInfo.getInfo(youtubeService, youtubeService.kioskList.defaultKioskId)
 
-        return kiosk.relatedItems
+        return kioskInfo.relatedItems
             .filterIsInstance<StreamInfoItem>()
             .map {
                 ParsedItem(
@@ -82,7 +86,8 @@ class YouTubeParser {
     }
 
     fun getVideo(url: String): ParsedVideo {
-        val info = StreamInfo.getInfo(ServiceList.YouTube, url)
+        val linkHandler = YoutubeStreamLinkHandlerFactory.getInstance().fromUrl(url)
+        val info = StreamInfo.getInfo(youtubeService, linkHandler)
 
         return ParsedVideo(
             name = info.name,
@@ -93,7 +98,8 @@ class YouTubeParser {
     }
 
     fun getChannel(url: String): ParsedChannel {
-        val info = ChannelInfo.getInfo(ServiceList.YouTube, url)
+        val linkHandler = YoutubeChannelLinkHandlerFactory.getInstance().fromUrl(url)
+        val info = ChannelInfo.getInfo(youtubeService, linkHandler)
 
         val videos = info.relatedItems
             .filterIsInstance<StreamInfoItem>()
@@ -114,7 +120,8 @@ class YouTubeParser {
     }
 
     fun getPlaylist(url: String): ParsedPlaylist {
-        val info = PlaylistInfo.getInfo(ServiceList.YouTube, url)
+        val linkHandler = YoutubePlaylistLinkHandlerFactory.getInstance().fromUrl(url)
+        val info = PlaylistInfo.getInfo(youtubeService, linkHandler)
 
         val videos = info.relatedItems
             .filterIsInstance<StreamInfoItem>()
