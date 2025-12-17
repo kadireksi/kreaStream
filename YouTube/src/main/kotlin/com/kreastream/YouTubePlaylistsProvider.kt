@@ -16,13 +16,9 @@ class YouTubePlaylistsProvider(language: String) : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         return parser.searchPlaylists(query).map {
-            TvSeriesSearchResponse(
-                name = it.name,
-                url = it.url,
-                apiName = this.name,
-                type = TvType.Others,
-                posterUrl = it.thumbnailUrl
-            )
+            newTvSeriesSearchResponse(it.name, it.url, TvType.Others) {
+                this.posterUrl = it.thumbnailUrl
+            }
         }
     }
 
@@ -30,21 +26,15 @@ class YouTubePlaylistsProvider(language: String) : MainAPI() {
         val playlist = parser.getPlaylist(url)
 
         val episodes = playlist.videos.map {
-            Episode(
-                data = it.url,
-                name = it.name,
-                posterUrl = it.thumbnailUrl
-            )
+            newEpisode(it.url) {
+                this.name = it.name
+                this.posterUrl = it.thumbnailUrl
+            }
         }
 
-        return TvSeriesLoadResponse(
-            name = playlist.name,
-            url = playlist.url,
-            apiName = this.name,
-            type = TvType.Others,
-            episodes = episodes,
-            posterUrl = playlist.thumbnailUrl
-        )
+        return newTvSeriesLoadResponse(playlist.name, playlist.url, TvType.Others, episodes) {
+            this.posterUrl = playlist.thumbnailUrl
+        }
     }
 
     override suspend fun loadLinks(

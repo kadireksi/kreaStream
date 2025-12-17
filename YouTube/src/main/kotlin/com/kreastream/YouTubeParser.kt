@@ -7,7 +7,8 @@ import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
-import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandlerFactory
+import org.schabi.newpipe.extractor.services.youtube.YoutubeService
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.kiosk.KioskInfo
 import org.schabi.newpipe.extractor.stream.Description
 
@@ -50,8 +51,9 @@ class YouTubeParser {
         search(query, InfoItem.InfoType.PLAYLIST)
 
     private fun search(query: String, type: InfoItem.InfoType): List<ParsedItem> {
-        val handler = SearchQueryHandlerFactory.getInstance().fromQuery(query)
-        val info = SearchInfo.getInfo(ServiceList.YouTube, handler)
+        val youtubeService = ServiceList.YouTube as YoutubeService
+        val handler = youtubeService.searchQHFactory.fromQuery(query)
+        val info = SearchInfo.getInfo(youtubeService, handler)
 
         return info.relatedItems
             .filter { it.infoType == type }
@@ -65,7 +67,8 @@ class YouTubeParser {
     }
 
     fun getTrendingVideos(): List<ParsedItem> {
-        val kiosk = KioskInfo.getInfo(ServiceList.YouTube, "Trending")
+        val youtubeService = ServiceList.YouTube as YoutubeService
+        val kiosk = KioskInfo.getInfo(youtubeService, "Trending")
 
         return kiosk.relatedItems
             .filterIsInstance<StreamInfoItem>()

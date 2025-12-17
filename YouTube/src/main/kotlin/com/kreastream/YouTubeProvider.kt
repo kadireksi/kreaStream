@@ -1,8 +1,6 @@
 package com.kreastream
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.AppUtils.toJson
-import com.lagradost.cloudstream3.utils.newMovieSearchResponse
 
 class YouTubeProvider : MainAPI() {
 
@@ -21,22 +19,14 @@ class YouTubeProvider : MainAPI() {
     ): HomePageResponse {
 
         val items = parser.getTrendingVideos().map {
-            newMovieSearchResponse(
-                it.name,
-                it.url,
-                TvType.Others
-            ) {
+            newMovieSearchResponse(it.name, it.url, TvType.Others) {
                 posterUrl = it.thumbnailUrl
             }
         }
 
-        return HomePageResponse(
-            listOf(
-                HomePageList(
-                    name = "Trending",
-                    list = items
-                )
-            )
+        return newHomePageResponse(
+            listName = "Trending",
+            list = items
         )
     }
 
@@ -46,31 +36,19 @@ class YouTubeProvider : MainAPI() {
         val results = mutableListOf<SearchResponse>()
 
         parser.searchVideos(query).forEach {
-            results += newMovieSearchResponse(
-                it.name,
-                it.url,
-                TvType.Others
-            ) {
+            results += newMovieSearchResponse(it.name, it.url, TvType.Others) {
                 posterUrl = it.thumbnailUrl
             }
         }
 
         parser.searchChannels(query).forEach {
-            results += newMovieSearchResponse(
-                it.name,
-                it.url,
-                TvType.Others
-            ) {
+            results += newMovieSearchResponse(it.name, it.url, TvType.Others) {
                 posterUrl = it.thumbnailUrl
             }
         }
 
         parser.searchPlaylists(query).forEach {
-            results += newMovieSearchResponse(
-                it.name,
-                it.url,
-                TvType.Others
-            ) {
+            results += newMovieSearchResponse(it.name, it.url, TvType.Others) {
                 posterUrl = it.thumbnailUrl
             }
         }
@@ -83,12 +61,7 @@ class YouTubeProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val info = parser.getVideo(url)
 
-        return newMovieLoadResponse(
-            info.name,
-            info.url,
-            TvType.Others,
-            info.url
-        ) {
+        return newMovieLoadResponse(info.name, info.url, TvType.Others, info.url) {
             posterUrl = info.thumbnailUrl
             plot = info.description?.content
         }

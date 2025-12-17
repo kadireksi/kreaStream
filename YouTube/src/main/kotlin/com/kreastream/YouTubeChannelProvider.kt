@@ -16,13 +16,9 @@ class YouTubeChannelProvider(language: String) : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         return parser.searchChannels(query).map {
-            TvSeriesSearchResponse(
-                name = it.name,
-                url = it.url,
-                apiName = this.name,
-                type = TvType.Others,
-                posterUrl = it.thumbnailUrl
-            )
+            newTvSeriesSearchResponse(it.name, it.url, TvType.Others) {
+                this.posterUrl = it.thumbnailUrl
+            }
         }
     }
 
@@ -30,21 +26,15 @@ class YouTubeChannelProvider(language: String) : MainAPI() {
         val channel = parser.getChannel(url)
 
         val episodes = channel.videos.map {
-            Episode(
-                data = it.url,
-                name = it.name,
-                posterUrl = it.thumbnailUrl
-            )
+            newEpisode(it.url) {
+                this.name = it.name
+                this.posterUrl = it.thumbnailUrl
+            }
         }
 
-        return TvSeriesLoadResponse(
-            name = channel.name,
-            url = channel.url,
-            apiName = this.name,
-            type = TvType.Others,
-            episodes = episodes,
-            posterUrl = channel.thumbnailUrl
-        )
+        return newTvSeriesLoadResponse(channel.name, channel.url, TvType.Others, episodes) {
+            this.posterUrl = channel.thumbnailUrl
+        }
     }
 
     override suspend fun loadLinks(
