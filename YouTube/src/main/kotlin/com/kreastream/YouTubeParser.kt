@@ -10,8 +10,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
 class YouTubeParser(
-    private val api: MainAPI,
-    private val apiName: String
+    private val api: MainAPI
 ) {
 
     /* ================= SEARCH ================= */
@@ -28,15 +27,15 @@ class YouTubeParser(
         val qh = ServiceList.YouTube.searchQHFactory.fromQuery(query)
         val info = SearchInfo.getInfo(ServiceList.YouTube, qh)
 
-        return info.items
+        return info.getItems()
             .filterIsInstance<StreamInfoItem>()
-            .map {
+            .map { item ->
                 api.newMovieSearchResponse(
-                    name = it.name ?: "YouTube",
-                    url = it.url,
-                    type = TvType.Others
+                    item.name ?: "YouTube",
+                    item.url,
+                    TvType.Others
                 ) {
-                    posterUrl = it.thumbnails.lastOrNull()?.url
+                    posterUrl = item.thumbnails.lastOrNull()?.url
                 }
             }
     }
@@ -45,15 +44,15 @@ class YouTubeParser(
         val qh = ServiceList.YouTube.searchQHFactory.fromQuery(query)
         val info = SearchInfo.getInfo(ServiceList.YouTube, qh)
 
-        return info.items
+        return info.getItems()
             .filterIsInstance<org.schabi.newpipe.extractor.channel.ChannelInfoItem>()
-            .map {
+            .map { item ->
                 api.newTvSeriesSearchResponse(
-                    name = it.name ?: "YouTube Channel",
-                    url = it.url,
-                    type = TvType.Others
+                    item.name ?: "YouTube Channel",
+                    item.url,
+                    TvType.Others
                 ) {
-                    posterUrl = it.thumbnails.lastOrNull()?.url
+                    posterUrl = item.thumbnails.lastOrNull()?.url
                 }
             }
     }
@@ -62,15 +61,15 @@ class YouTubeParser(
         val qh = ServiceList.YouTube.searchQHFactory.fromQuery(query)
         val info = SearchInfo.getInfo(ServiceList.YouTube, qh)
 
-        return info.items
+        return info.getItems()
             .filterIsInstance<org.schabi.newpipe.extractor.playlist.PlaylistInfoItem>()
-            .map {
+            .map { item ->
                 api.newTvSeriesSearchResponse(
-                    name = it.name ?: "YouTube Playlist",
-                    url = it.url,
-                    type = TvType.Others
+                    item.name ?: "YouTube Playlist",
+                    item.url,
+                    TvType.Others
                 ) {
-                    posterUrl = it.thumbnails.lastOrNull()?.url
+                    posterUrl = item.thumbnails.lastOrNull()?.url
                 }
             }
     }
@@ -81,10 +80,10 @@ class YouTubeParser(
         val info = StreamInfo.getInfo(ServiceList.YouTube, url)
 
         return api.newMovieLoadResponse(
-            name = info.name ?: "YouTube Video",
-            url = url,
-            type = TvType.Others,
-            dataUrl = url
+            info.name ?: "YouTube",
+            url,
+            TvType.Others,
+            url
         ) {
             posterUrl = info.thumbnails.lastOrNull()?.url
             plot = info.description?.content
@@ -95,20 +94,20 @@ class YouTubeParser(
     suspend fun channelToLoadResponse(url: String): LoadResponse {
         val info = ChannelInfo.getInfo(ServiceList.YouTube, url)
 
-        val episodes = info.items
+        val episodes = info.getItems()
             .filterIsInstance<StreamInfoItem>()
-            .map {
-                api.newEpisode(it.url) {
-                    name = it.name
-                    posterUrl = it.thumbnails.lastOrNull()?.url
+            .map { item ->
+                api.newEpisode(item.url, false) {
+                    name = item.name
+                    posterUrl = item.thumbnails.lastOrNull()?.url
                 }
             }
 
         return api.newTvSeriesLoadResponse(
-            name = info.name ?: "YouTube Channel",
-            url = url,
-            type = TvType.Others,
-            episodes = episodes
+            info.name ?: "YouTube Channel",
+            url,
+            TvType.Others,
+            episodes
         ) {
             posterUrl = info.avatars.lastOrNull()?.url
             plot = info.description
@@ -118,20 +117,20 @@ class YouTubeParser(
     suspend fun playlistToLoadResponse(url: String): LoadResponse {
         val info = PlaylistInfo.getInfo(ServiceList.YouTube, url)
 
-        val episodes = info.items
+        val episodes = info.getItems()
             .filterIsInstance<StreamInfoItem>()
-            .map {
-                api.newEpisode(it.url) {
-                    name = it.name
-                    posterUrl = it.thumbnails.lastOrNull()?.url
+            .map { item ->
+                api.newEpisode(item.url, false) {
+                    name = item.name
+                    posterUrl = item.thumbnails.lastOrNull()?.url
                 }
             }
 
         return api.newTvSeriesLoadResponse(
-            name = info.name ?: "YouTube Playlist",
-            url = url,
-            type = TvType.Others,
-            episodes = episodes
+            info.name ?: "YouTube Playlist",
+            url,
+            TvType.Others,
+            episodes
         ) {
             posterUrl = info.thumbnails.lastOrNull()?.url
             plot = info.description
@@ -140,24 +139,22 @@ class YouTubeParser(
 
     /* ================= MAIN PAGE ================= */
 
-    fun getTrendingVideoUrls(page: Int): HomePageList {
+    fun getTrendingVideoUrls(): HomePageList {
         val qh = ServiceList.YouTube.searchQHFactory.fromQuery("trending")
         val info = SearchInfo.getInfo(ServiceList.YouTube, qh)
 
-        val items = info.items
+        val list = info.getItems()
             .filterIsInstance<StreamInfoItem>()
-            .map {
+            .map { item ->
                 api.newMovieSearchResponse(
-                    name = it.name ?: "YouTube",
-                    url = it.url,
-                    type = TvType.Others
+                    item.name ?: "YouTube",
+                    item.url,
+                    TvType.Others
                 ) {
-                    posterUrl = it.thumbnails.lastOrNull()?.url
+                    posterUrl = item.thumbnails.lastOrNull()?.url
                 }
             }
 
-        return HomePageList(
-            listOf(HomePageList.HomePage("Trending", items))
-        )
+        return HomePageList("Trending", list)
     }
 }
