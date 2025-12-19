@@ -71,7 +71,7 @@ class DDizi : MainAPI() {
             HomePageList(
                 name = request.name,
                 list = items,
-                true   // ✅ THIS is the correct horizontal flag
+                true
             )
         )
 
@@ -225,19 +225,10 @@ class DDizi : MainAPI() {
                 ?.get(1)
                 ?: return false
 
-        // ✅ Virtual quality sources (same URL, different labels)
-        val qualities = listOf(
-            Qualities.P1080,
-            Qualities.P720,
-            Qualities.P480,
-            Qualities.P360
-        )
-
-        qualities.forEach { q ->
             callback(
                 newExtractorLink(
                     source = name,
-                    name = "$name ${q.value}p",
+                    name = "$name",
                     url = fileUrl
                 ) {
                     referer = ogVideo
@@ -245,11 +236,10 @@ class DDizi : MainAPI() {
                         "User-Agent" to USER_AGENT,
                         "Referer" to ogVideo
                     )
-                    quality = q.value   // ✅ FIX
+                    quality = Qualities.Unknown.value
                     type = ExtractorLinkType.M3U8
                 }
             )
-        }
 
         return true
     }
