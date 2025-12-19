@@ -15,7 +15,7 @@ class DDizi : MainAPI() {
     override val hasMainPage = true
     override val hasQuickSearch = false
     override val hasDownloadSupport = true
-    override val isHorizontal = true 
+    override val isHorizontalImages = true
     override val supportedTypes = setOf(TvType.TvSeries)
 
     override val mainPage = mainPageOf(
