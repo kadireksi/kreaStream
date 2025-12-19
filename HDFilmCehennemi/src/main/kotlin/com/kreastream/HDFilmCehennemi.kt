@@ -483,11 +483,6 @@ class HDFilmCehennemi : MainAPI() {
             // 1. Unpack the javascript
             val unpacked = JsUnpacker(script).unpack() ?: return
             
-            // --- NEW: Extract Rapidrame ID for Download ---
-            // Look for image: "https://.../aaktqas1ejb1.jpg"
-            //val imageRegex = Regex("""image:\s*["'](.*?)["']""")
-            //val imageUrl = imageRegex.find(unpacked)?.groupValues?.get(1)
-            
             val callRegex = Regex("""\w+\(\[(.*?)\]\)""")
             val arrayContent = callRegex.find(unpacked)?.groupValues?.get(1) ?: return
             
@@ -582,90 +577,87 @@ class HDFilmCehennemi : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        val rapidrameReferer = "$mainUrl/"
+        val mainReferer = "$mainUrl/"
+
         var rapidrameId: String? = null
+
+        fun normalizeRapidrame(src: String): Pair<String?, String> {
+            val id = when {
+                "/rplayer/" in src -> src.substringAfter("/rplayer/").removeSuffix("/")
+                "?rapidrame_id=" in src -> src.substringAfter("?rapidrame_id=")
+                else -> null
+            }?.takeIf { it.isNotEmpty() }
+
+            val url = when {
+                id != null -> "$mainUrl/playerr/$id"
+                else -> src
+            }
+            return id to url
+        }
+
+        fun invokeSource(name: String, rawSrc: String, referer: String = mainReferer) {
+            val (id, url) = normalizeRapidrame(rawSrc)
+            if (id != null) rapidrameId = id
+            invokeLocalSource(name, url, referer, callback)
+        }
 
         document.select("div.alternative-links").forEach { element ->
             val langCode = element.attr("data-lang").uppercase()
             element.select("button.alternative-link").forEach { button ->
-                val sourceNameRaw = button.text().replace("(HDrip Xbet)", "").trim()
+                var sourceName = button.text().replace("(HDrip Xbet)", "").trim()
+                if (sourceName.equals("close", ignoreCase = true)) return@forEach
 
-                // Skip 'Close' here as we handle it separately (or if it appears in list)
-                if (sourceNameRaw.equals("close", ignoreCase = true)) {
-                    return@forEach
-                }
-                
                 val videoID = button.attr("data-video")
-                
-                val apiGet = app.get(
-                    "${mainUrl}/video/$videoID/",
+                val apiResponse = app.get(
+                    "$mainUrl/video/$videoID/",
                     headers = mapOf("Content-Type" to "application/json", "X-Requested-With" to "fetch"),
                     referer = data
                 ).text
 
-                var iframe = Regex("""data-src=\\"([^"]+)""").find(apiGet)?.groupValues?.get(1)?.replace("\\", "") ?: ""
-                
-                if (iframe.contains("?rapidrame_id=")) {
-                    iframe = "${mainUrl}/playerr/" + iframe.substringAfter("?rapidrame_id=")
-                }
+                val iframe = Regex("""data-src=\\"([^"]+)""").find(apiResponse)
+                    ?.groupValues?.get(1)
+                    ?.replace("\\", "") ?: ""
 
                 if (iframe.isNotEmpty()) {
-                    val finalSourceName = if (sourceNameRaw.contains("rapidrame", ignoreCase = true)) {
+                    val finalName = if (sourceName.contains("rapidrame", ignoreCase = true)) {
                         "Rapidrame $langCode"
                     } else {
-                        "$sourceNameRaw $langCode"
+                        "$sourceName $langCode"
                     }
-
-                    rapidrameId = iframe.substringAfter("?rapidrame_id=").takeIf { it.isNotEmpty() }
-                    
-                    invokeLocalSource(finalSourceName, iframe, rapidrameReferer, callback) 
+                    invokeSource(finalName, iframe)
                 }
             }
         }
 
-        val defaultSourceUrl = fixUrlNull(document.selectFirst(".close")?.attr("data-src"))
+        document.selectFirst(".close")?.attr("data-src")?.let { rawSrc ->
+            val url = fixUrlNull(rawSrc) ?: return@let
+            var referer = mainReferer
 
-        if (defaultSourceUrl != null) {
-            val sourceName = "Close"
-            var referer = "$mainUrl/" 
-            
-            if (defaultSourceUrl.contains("hdfilmcehennemi.mobi")) {
+            if (url.contains("hdfilmcehennemi.mobi")) {
                 try {
-                    val iframedoc = app.get(defaultSourceUrl, referer = mainUrl).document
-                    val baseUri = iframedoc.location().substringBefore("/", "https://www.hdfilmcehennemi.mobi")
-                    referer = baseUri
-                    
-                    iframedoc.select("track[kind=captions]").forEach { track ->
+                    val iframeDoc = app.get(url, referer = mainUrl).document
+                    val baseUri = iframeDoc.location()
+                        .substringBefore("/", "https://www.hdfilmcehennemi.mobi")
+
+                    iframeDoc.select("track[kind=captions]").forEach { track ->
                         val lang = when (track.attr("srclang")) {
                             "tr" -> "Türkçe"
                             "en" -> "İngilizce"
-                            else -> track.attr("srclang")
+                            else -> track.attr("srclang").uppercase()
                         }
-                        val subUrl = track.attr("src").let { if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/") }
+                        val subUrl = track.attr("src").let {
+                            if (it.startsWith("http")) it else "$baseUri/$it".replace("//", "/")
+                        }
                         subtitleCallback(newSubtitleFile(lang, subUrl))
                     }
-                } catch (e: Exception) { 
-                    Log.e("HDFC", "Sub extraction error for default source", e) 
+                    referer = baseUri
+                } catch (e: Exception) {
+                    Log.e("HDFC", "Subtitle extraction failed for Close source", e)
                 }
             }
-
-            rapidrameId = defaultSourceUrl.substringAfter("?rapidrame_id=").takeIf { it.isNotEmpty() }
-
-            invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
+            invokeSource("Close", url, referer)
         }
-
-        var rapidrameD = document.selectFirst("iframe.rapidrame, iframe.close")
-            ?.attr("data-src")
-            ?.let { src ->
-                when {
-                    "/rplayer/" in src -> src.substringAfter("/rplayer/").removeSuffix("/")
-                    "?rapidrame_id=" in src -> src.substringAfter("?rapidrame_id=")
-                    else -> null
-                }
-            }
-            ?.takeIf { it.isNotEmpty() }
-
-        rapidrameD?.let { extractDownloadLinks(it, callback) }
+        rapidrameId?.let { extractDownloadLinks(it, callback) }
 
         return true
     }
