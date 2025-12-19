@@ -18,7 +18,7 @@ class DDizi : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries)
 
     override val mainPage = mainPageOf(
-        "$mainUrl/yeni-eklenenler1" to "Son Eklenen Bölümler",
+        "$mainUrl/yeni-eklenenler7" to "Son Eklenen Bölümler",
         "$mainUrl" to "Yerli Diziler",
         "$mainUrl/yabanci-dizi-izle" to "Yabancı Diziler",
         "$mainUrl/eski.diziler" to "Eski Diziler"
@@ -223,8 +223,8 @@ class DDizi : MainAPI() {
                 name = name,
                 url = fileUrl
             ) {
-                referer = ogVideo
-                headers = mapOf(
+                this.referer = ogVideo
+                this.headers = mapOf(
                     "User-Agent" to USER_AGENT,
                     "Referer" to ogVideo
                 )
