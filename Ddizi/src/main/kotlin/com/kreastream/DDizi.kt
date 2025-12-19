@@ -3,7 +3,6 @@ package com.kreastream
 import android.util.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
@@ -15,7 +14,6 @@ class DDizi : MainAPI() {
     override val hasMainPage = true
     override val hasQuickSearch = false
     override val hasDownloadSupport = true
-    override val isHorizontalImages = true
     override val supportedTypes = setOf(TvType.TvSeries)
 
     override val mainPage = mainPageOf(
@@ -44,10 +42,9 @@ class DDizi : MainAPI() {
                     ?.mapNotNull { a ->
                         val title = a.text().trim()
                         val href = fixUrl(a.attr("href"))
-
                         if (title.isBlank() || href.isBlank()) return@mapNotNull null
 
-                        // 🔴 IMPORTANT: fetch poster from SERIES PAGE
+                        // fetch poster from series page
                         val posterDoc = app.get(href).document
                         val poster = posterDoc.selectFirst(
                             "div.afis img, img.afis, img.img-back, img.img-back-cat"
@@ -68,8 +65,19 @@ class DDizi : MainAPI() {
         val hasNext =
             document.selectFirst(".pagination a:contains(Sonraki)") != null
 
-        return newHomePageResponse(request.name, items, hasNext)
+        val pages = mutableListOf<HomePageList>()
+
+        pages.add(
+            HomePageList(
+                name = request.name,
+                list = items,
+                true   // ✅ THIS is the correct horizontal flag
+            )
+        )
+
+        return newHomePageResponse(pages, hasNext)
     }
+
 
     private fun Element.toSearchResult(): SearchResponse? {
         val a = selectFirst("a") ?: return null
@@ -162,7 +170,7 @@ class DDizi : MainAPI() {
     }
 
     /* =========================
-       LOAD LINKS (ORIGINAL LOGIC)
+       LOAD LINKS (VIRTUAL QUALITIES)
        ========================= */
     override suspend fun loadLinks(
         data: String,
@@ -210,42 +218,37 @@ class DDizi : MainAPI() {
             .firstOrNull { it.html().contains("jwplayer") && it.html().contains("sources") }
             ?: return false
 
-        val sourceRegex =
-            Regex("""file:\s*["'](.*?)["']""")
         val fileUrl =
-            sourceRegex.find(jwScript.html())?.groupValues?.get(1)
+            Regex("""file:\s*["'](.*?)["']""")
+                .find(jwScript.html())
+                ?.groupValues
+                ?.get(1)
                 ?: return false
 
-        val isHls = fileUrl.contains(".m3u8")
-        val videoHeaders = if (fileUrl.contains("master.txt")) {
-            mapOf(
-                "accept" to "*/*",
-                "user-agent" to USER_AGENT,
-                "referer" to ogVideo
-            )
-        } else {
-            getHeaders(ogVideo)
-        }
-
-        callback(
-            newExtractorLink(
-                source = name,
-                name = name,
-                url = fileUrl
-            ) {
-                this.referer = ogVideo
-                this.quality = Qualities.Unknown.value
-                this.headers = mapOf(
-                    "User-Agent" to USER_AGENT,
-                    "Referer" to ogVideo
-                )
-                this.type =
-                    if (isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-            }
+        // ✅ Virtual quality sources (same URL, different labels)
+        val qualities = listOf(
+            Qualities.P1080,
+            Qualities.P720,
+            Qualities.P480,
+            Qualities.P360
         )
 
-        if (isHls) {
-            M3u8Helper.generateM3u8(name, fileUrl, ogVideo, headers = videoHeaders).forEach(callback)
+        qualities.forEach { q ->
+            callback(
+                newExtractorLink(
+                    source = name,
+                    name = "$name ${q.value}p",
+                    url = fileUrl
+                ) {
+                    referer = ogVideo
+                    headers = mapOf(
+                        "User-Agent" to USER_AGENT,
+                        "Referer" to ogVideo
+                    )
+                    quality = q.value   // ✅ FIX
+                    type = ExtractorLinkType.M3U8
+                }
+            )
         }
 
         return true
@@ -254,10 +257,5 @@ class DDizi : MainAPI() {
     companion object {
         private const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/134.0.0.0 Safari/537.36"
-        private fun getHeaders(referer: String): Map<String, String> = mapOf(
-            "accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "user-agent" to USER_AGENT,
-            "referer" to referer
-        )
     }
 }
