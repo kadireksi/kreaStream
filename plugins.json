@@ -37,5 +37,24 @@
         "description": "T\u00fcrk Tv Dizi ve Canl\u0131 TV Radyo Yay\u0131nlar\u0131",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
         "name": "TurkTV"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=yabancidizi.tv&sz=%size%",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
+        "fileSize": 38947,
+        "status": 1,
+        "language": "tr",
+        "authors": [
+            "kreastream"
+        ],
+        "tvTypes": [
+            "TvSeries"
+        ],
+        "version": 251220,
+        "internalName": "YabanciDizi",
+        "description": "Son \u00e7\u0131kan yabanc\u0131 dizi ve filmleri yabancidizi' de izle. En yeni yabanc\u0131 film ve diziler, t\u00fcrk\u00e7e altyaz\u0131l\u0131 yada dublaj olarak 1080p kalitesinde hd izle.",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/YabanciDizi.cs3",
+        "name": "YabanciDizi"
     }
 ]
