@@ -1,23 +1,22 @@
 [
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=hdfilmcehennemi.com&sz=%size%",
+        "iconUrl": "https://www.ddizi.im/favicon.ico",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 34227,
+        "fileSize": 18212,
         "status": 1,
         "language": "tr",
         "authors": [
             "kreastream"
         ],
         "tvTypes": [
-            "Movie",
             "TvSeries"
         ],
         "version": 251219,
-        "internalName": "HDFilmCehennemi",
-        "description": "T\u00fcrkiye'nin en h\u0131zl\u0131 hd film izleme sitesi",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/HDFilmCehennemi.cs3",
-        "name": "HDFilmCehennemi"
+        "internalName": "Ddizi",
+        "description": "DDizi.im i\u00e7in Cloudstream eklentisi",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Ddizi.cs3",
+        "name": "Ddizi"
     },
     {
         "iconUrl": "https://m.media-amazon.com/images/I/41fJO1NxFxL.png",
