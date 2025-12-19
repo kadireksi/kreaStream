@@ -3,7 +3,7 @@
         "iconUrl": "https://www.ddizi.im/favicon.ico",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 14519,
+        "fileSize": 14055,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -12,7 +12,7 @@
         "tvTypes": [
             "TvSeries"
         ],
-        "version": 251219,
+        "version": 251220,
         "internalName": "Ddizi",
         "description": "DDizi.im i\u00e7in Cloudstream eklentisi",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Ddizi.cs3",
