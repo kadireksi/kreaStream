@@ -54,11 +54,16 @@ class DDizi : MainAPI() {
         return newHomePageResponse(request.name, items, hasNext)
     }
 
+    /* =========================
+       SEARCH RESULT PARSER
+       ========================= */
     private fun Element.toSearchResult(): SearchResponse? {
-        val a = selectFirst("a") ?: this
+        val a = if (tagName() == "a") this else selectFirst("a") ?: return null
+
         val title = a.text().trim()
         val href = fixUrl(a.attr("href"))
-        val poster = selectFirst("img")
+
+        val poster = a.selectFirst("img")
             ?.let { fixUrlNull(it.attr("data-src") ?: it.attr("src")) }
 
         if (title.isBlank() || href.isBlank()) return null
@@ -96,8 +101,14 @@ class DDizi : MainAPI() {
 
         val episodes = mutableListOf<Episode>()
 
+        val isSeriesPage =
+            url.contains("/dizi/") ||
+            url.contains("/diziler/") ||
+            url.contains("/yabanci-dizi") ||
+            url.contains("/eski.diziler")
+
         /* ---- SERIES PAGE ---- */
-        if (url.contains("/dizi/") || url.contains("/diziler/")) {
+        if (isSeriesPage) {
 
             document.select(
                 "div.bolumler a, div.sezonlar a, div.dizi-arsiv a, div.dizi-boxpost-cat a"
@@ -171,7 +182,7 @@ class DDizi : MainAPI() {
             data,
             headers = mapOf(
                 "User-Agent" to USER_AGENT,
-                "Referer" to mainUrl
+                "Referer" to data
             )
         ).document
 
