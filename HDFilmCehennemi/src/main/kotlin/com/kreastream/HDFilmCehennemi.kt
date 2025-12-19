@@ -654,7 +654,7 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        var rapidrameId = document.selectFirst("iframe.rapidrame, iframe.close")
+        var rapidrameD = document.selectFirst("iframe.rapidrame, iframe.close")
             ?.attr("data-src")
             ?.let { src ->
                 when {
@@ -665,7 +665,7 @@ class HDFilmCehennemi : MainAPI() {
             }
             ?.takeIf { it.isNotEmpty() }
 
-        rapidrameId?.let { extractDownloadLinks(it, callback) }
+        rapidrameD?.let { extractDownloadLinks(it, callback) }
 
         return true
     }
