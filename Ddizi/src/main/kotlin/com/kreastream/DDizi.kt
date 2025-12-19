@@ -22,9 +22,9 @@ class DDizi : MainAPI() {
         "$mainUrl/eski.diziler" to "Eski Diziler"
     )
 
-    // =============================
-    // MAIN PAGE
-    // =============================
+    /* =========================
+       MAIN PAGE
+       ========================= */
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
@@ -33,9 +33,20 @@ class DDizi : MainAPI() {
         val url = if (page > 1) "${request.data}/$page" else request.data
         val document = app.get(url).document
 
-        val items = document.select(
-            "div.dizi-boxpost, div.dizi-boxpost-cat"
-        ).mapNotNull { it.toSearchResult() }
+        val items = when (request.name) {
+
+            "Yerli Diziler" -> {
+                document.selectFirst("ul.list_")
+                    ?.select("li > a")
+                    ?.mapNotNull { it.toSearchResult() }
+                    ?: emptyList()
+            }
+
+            else -> {
+                document.select("div.dizi-boxpost, div.dizi-boxpost-cat")
+                    .mapNotNull { it.toSearchResult() }
+            }
+        }
 
         val hasNext =
             document.selectFirst(".pagination a:contains(Sonraki)") != null
@@ -44,20 +55,22 @@ class DDizi : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val a = selectFirst("a") ?: return null
+        val a = selectFirst("a") ?: this
         val title = a.text().trim()
         val href = fixUrl(a.attr("href"))
         val poster = selectFirst("img")
             ?.let { fixUrlNull(it.attr("data-src") ?: it.attr("src")) }
+
+        if (title.isBlank() || href.isBlank()) return null
 
         return newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
             posterUrl = poster
         }
     }
 
-    // =============================
-    // SEARCH
-    // =============================
+    /* =========================
+       SEARCH
+       ========================= */
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.post(
             "$mainUrl/arama/",
@@ -69,13 +82,13 @@ class DDizi : MainAPI() {
         ).mapNotNull { it.toSearchResult() }
     }
 
-    // =============================
-    // LOAD (PARTS AS EPISODES)
-    // =============================
+    /* =========================
+       LOAD (SERIES + PARTS)
+       ========================= */
     override suspend fun load(url: String): LoadResponse {
 
         val document = app.get(url).document
-        val rawTitle = document.selectFirst("h1, h2")?.text()?.trim() ?: name
+        val pageTitle = document.selectFirst("h1, h2")?.text()?.trim() ?: name
 
         val poster =
             document.selectFirst("div.afis img, img.afis, img.img-back")
@@ -83,10 +96,13 @@ class DDizi : MainAPI() {
 
         val episodes = mutableListOf<Episode>()
 
-        // ===== SERIES PAGE =====
+        /* ---- SERIES PAGE ---- */
         if (url.contains("/dizi/") || url.contains("/diziler/")) {
 
-            document.select("div.bolumler a, div.sezonlar a").forEach { el ->
+            document.select(
+                "div.bolumler a, div.sezonlar a, div.dizi-arsiv a, div.dizi-boxpost-cat a"
+            ).forEach { el ->
+
                 val epTitle = el.text().trim()
                 val epUrl = fixUrl(el.attr("href"))
 
@@ -99,7 +115,8 @@ class DDizi : MainAPI() {
             }
 
         } else {
-            // ===== EPISODE PAGE WITH PARTS =====
+            /* ---- EPISODE PAGE (PARTS AS EPISODES) ---- */
+
             val parts = document.select("div.parts a")
 
             if (parts.isNotEmpty()) {
@@ -113,17 +130,17 @@ class DDizi : MainAPI() {
 
                     episodes.add(
                         newEpisode(partUrl) {
-                            name = "$rawTitle - $index.Parça"
+                            name = "$pageTitle - $index.Parça"
                             true
                         }
                     )
-
                     index++
                 }
+
             } else {
                 episodes.add(
                     newEpisode(url) {
-                        name = rawTitle
+                        name = pageTitle
                         true
                     }
                 )
@@ -131,7 +148,7 @@ class DDizi : MainAPI() {
         }
 
         return newTvSeriesLoadResponse(
-            rawTitle,
+            pageTitle,
             url,
             TvType.TvSeries,
             episodes
@@ -140,9 +157,9 @@ class DDizi : MainAPI() {
         }
     }
 
-    // =============================
-    // LOAD LINKS
-    // =============================
+    /* =========================
+       LOAD LINKS
+       ========================= */
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -150,9 +167,15 @@ class DDizi : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        val document = app.get(data).document
+        val document = app.get(
+            data,
+            headers = mapOf(
+                "User-Agent" to USER_AGENT,
+                "Referer" to mainUrl
+            )
+        ).document
 
-        // YouTube
+        // YouTube iframe
         document.selectFirst("iframe")?.attr("src")
             ?.takeIf { it.contains("youtube", true) }
             ?.let { iframe ->
@@ -166,7 +189,7 @@ class DDizi : MainAPI() {
                     }
             }
 
-        // og:video
+        // og:video (JWPlayer / M3U8 / MP4)
         document.selectFirst("meta[property=og:video]")
             ?.attr("content")
             ?.let {
@@ -175,5 +198,10 @@ class DDizi : MainAPI() {
             }
 
         return false
+    }
+
+    companion object {
+        private const val USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/134.0.0.0 Safari/537.36"
     }
 }
