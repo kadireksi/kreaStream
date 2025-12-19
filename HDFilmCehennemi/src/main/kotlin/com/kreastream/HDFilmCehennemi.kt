@@ -654,7 +654,7 @@ class HDFilmCehennemi : MainAPI() {
             invokeLocalSource(sourceName, defaultSourceUrl, referer, callback) 
         }
 
-        val rapidrameId = document.selectFirst("iframe.rapidrame, iframe.close")
+        var rapidrameId = document.selectFirst("iframe.rapidrame, iframe.close")
             ?.attr("data-src")
             ?.let { src ->
                 when {
