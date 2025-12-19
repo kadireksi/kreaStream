@@ -216,6 +216,15 @@ class DDizi : MainAPI() {
                 ?: return false
 
         val isHls = fileUrl.contains(".m3u8")
+        val videoHeaders = if (fileUrl.contains("master.txt")) {
+            mapOf(
+                "accept" to "*/*",
+                "user-agent" to USER_AGENT,
+                "referer" to ogVideo
+            )
+        } else {
+            getHeaders(ogVideo)
+        }
 
         callback(
             newExtractorLink(
@@ -224,6 +233,7 @@ class DDizi : MainAPI() {
                 url = fileUrl
             ) {
                 this.referer = ogVideo
+                this.quality = Qualities.Unknown.value
                 this.headers = mapOf(
                     "User-Agent" to USER_AGENT,
                     "Referer" to ogVideo
@@ -234,7 +244,7 @@ class DDizi : MainAPI() {
         )
 
         if (isHls) {
-            M3u8Helper.generateM3u8(name, fileUrl, ogVideo).forEach(callback)
+            M3u8Helper.generateM3u8(name, fileUrl, ogVideo, headers = videoHeaders).forEach(callback)
         }
 
         return true
@@ -243,5 +253,10 @@ class DDizi : MainAPI() {
     companion object {
         private const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/134.0.0.0 Safari/537.36"
+        private fun getHeaders(referer: String): Map<String, String> = mapOf(
+            "accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "user-agent" to USER_AGENT,
+            "referer" to referer
+        )
     }
 }
