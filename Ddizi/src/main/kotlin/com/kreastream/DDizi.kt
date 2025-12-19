@@ -1,7 +1,9 @@
 package com.kreastream
 
+import android.util.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
@@ -38,8 +40,22 @@ class DDizi : MainAPI() {
             "Yerli Diziler" -> {
                 document.selectFirst("ul.list_")
                     ?.select("li > a")
-                    ?.mapNotNull { it.toSearchResult() }
-                    ?: emptyList()
+                    ?.mapNotNull { a ->
+                        val title = a.text().trim()
+                        val href = fixUrl(a.attr("href"))
+
+                        if (title.isBlank() || href.isBlank()) return@mapNotNull null
+
+                        // 🔴 IMPORTANT: fetch poster from SERIES PAGE
+                        val posterDoc = app.get(href).document
+                        val poster = posterDoc.selectFirst(
+                            "div.afis img, img.afis, img.img-back, img.img-back-cat"
+                        )?.let { fixUrlNull(it.attr("data-src") ?: it.attr("src")) }
+
+                        newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                            posterUrl = poster
+                        }
+                    } ?: emptyList()
             }
 
             else -> {
@@ -54,19 +70,12 @@ class DDizi : MainAPI() {
         return newHomePageResponse(request.name, items, hasNext)
     }
 
-    /* =========================
-       SEARCH RESULT PARSER
-       ========================= */
     private fun Element.toSearchResult(): SearchResponse? {
-        val a = if (tagName() == "a") this else selectFirst("a") ?: return null
-
+        val a = selectFirst("a") ?: return null
         val title = a.text().trim()
         val href = fixUrl(a.attr("href"))
-
-        val poster = a.selectFirst("img")
+        val poster = selectFirst("img")
             ?.let { fixUrlNull(it.attr("data-src") ?: it.attr("src")) }
-
-        if (title.isBlank() || href.isBlank()) return null
 
         return newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
             posterUrl = poster
@@ -107,47 +116,35 @@ class DDizi : MainAPI() {
             url.contains("/yabanci-dizi") ||
             url.contains("/eski.diziler")
 
-        /* ---- SERIES PAGE ---- */
         if (isSeriesPage) {
-
             document.select(
                 "div.bolumler a, div.sezonlar a, div.dizi-arsiv a, div.dizi-boxpost-cat a"
             ).forEach { el ->
-
-                val epTitle = el.text().trim()
-                val epUrl = fixUrl(el.attr("href"))
-
                 episodes.add(
-                    newEpisode(epUrl) {
-                        name = epTitle
+                    newEpisode(fixUrl(el.attr("href"))) {
+                        name = el.text().trim()
                         true
                     }
                 )
             }
-
         } else {
-            /* ---- EPISODE PAGE (PARTS AS EPISODES) ---- */
-
             val parts = document.select("div.parts a")
-
             if (parts.isNotEmpty()) {
-                var index = 1
-
-                parts.forEach { part ->
+                var i = 1
+                parts.forEach { p ->
                     val partUrl =
-                        part.attr("href").takeIf { it.isNotBlank() }
+                        p.attr("href").takeIf { it.isNotBlank() }
                             ?.let { fixUrl(it) }
                             ?: url
 
                     episodes.add(
                         newEpisode(partUrl) {
-                            name = "$pageTitle - $index.Parça"
+                            name = "$pageTitle - $i.Parça"
                             true
                         }
                     )
-                    index++
+                    i++
                 }
-
             } else {
                 episodes.add(
                     newEpisode(url) {
@@ -158,18 +155,13 @@ class DDizi : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse(
-            pageTitle,
-            url,
-            TvType.TvSeries,
-            episodes
-        ) {
+        return newTvSeriesLoadResponse(pageTitle, url, TvType.TvSeries, episodes) {
             posterUrl = poster
         }
     }
 
     /* =========================
-       LOAD LINKS
+       LOAD LINKS (ORIGINAL LOGIC)
        ========================= */
     override suspend fun loadLinks(
         data: String,
@@ -186,7 +178,7 @@ class DDizi : MainAPI() {
             )
         ).document
 
-        // YouTube iframe
+        // --- YOUTUBE ---
         document.selectFirst("iframe")?.attr("src")
             ?.takeIf { it.contains("youtube", true) }
             ?.let { iframe ->
@@ -200,15 +192,52 @@ class DDizi : MainAPI() {
                     }
             }
 
-        // og:video (JWPlayer / M3U8 / MP4)
-        document.selectFirst("meta[property=og:video]")
-            ?.attr("content")
-            ?.let {
-                loadExtractor(it, data, subtitleCallback, callback)
-                return true
-            }
+        // --- OG:VIDEO ---
+        val ogVideo =
+            document.selectFirst("meta[property=og:video]")?.attr("content")
+                ?: return false
 
-        return false
+        val playerDoc = app.get(
+            ogVideo,
+            headers = mapOf(
+                "User-Agent" to USER_AGENT,
+                "Referer" to data
+            )
+        ).document
+
+        val jwScript = playerDoc.select("script")
+            .firstOrNull { it.html().contains("jwplayer") && it.html().contains("sources") }
+            ?: return false
+
+        val sourceRegex =
+            Regex("""file:\s*["'](.*?)["']""")
+        val fileUrl =
+            sourceRegex.find(jwScript.html())?.groupValues?.get(1)
+                ?: return false
+
+        val isHls = fileUrl.contains(".m3u8")
+
+        callback(
+            newExtractorLink(
+                source = name,
+                name = name,
+                url = fileUrl
+            ) {
+                referer = ogVideo
+                headers = mapOf(
+                    "User-Agent" to USER_AGENT,
+                    "Referer" to ogVideo
+                )
+                this.type =
+                    if (isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+            }
+        )
+
+        if (isHls) {
+            M3u8Helper.generateM3u8(name, fileUrl, ogVideo).forEach(callback)
+        }
+
+        return true
     }
 
     companion object {
