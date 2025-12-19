@@ -137,7 +137,7 @@ class YabanciDizi : MainAPI() {
                 tags.add(it.text().trim())
             }
         }
-        val rating = document.selectFirst("div.color-imdb")?.text()?.trim()?.toRatingInt()
+        val score = document.selectFirst("div.color-imdb")?.text()?.trim()?.toFloatOrNull()
         val duration =
             document.selectXpath("//div[text()='Süre']//following-sibling::div").text().trim()
                 .split(" ").first().toIntOrNull()
@@ -173,7 +173,7 @@ class YabanciDizi : MainAPI() {
                 this.year = year
                 this.plot = description
                 this.tags = tags
-                this.rating = rating
+                this.score = Score.from10(score)
                 this.duration = duration
                 addActors(actors)
                 addTrailer("https://www.youtube.com/embed/${trailer}")
@@ -184,7 +184,7 @@ class YabanciDizi : MainAPI() {
                 this.year = year
                 this.plot = description
                 this.tags = tags
-                this.rating = rating
+                this.score = Score.from10(score)
                 this.duration = duration
                 addActors(actors)
                 addTrailer("https://www.youtube.com/embed/${trailer}")
