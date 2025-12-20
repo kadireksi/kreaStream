@@ -45,21 +45,9 @@ class YabanciDizi : MainAPI() {
     override var sequentialMainPageScrollDelay = 250L  // ? 0.05 saniye
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/dizi/tur/aile-izle" to "Aile",
-        "${mainUrl}/dizi/tur/aksiyon-izle-1" to "Aksiyon",
-        "${mainUrl}/dizi/tur/bilim-kurgu-izle-1" to "Bilim Kurgu",
-        "${mainUrl}/dizi/tur/belgesel" to "Belgesel",
-        "${mainUrl}/dizi/tur/dram-izle" to "Dram",
-        "${mainUrl}/dizi/tur/fantastik-izle" to "Fantastik",
-        "${mainUrl}/dizi/tur/gerilim-izle" to "Gerilim",
-        "${mainUrl}/dizi/tur/gizem-izle" to "Gizem",
-        "${mainUrl}/dizi/tur/komedi-izle" to "Komedi",
-        "${mainUrl}/dizi/tur/korku-izle" to "Korku",
-        "${mainUrl}/dizi/tur/macera-izle" to "Macera",
-        "${mainUrl}/dizi/tur/romantik-izle-1" to "Romantik",
-        "${mainUrl}/dizi/tur/suc" to "Suç",
-        "${mainUrl}/dizi/tur/kore-dizileri" to "Kore Dizileri",
-        "${mainUrl}/dizi/tur/stand-up" to "Stand Up",
+        "${mainUrl}/" to "Yeni Dizi Bölümleri",
+        "${mainUrl}/film-izle-hd" to "Filmler",
+        "${mainUrl}/dizi-izle" to "Tüm Diziler",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
