@@ -178,7 +178,7 @@
             "methods": [
                 {
                     "type": "regex",
-                    "pattern": "\"\\\"contentUrl\\\"\\\\s*:\\\\s*\\\"([^\\\"]+\\\\.mp4)\\\"\""
+                    "pattern": "contentUrl: \"(.*?)\"
                 },
                 {
                     "type": "direct_m3u8"
@@ -236,8 +236,8 @@
                     "type": "direct_m3u8"
                 },
                 {
-                    "type": "regex",
-                    "pattern": ".mp4"
+                 "type": "regex",
+                    "pattern": "contentUrl: \"(.*?)\"
                 }
             ]
         },
