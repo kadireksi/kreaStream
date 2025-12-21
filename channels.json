@@ -230,7 +230,7 @@
             "methods": [
                 {
                     "type": "iframe",
-                    "selector": "iframe[src*='https']"
+                    "selector": "source[src*='https']"
                 },
                 {
                     "type": "direct_m3u8"
