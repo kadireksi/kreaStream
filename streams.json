@@ -198,20 +198,10 @@
     "genres": "Spor"
   },
   {
-    "id": "trtspor2",
-    "title": "TRT Spor 2",
-    "group": "TV",
-    "url": "https://tv-trtspor2.medya.trt.com.tr/master.m3u8",
-    "poster": "",
-    "type": "tv",
-    "headers": {},
-    "genres": "Spor"
-  },
-  {
     "id": "trtsporyildiz",
     "title": "TRT Spor Yıldız",
     "group": "TV",
-    "url": "https://trt.daioncdn.net/trtspor-yildiz/master.m3u8",
+    "url": "https://tv-trtspor2.medya.trt.com.tr/master.m3u8",
     "poster": "https://www.trt.net.tr/_nuxt/img/trt-spor-yildiz-televizyon-kanali.588596f.png",
     "type": "tv",
     "headers": {},
@@ -230,10 +220,10 @@
     "genres": "Ulusal"
   },
   {
-    "id": "trt1alt",
-    "title": "TRT 1 (24 saat)",
+    "id": "trt1",
+    "title": "TRT 1",
     "group": "TV",
-    "url": "https://trt.daioncdn.net/trt-1/master.m3u8",
+    "url": "https://tv-trt1.medya.trt.com.tr/master.m3u8",
     "poster": "https://www.trt.net.tr/_nuxt/img/trt-1-televizyon-kanali.4c9c3dd.png",
     "type": "tv",
     "headers": {},
@@ -390,7 +380,7 @@
     "id": "metrofm",
     "title": "Metro FM",
     "group": "Radio",
-    "url": "https://25583.live.streamtheworld.com/METRO_FM128AAC.aac",
+    "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/METRO_FM128AAC.aac?/;stream.mp3",
     "poster": "https://mediacdns.karnaval.com/media/station_media/2/logos/meta_image.png",
     "type": "radio",
     "headers": {},
