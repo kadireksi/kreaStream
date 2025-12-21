@@ -259,7 +259,7 @@
             {
                 "title": "Güncel Diziler",
                 "path": "/dizi-izle",
-                "ishorizontal": false,
+                "ishorizontal": true,
                 "selectors": {
                     "container": "div.list > div.list-item",
                     "title": "div.program-name > strong@text",
@@ -270,7 +270,7 @@
             {
                 "title": "Arşiv Diziler",
                 "path": "/dizi-arsivi",
-                "ishorizontal": false,
+                "ishorizontal": true,
                 "selectors": {
                     "container": "div.list > div.list-item",
                     "title": "div.program-name > strong@text",
