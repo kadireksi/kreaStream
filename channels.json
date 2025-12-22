@@ -169,9 +169,9 @@
             "path_suffix": "/bolumler",
             "reverse_order": true,
             "selectors": {
-                "container": "#videoepisodecombobox option@value)",
-                "name": "option@value)",
-                "url": "option@value)"
+                "container": "#videoepisodecombobox > #episode-combobox",
+                "name": "option@text",
+                "url": "option@value"
             }
         },
         "video_extraction": {
