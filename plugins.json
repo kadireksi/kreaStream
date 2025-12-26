@@ -22,7 +22,7 @@
         "iconUrl": "https://www.shutterstock.com/image-vector/iptv-vector-line-icon-ip-260nw-1841427610.jpg",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 51192,
+        "fileSize": 52076,
         "status": 1,
         "authors": [
             "kreastream"
@@ -55,23 +55,5 @@
         "description": "T\u00fcrk Tv Dizi ve Canl\u0131 TV Radyo Yay\u0131nlar\u0131",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
         "name": "TurkTV"
-    },
-    {
-        "iconUrl": "https://raw.githubusercontent.com/doGior/doGiorsHadEnough/refs/heads/master/TV/television.png",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 27844,
-        "status": 1,
-        "authors": [
-            "kreastream"
-        ],
-        "tvTypes": [
-            "Live"
-        ],
-        "version": 251226,
-        "internalName": "TV",
-        "description": "Live streams from the Free TV github repository. Forked from the Free-TV plugin in the ItalianProvider repo",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TV.cs3",
-        "name": "TV"
     }
 ]
