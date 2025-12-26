@@ -61,15 +61,31 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                 val nameInput = credsView.findView<EditText>("name")
                 val linkInput = credsView.findView<EditText>("link")
                 
-                // Add checkbox for "show as section"
+                // Add checkboxes for new options
                 val sectionCheckbox = CheckBox(context).apply {
                     text = "Show as separate section on main page"
                     textSize = 14f
                     setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
                 }
                 
-                // Add checkbox to the layout
+                val activeCheckbox = CheckBox(context).apply {
+                    text = "Active (show on main page)"
+                    textSize = 14f
+                    isChecked = true // Default to active
+                    setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+                }
+                
+                val episodesCheckbox = CheckBox(context).apply {
+                    text = "Show channels as episodes"
+                    textSize = 14f
+                    isChecked = true // Default to episodes mode
+                    setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+                }
+                
+                // Add checkboxes to the layout
                 if (credsView is LinearLayout) {
+                    credsView.addView(activeCheckbox)
+                    credsView.addView(episodesCheckbox)
                     credsView.addView(sectionCheckbox)
                 }
 
@@ -89,6 +105,8 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                                 it.value.lowercase()
                             }
                             val showAsSection = sectionCheckbox.isChecked
+                            val isActive = activeCheckbox.isChecked
+                            val showAsEpisodes = episodesCheckbox.isChecked
                             
                             if (name.isNullOrEmpty() || !link.startsWith("http")) {
                                 showToast("Lütfen Tüm Bilgileri doldurun")
@@ -101,7 +119,7 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                                         val existingLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
                                         val nextOrder = (existingLinks.maxOfOrNull { it.order } ?: 0) + 1
                                         val updatedLinks = existingLinks.toMutableList().apply {
-                                            add(Link(name, link, nextOrder, showAsSection))
+                                            add(Link(name, link, nextOrder, showAsSection, isActive, showAsEpisodes))
                                         }
                                         setKey("iptv_links", updatedLinks.toTypedArray())
                                         showToast("Bağlantı başarıyla kaydedildi")
@@ -202,8 +220,15 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
     ) {
         links.forEachIndexed { index, link ->
             val linkItemView = getLayout("list_link", inflater, viewContainer)
-            val sectionIndicator = if (link.showAsSection) " [Section]" else ""
-            linkItemView.findView<TextView>("name").text = "${index + 1}. ${link.name}$sectionIndicator"
+            
+            // Build status indicators
+            val statusIndicators = mutableListOf<String>()
+            if (!link.isActive) statusIndicators.add("Inactive")
+            if (link.showAsSection) statusIndicators.add("Section")
+            if (!link.showAsEpisodes) statusIndicators.add("Live")
+            
+            val statusText = if (statusIndicators.isNotEmpty()) " [${statusIndicators.joinToString(", ")}]" else ""
+            linkItemView.findView<TextView>("name").text = "${index + 1}. ${link.name}$statusText"
             linkItemView.findView<TextView>("link").text = link.link
             
             val deleteButton = linkItemView.findView<ImageView>("delete_button")
@@ -230,6 +255,48 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             }
+            
+            // Active/Inactive toggle button
+            val activeButton = Button(context).apply {
+                text = if (link.isActive) "A" else "I"
+                textSize = 10f
+                setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
+                layoutParams = LinearLayout.LayoutParams(
+                    dpToPx(30),
+                    dpToPx(30)
+                ).apply {
+                    rightMargin = dpToPx(4)
+                }
+                setOnClickListener {
+                    toggleActive(link)
+                    // Refresh the display
+                    container.removeAllViews()
+                    val newSavedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+                    displayLinks(newSavedLinks.sortedBy { it.order }, container, inflater, viewContainer)
+                }
+            }
+            controlsContainer.addView(activeButton)
+            
+            // Episodes/Live toggle button
+            val episodesButton = Button(context).apply {
+                text = if (link.showAsEpisodes) "E" else "L"
+                textSize = 10f
+                setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
+                layoutParams = LinearLayout.LayoutParams(
+                    dpToPx(30),
+                    dpToPx(30)
+                ).apply {
+                    rightMargin = dpToPx(4)
+                }
+                setOnClickListener {
+                    toggleEpisodes(link)
+                    // Refresh the display
+                    container.removeAllViews()
+                    val newSavedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+                    displayLinks(newSavedLinks.sortedBy { it.order }, container, inflater, viewContainer)
+                }
+            }
+            controlsContainer.addView(episodesButton)
             
             // Section toggle button
             val sectionButton = Button(context).apply {
@@ -321,6 +388,44 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
         } catch (e: Exception) {
             e.printStackTrace()
             showToast("Hata: Section ayarı değiştirilemedi")
+        }
+    }
+    
+    private fun toggleActive(link: Link) {
+        try {
+            val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+            val updatedLinks = savedLinks.map { savedLink ->
+                if (savedLink.name == link.name) {
+                    savedLink.copy(isActive = !savedLink.isActive)
+                } else {
+                    savedLink
+                }
+            }.toTypedArray()
+            
+            setKey("iptv_links", updatedLinks)
+            plugin.reload()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            showToast("Hata: Active ayarı değiştirilemedi")
+        }
+    }
+    
+    private fun toggleEpisodes(link: Link) {
+        try {
+            val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+            val updatedLinks = savedLinks.map { savedLink ->
+                if (savedLink.name == link.name) {
+                    savedLink.copy(showAsEpisodes = !savedLink.showAsEpisodes)
+                } else {
+                    savedLink
+                }
+            }.toTypedArray()
+            
+            setKey("iptv_links", updatedLinks)
+            plugin.reload()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            showToast("Hata: Episodes ayarı değiştirilemedi")
         }
     }
 }

@@ -20,16 +20,16 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
     private val headers = mapOf("User-Agent" to "Player (Linux; Android 14)")
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val savedLinks = getKey<Array<Link>>("iptv_links")?.sortedBy { it.order } ?: emptyList()
+        val savedLinks = getKey<Array<Link>>("iptv_links")?.sortedBy { it.order }?.filter { it.isActive } ?: emptyList()
         
         if (savedLinks.isEmpty()) {
             return newHomePageResponse(
                 listOf(
                     HomePageList(
-                        "No IPTV Links", 
+                        "No Active IPTV Links", 
                         listOf(
                             newTvSeriesSearchResponse(
-                                name = "Add IPTV links in settings",
+                                name = "Add IPTV links in settings or activate existing ones",
                                 url = "empty",
                                 type = TvType.TvSeries
                             )
@@ -42,7 +42,8 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
         }
 
         val homePageSections = mutableListOf<HomePageList>()
-        val generalSeriesList = mutableListOf<TvSeriesSearchResponse>()
+        val generalSeriesList = mutableListOf<SearchResponse>()
+        val generalLiveList = mutableListOf<SearchResponse>()
         
         savedLinks.forEach { link ->
             try {
@@ -52,23 +53,64 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 val playlist = IptvPlaylistParser().parseM3U(playlistContent)
                 allPlaylists[link.name] = playlist
                 
-                // Create a series for this IPTV link
-                val seriesResponse = newTvSeriesSearchResponse(
-                    name = link.name,
-                    url = "series:${link.name}",
-                    type = TvType.TvSeries
-                ) {
-                    this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
-                }
-                
-                if (link.showAsSection) {
-                    // Add as separate section
-                    homePageSections.add(
-                        HomePageList(link.name, listOf(seriesResponse), isHorizontalImages = true)
-                    )
+                if (link.showAsEpisodes) {
+                    // Create a series for this IPTV link
+                    val seriesResponse = newTvSeriesSearchResponse(
+                        name = link.name,
+                        url = "series:${link.name}",
+                        type = TvType.TvSeries
+                    ) {
+                        this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
+                    }
+                    
+                    if (link.showAsSection) {
+                        // Add as separate section
+                        homePageSections.add(
+                            HomePageList(link.name, listOf(seriesResponse), isHorizontalImages = true)
+                        )
+                    } else {
+                        // Add to general IPTV series list
+                        generalSeriesList.add(seriesResponse)
+                    }
                 } else {
-                    // Add to general IPTV series list
-                    generalSeriesList.add(seriesResponse)
+                    // Handle as normal live streams grouped by categories
+                    val liveChannels = playlist.items.groupBy { it.attributes["group-title"] }.map { group ->
+                        val title = group.key ?: "Unknown"
+                        val channels = group.value.map { item ->
+                            val streamurl = item.url.toString()
+                            val channelname = item.title.toString()
+                            val posterurl = item.attributes["tvg-logo"].toString()
+                            val chGroup = item.attributes["group-title"].toString()
+                            val key = item.attributes["key"].toString()
+                            val keyid = item.attributes["keyid"].toString()
+
+                            newLiveSearchResponse(
+                                name = channelname,
+                                url = LoadData(
+                                    streamurl,
+                                    channelname,
+                                    posterurl,
+                                    chGroup,
+                                    key,
+                                    keyid
+                                ).toJson(),
+                                type = TvType.Live
+                            ) { this.posterUrl = posterurl }
+                        }
+                        
+                        if (link.showAsSection) {
+                            // Add each group as separate section
+                            HomePageList("${link.name} - $title", channels, isHorizontalImages = true)
+                        } else {
+                            // Add to general live list
+                            generalLiveList.addAll(channels)
+                            null
+                        }
+                    }.filterNotNull()
+                    
+                    if (link.showAsSection) {
+                        homePageSections.addAll(liveChannels)
+                    }
                 }
                 
             } catch (e: Exception) {
@@ -87,15 +129,18 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                         HomePageList("${link.name} (Error)", listOf(errorResponse), isHorizontalImages = true)
                     )
                 } else {
-                    // Add to general IPTV series list
+                    // Add to general series list
                     generalSeriesList.add(errorResponse)
                 }
             }
         }
 
-        // Add general IPTV series section if there are any
+        // Add general sections if there are any items
         if (generalSeriesList.isNotEmpty()) {
             homePageSections.add(0, HomePageList("IPTV Series", generalSeriesList, isHorizontalImages = true))
+        }
+        if (generalLiveList.isNotEmpty()) {
+            homePageSections.add(HomePageList("IPTV Live Channels", generalLiveList, isHorizontalImages = true))
         }
 
         return newHomePageResponse(homePageSections, hasNext = false)
@@ -175,41 +220,78 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 }
 
                 val playlist = allPlaylists[linkName]!!
-                val episodes = playlist.items.mapIndexed { index, item ->
-                    val streamurl = item.url.toString()
-                    val channelname = item.title.toString()
-                    val posterurl = item.attributes["tvg-logo"].toString()
-                    val chGroup = item.attributes["group-title"].toString()
-                    val key = item.attributes["key"].toString()
-                    val keyid = item.attributes["keyid"].toString()
+                
+                if (link.showAsEpisodes) {
+                    // Handle as episodes
+                    val episodes = playlist.items.mapIndexed { index, item ->
+                        val streamurl = item.url.toString()
+                        val channelname = item.title.toString()
+                        val posterurl = item.attributes["tvg-logo"].toString()
+                        val chGroup = item.attributes["group-title"].toString()
+                        val key = item.attributes["key"].toString()
+                        val keyid = item.attributes["keyid"].toString()
 
-                    newEpisode(
-                        data = LoadData(
-                            streamurl,
-                            channelname,
-                            posterurl,
-                            chGroup,
-                            key,
-                            keyid
-                        ).toJson()
+                        newEpisode(
+                            data = LoadData(
+                                streamurl,
+                                channelname,
+                                posterurl,
+                                chGroup,
+                                key,
+                                keyid
+                            ).toJson()
+                        ) {
+                            this.name = channelname
+                            this.season = 1
+                            this.episode = index + 1
+                            this.posterUrl = posterurl
+                            this.description = "Group: $chGroup"
+                        }
+                    }
+
+                    println("IPTV Debug - Created ${episodes.size} episodes")
+                    return newTvSeriesLoadResponse(
+                        name = linkName,
+                        url = url,
+                        type = TvType.TvSeries,
+                        episodes = episodes
                     ) {
-                        this.name = channelname
+                        this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
+                        this.plot = "IPTV channels from $linkName (${playlist.items.size} channels) - Episodes Mode"
+                    }
+                } else {
+                    // Handle as normal live streams - create a single episode that redirects to live mode
+                    val episode = newEpisode(
+                        data = "live:$linkName"
+                    ) {
+                        this.name = "Watch Live Channels"
                         this.season = 1
-                        this.episode = index + 1
-                        this.posterUrl = posterurl
-                        this.description = "Group: $chGroup"
+                        this.episode = 1
+                        this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
+                        this.description = "Access live channels from $linkName"
+                    }
+
+                    return newTvSeriesLoadResponse(
+                        name = linkName,
+                        url = url,
+                        type = TvType.TvSeries,
+                        episodes = listOf(episode)
+                    ) {
+                        this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
+                        this.plot = "IPTV channels from $linkName (${playlist.items.size} channels) - Live Mode"
                     }
                 }
-
-                println("IPTV Debug - Created ${episodes.size} episodes")
+            }
+            
+            cleanUrl.startsWith("live:") -> {
+                val linkName = cleanUrl.removePrefix("live:")
                 return newTvSeriesLoadResponse(
-                    name = linkName,
+                    name = "$linkName Live Channels",
                     url = url,
                     type = TvType.TvSeries,
-                    episodes = episodes
+                    episodes = emptyList()
                 ) {
-                    this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
-                    this.plot = "IPTV channels from $linkName (${playlist.items.size} channels)"
+                    this.plot = "This link is configured for live channel browsing. Check the main page for live channels."
                 }
             }
             
@@ -284,6 +366,11 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        if (data.startsWith("live:")) {
+            // This shouldn't be called for live mode, but handle gracefully
+            return false
+        }
+        
         val loadData = parseJson<LoadData>(data)
         
         if (loadData.url.contains(".mpd")) {

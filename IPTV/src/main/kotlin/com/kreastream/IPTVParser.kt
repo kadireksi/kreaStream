@@ -6,7 +6,9 @@ data class Link(
     val name: String, 
     val link: String,
     val order: Int = 0,
-    val showAsSection: Boolean = false
+    val showAsSection: Boolean = false,
+    val isActive: Boolean = true,
+    val showAsEpisodes: Boolean = true
 )
 
 data class Playlist(
