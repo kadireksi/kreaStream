@@ -19,6 +19,24 @@
         "name": "Ddizi"
     },
     {
+        "iconUrl": "https://www.shutterstock.com/image-vector/iptv-vector-line-icon-ip-260nw-1841427610.jpg",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
+        "fileSize": 39207,
+        "status": 1,
+        "authors": [
+            "kreastream"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 251226,
+        "internalName": "IPTV",
+        "description": "General IPTV player. Add a list in the settings and you'll see it in the plugins list in the home",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/IPTV.cs3",
+        "name": "IPTV"
+    },
+    {
         "iconUrl": "https://m.media-amazon.com/images/I/41fJO1NxFxL.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
