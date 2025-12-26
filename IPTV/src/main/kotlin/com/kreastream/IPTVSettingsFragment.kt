@@ -60,6 +60,18 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                 val credsView = getLayout("add_link", inflater, container)
                 val nameInput = credsView.findView<EditText>("name")
                 val linkInput = credsView.findView<EditText>("link")
+                
+                // Add checkbox for "show as section"
+                val sectionCheckbox = CheckBox(context).apply {
+                    text = "Show as separate section on main page"
+                    textSize = 14f
+                    setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+                }
+                
+                // Add checkbox to the layout
+                if (credsView is LinearLayout) {
+                    credsView.addView(sectionCheckbox)
+                }
 
                 val clipboardManager = context?.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                 val clipboardText = clipboardManager?.primaryClip?.getItemAt(0)?.text
@@ -68,14 +80,16 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                 }
 
                 AlertDialog.Builder(context ?: throw Exception("Unable to build alert dialog"))
-                    .setTitle("Add link")
+                    .setTitle("Bağlantı Ekle")
                     .setView(credsView)
-                    .setPositiveButton("Save", object : DialogInterface.OnClickListener {
+                    .setPositiveButton("Kaydet", object : DialogInterface.OnClickListener {
                         override fun onClick(p0: DialogInterface, p1: Int) {
                             var name = nameInput.text.trim().toString()
                             var link = linkInput.text.trim().toString().replace(Regex("^(HTTPS|HTTP)", RegexOption.IGNORE_CASE)) {
                                 it.value.lowercase()
                             }
+                            val showAsSection = sectionCheckbox.isChecked
+                            
                             if (name.isNullOrEmpty() || !link.startsWith("http")) {
                                 showToast("Lütfen Tüm Bilgileri doldurun")
                             } else {
@@ -87,7 +101,7 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                                         val existingLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
                                         val nextOrder = (existingLinks.maxOfOrNull { it.order } ?: 0) + 1
                                         val updatedLinks = existingLinks.toMutableList().apply {
-                                            add(Link(name, link, nextOrder))
+                                            add(Link(name, link, nextOrder, showAsSection))
                                         }
                                         setKey("iptv_links", updatedLinks.toTypedArray())
                                         showToast("Bağlantı başarıyla kaydedildi")
@@ -134,7 +148,7 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                 }
 
                 AlertDialog.Builder(context ?: throw Exception("Unable to build alert dialog"))
-                    .setTitle("List link IPTV")
+                    .setTitle("KreaTV bağlantı Listesi")
                     .setView(credsView)
                     .show()
             }
@@ -188,7 +202,8 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
     ) {
         links.forEachIndexed { index, link ->
             val linkItemView = getLayout("list_link", inflater, viewContainer)
-            linkItemView.findView<TextView>("name").text = "${index + 1}. ${link.name}"
+            val sectionIndicator = if (link.showAsSection) " [Section]" else ""
+            linkItemView.findView<TextView>("name").text = "${index + 1}. ${link.name}$sectionIndicator"
             linkItemView.findView<TextView>("link").text = link.link
             
             val deleteButton = linkItemView.findView<ImageView>("delete_button")
@@ -207,14 +222,35 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                 }
             }
             
-            // Add ordering controls
-            val orderContainer = LinearLayout(context).apply {
+            // Add controls container
+            val controlsContainer = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             }
+            
+            // Section toggle button
+            val sectionButton = Button(context).apply {
+                text = if (link.showAsSection) "S" else "G"
+                textSize = 10f
+                setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
+                layoutParams = LinearLayout.LayoutParams(
+                    dpToPx(30),
+                    dpToPx(30)
+                ).apply {
+                    rightMargin = dpToPx(4)
+                }
+                setOnClickListener {
+                    toggleSection(link)
+                    // Refresh the display
+                    container.removeAllViews()
+                    val newSavedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+                    displayLinks(newSavedLinks.sortedBy { it.order }, container, inflater, viewContainer)
+                }
+            }
+            controlsContainer.addView(sectionButton)
             
             // Up button
             if (index > 0) {
@@ -236,7 +272,7 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                         displayLinks(newSavedLinks.sortedBy { it.order }, container, inflater, viewContainer)
                     }
                 }
-                orderContainer.addView(upButton)
+                controlsContainer.addView(upButton)
             }
             
             // Down button
@@ -257,15 +293,34 @@ class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFr
                         displayLinks(newSavedLinks.sortedBy { it.order }, container, inflater, viewContainer)
                     }
                 }
-                orderContainer.addView(downButton)
+                controlsContainer.addView(downButton)
             }
             
-            // Add order controls to the link item
+            // Add controls to the link item
             if (linkItemView is LinearLayout) {
-                linkItemView.addView(orderContainer)
+                linkItemView.addView(controlsContainer)
             }
             
             container.addView(linkItemView)
+        }
+    }
+    
+    private fun toggleSection(link: Link) {
+        try {
+            val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+            val updatedLinks = savedLinks.map { savedLink ->
+                if (savedLink.name == link.name) {
+                    savedLink.copy(showAsSection = !savedLink.showAsSection)
+                } else {
+                    savedLink
+                }
+            }.toTypedArray()
+            
+            setKey("iptv_links", updatedLinks)
+            plugin.reload()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            showToast("Hata: Section ayarı değiştirilemedi")
         }
     }
 }

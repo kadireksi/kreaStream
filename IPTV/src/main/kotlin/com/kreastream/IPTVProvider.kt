@@ -41,11 +41,13 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
             )
         }
 
-        val seriesList = mutableListOf<TvSeriesSearchResponse>()
+        val homePageSections = mutableListOf<HomePageList>()
+        val generalSeriesList = mutableListOf<TvSeriesSearchResponse>()
         
         savedLinks.forEach { link ->
             try {
                 // Try to fetch and parse the playlist
+                println("IPTV Debug - Fetching playlist from: ${link.link}")
                 val playlistContent = app.get(link.link, headers = headers, timeout = 30).text
                 val playlist = IptvPlaylistParser().parseM3U(playlistContent)
                 allPlaylists[link.name] = playlist
@@ -58,7 +60,16 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 ) {
                     this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
                 }
-                seriesList.add(seriesResponse)
+                
+                if (link.showAsSection) {
+                    // Add as separate section
+                    homePageSections.add(
+                        HomePageList(link.name, listOf(seriesResponse), isHorizontalImages = true)
+                    )
+                } else {
+                    // Add to general IPTV series list
+                    generalSeriesList.add(seriesResponse)
+                }
                 
             } catch (e: Exception) {
                 // If failed to load, still add an entry but mark as error
@@ -69,16 +80,25 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 ) {
                     this.posterUrl = null
                 }
-                seriesList.add(errorResponse)
+                
+                if (link.showAsSection) {
+                    // Add as separate section even if error
+                    homePageSections.add(
+                        HomePageList("${link.name} (Error)", listOf(errorResponse), isHorizontalImages = true)
+                    )
+                } else {
+                    // Add to general IPTV series list
+                    generalSeriesList.add(errorResponse)
+                }
             }
         }
 
-        return newHomePageResponse(
-            listOf(
-                HomePageList("IPTV Series", seriesList, isHorizontalImages = true)
-            ),
-            hasNext = false
-        )
+        // Add general IPTV series section if there are any
+        if (generalSeriesList.isNotEmpty()) {
+            homePageSections.add(0, HomePageList("IPTV Series", generalSeriesList, isHorizontalImages = true))
+        }
+
+        return newHomePageResponse(homePageSections, hasNext = false)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
