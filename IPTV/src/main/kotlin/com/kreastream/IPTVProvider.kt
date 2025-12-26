@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
+import com.lagradost.cloudstream3.AcraApplication.Companion.getKey
 import okhttp3.Interceptor
 
 class IPTVProvider(override var mainUrl: String, override var name: String) : MainAPI() {
@@ -12,107 +13,108 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
     override val hasQuickSearch = true
     override val hasDownloadSupport = false
     override val supportedTypes = setOf(
-        TvType.Live,
         TvType.TvSeries
     )
 
-    private val items = mutableMapOf<String, Playlist?>()
+    private val allPlaylists = mutableMapOf<String, Playlist?>()
     private val headers = mapOf("User-Agent" to "Player (Linux; Android 14)")
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        items[name] = IptvPlaylistParser().parseM3U(app.get(mainUrl, headers = headers).text)
+        val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+        
+        if (savedLinks.isEmpty()) {
+            return newHomePageResponse(
+                listOf(
+                    HomePageList(
+                        "No IPTV Links", 
+                        listOf(
+                            newTvSeriesSearchResponse(
+                                name = "Add IPTV links in settings",
+                                url = "empty",
+                                type = TvType.TvSeries
+                            )
+                        ), 
+                        isHorizontalImages = true
+                    )
+                ),
+                hasNext = false
+            )
+        }
 
-        // Create a series entry for this IPTV provider
-        val seriesResponse = newTvSeriesSearchResponse(
-            name = "$name Episodes",
-            url = "series:$name",
-            type = TvType.TvSeries
-        ) {
-            this.posterUrl = items[name]!!.items.firstOrNull()?.attributes?.get("tvg-logo")
+        val seriesList = mutableListOf<TvSeriesSearchResponse>()
+        
+        savedLinks.forEach { link ->
+            try {
+                // Try to fetch and parse the playlist
+                val playlistContent = app.get(link.link, headers = headers, timeout = 30).text
+                val playlist = IptvPlaylistParser().parseM3U(playlistContent)
+                allPlaylists[link.name] = playlist
+                
+                // Create a series for this IPTV link
+                val seriesResponse = newTvSeriesSearchResponse(
+                    name = link.name,
+                    url = "series:${link.name}",
+                    type = TvType.TvSeries
+                ) {
+                    this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
+                }
+                seriesList.add(seriesResponse)
+                
+            } catch (e: Exception) {
+                // If failed to load, still add an entry but mark as error
+                val errorResponse = newTvSeriesSearchResponse(
+                    name = "${link.name} (Error)",
+                    url = "error:${link.name}",
+                    type = TvType.TvSeries
+                ) {
+                    this.posterUrl = null
+                }
+                seriesList.add(errorResponse)
+            }
         }
 
         return newHomePageResponse(
             listOf(
-                // Add the series as the first item
-                HomePageList("Series", listOf(seriesResponse), isHorizontalImages = true),
-                // Keep the original live channels grouped by category
-                *items[name]!!.items.groupBy { it.attributes["group-title"] }.map { group ->
-                    val title = group.key ?: ""
-                    val show = group.value.map { item ->
-                        val streamurl = item.url.toString()
-                        val channelname = item.title.toString()
-                        val posterurl = item.attributes["tvg-logo"].toString()
-                        val chGroup = item.attributes["group-title"].toString()
-                        val key = item.attributes["key"].toString()
-                        val keyid = item.attributes["keyid"].toString()
-
-                        newLiveSearchResponse(
-                            name = channelname,
-                            url = LoadData(
-                                streamurl,
-                                channelname,
-                                posterurl,
-                                chGroup,
-                                key,
-                                keyid
-                            ).toJson(),
-                            type = TvType.Live
-                        ) { this.posterUrl = posterurl }
-                    }
-
-                    HomePageList(title, show, isHorizontalImages = true)
-                }.toTypedArray()
+                HomePageList("IPTV Series", seriesList, isHorizontalImages = true)
             ),
             hasNext = false
         )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        if (items[name] == null) {
-            items[name] = IptvPlaylistParser().parseM3U(app.get(mainUrl, headers = headers).text)
-        }
-
+        val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
         val results = mutableListOf<SearchResponse>()
         
-        // Add series if query matches
-        if (name.lowercase().contains(query.lowercase())) {
-            results.add(
-                newTvSeriesSearchResponse(
-                    name = "$name Episodes",
-                    url = "series:$name",
-                    type = TvType.TvSeries
-                ) {
-                    this.posterUrl = items[name]!!.items.firstOrNull()?.attributes?.get("tvg-logo")
-                }
-            )
+        savedLinks.forEach { link ->
+            if (link.name.lowercase().contains(query.lowercase())) {
+                results.add(
+                    newTvSeriesSearchResponse(
+                        name = link.name,
+                        url = "series:${link.name}",
+                        type = TvType.TvSeries
+                    ) {
+                        this.posterUrl = allPlaylists[link.name]?.items?.firstOrNull()?.attributes?.get("tvg-logo")
+                    }
+                )
+            }
         }
 
-        // Add individual channels
-        results.addAll(
-            items[name]!!.items.filter {
-                it.title.toString().lowercase().contains(query.lowercase())
-            }.map { item ->
-                val streamurl = item.url.toString()
-                val channelname = item.title.toString()
-                val posterurl = item.attributes["tvg-logo"].toString()
-                val chGroup = item.attributes["group-title"].toString()
-                val key = item.attributes["key"].toString()
-                val keyid = item.attributes["keyid"].toString()
-
-                newLiveSearchResponse(
-                    name = channelname,
-                    url = LoadData(
-                        streamurl,
-                        channelname,
-                        posterurl,
-                        chGroup,
-                        key,
-                        keyid
-                    ).toJson(),
-                    type = TvType.Live
-                ) { this.posterUrl = posterurl }
+        // Also search within channel names
+        allPlaylists.forEach { (linkName, playlist) ->
+            playlist?.items?.filter { 
+                it.title.toString().lowercase().contains(query.lowercase()) 
+            }?.forEach { item ->
+                results.add(
+                    newTvSeriesSearchResponse(
+                        name = "${item.title} (${linkName})",
+                        url = "channel:${linkName}:${item.title}",
+                        type = TvType.TvSeries
+                    ) {
+                        this.posterUrl = item.attributes["tvg-logo"]
+                    }
+                )
             }
-        )
+        }
 
         return results
     }
@@ -120,89 +122,127 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse {
-        if (items[name] == null) {
-            items[name] = IptvPlaylistParser().parseM3U(app.get(mainUrl, headers = headers).text)
-        }
-
-        // Handle series URL
-        if (url.startsWith("series:")) {
-            val seriesName = url.removePrefix("series:")
-            val episodes = items[name]!!.items.mapIndexed { index, item ->
-                val streamurl = item.url.toString()
-                val channelname = item.title.toString()
-                val posterurl = item.attributes["tvg-logo"].toString()
-                val chGroup = item.attributes["group-title"].toString()
-                val key = item.attributes["key"].toString()
-                val keyid = item.attributes["keyid"].toString()
-
-                newEpisode(
-                    data = LoadData(
-                        streamurl,
-                        channelname,
-                        posterurl,
-                        chGroup,
-                        key,
-                        keyid
-                    ).toJson()
-                ) {
-                    this.name = channelname
-                    this.season = 1
-                    this.episode = index + 1
-                    this.posterUrl = posterurl
-                    this.description = "Group: $chGroup"
+        when {
+            url.startsWith("series:") -> {
+                val linkName = url.removePrefix("series:")
+                val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+                val link = savedLinks.find { it.name == linkName }
+                
+                if (link == null) {
+                    throw Exception("IPTV link not found: $linkName")
                 }
-            }
 
-            return newTvSeriesLoadResponse(
-                name = "$seriesName Episodes",
-                url = url,
-                type = TvType.TvSeries,
-                episodes = episodes
-            ) {
-                this.posterUrl = items[name]!!.items.firstOrNull()?.attributes?.get("tvg-logo")
-                this.plot = "All channels from $seriesName as episodes"
-            }
-        }
+                // Load playlist if not already loaded
+                if (allPlaylists[linkName] == null) {
+                    try {
+                        val playlistContent = app.get(link.link, headers = headers, timeout = 30).text
+                        allPlaylists[linkName] = IptvPlaylistParser().parseM3U(playlistContent)
+                    } catch (e: Exception) {
+                        throw Exception("Failed to load IPTV playlist: ${e.message}")
+                    }
+                }
 
-        // Handle individual channel URL (existing logic)
-        val loadData = parseJson<LoadData>(url)
-        val recommendations = mutableListOf<LiveSearchResponse>()
-        for (item in items[name]!!.items) {
-            if (recommendations.size >= 24) break
-            if (item.attributes["group-title"].toString() == loadData.group) {
-                val rcStreamUrl = item.url.toString()
-                val rcChannelName = item.title.toString()
-                if (rcChannelName == loadData.title) continue
+                val playlist = allPlaylists[linkName]!!
+                val episodes = playlist.items.mapIndexed { index, item ->
+                    val streamurl = item.url.toString()
+                    val channelname = item.title.toString()
+                    val posterurl = item.attributes["tvg-logo"].toString()
+                    val chGroup = item.attributes["group-title"].toString()
+                    val key = item.attributes["key"].toString()
+                    val keyid = item.attributes["keyid"].toString()
 
-                val rcPosterUrl = item.attributes["tvg-logo"].toString()
-                val rcChGroup = item.attributes["group-title"].toString()
-                val key = item.attributes["key"].toString()
-                val keyid = item.attributes["keyid"].toString()
-
-                recommendations.add(
-                    newLiveSearchResponse(
-                        name = rcChannelName,
-                        url = LoadData(
-                            rcStreamUrl,
-                            rcChannelName,
-                            rcPosterUrl,
-                            rcChGroup,
+                    newEpisode(
+                        data = LoadData(
+                            streamurl,
+                            channelname,
+                            posterurl,
+                            chGroup,
                             key,
                             keyid
-                        ).toJson(),
-                        type = TvType.Live
-                    ) { this.posterUrl = rcPosterUrl }
-                )
+                        ).toJson()
+                    ) {
+                        this.name = channelname
+                        this.season = 1
+                        this.episode = index + 1
+                        this.posterUrl = posterurl
+                        this.description = "Group: $chGroup"
+                    }
+                }
+
+                return newTvSeriesLoadResponse(
+                    name = linkName,
+                    url = url,
+                    type = TvType.TvSeries,
+                    episodes = episodes
+                ) {
+                    this.posterUrl = playlist.items.firstOrNull()?.attributes?.get("tvg-logo")
+                    this.plot = "IPTV channels from $linkName (${playlist.items.size} channels)"
+                }
+            }
+            
+            url.startsWith("error:") -> {
+                val linkName = url.removePrefix("error:")
+                return newTvSeriesLoadResponse(
+                    name = "$linkName (Error)",
+                    url = url,
+                    type = TvType.TvSeries,
+                    episodes = emptyList()
+                ) {
+                    this.plot = "Failed to load IPTV playlist. Check the link or try again later."
+                }
+            }
+            
+            url.startsWith("channel:") -> {
+                val parts = url.removePrefix("channel:").split(":", limit = 2)
+                val linkName = parts[0]
+                val channelName = parts[1]
+                
+                val playlist = allPlaylists[linkName]
+                val channel = playlist?.items?.find { it.title == channelName }
+                
+                if (channel != null) {
+                    val episode = newEpisode(
+                        data = LoadData(
+                            channel.url.toString(),
+                            channel.title.toString(),
+                            channel.attributes["tvg-logo"].toString(),
+                            channel.attributes["group-title"].toString(),
+                            channel.attributes["key"].toString(),
+                            channel.attributes["keyid"].toString()
+                        ).toJson()
+                    ) {
+                        this.name = channel.title.toString()
+                        this.season = 1
+                        this.episode = 1
+                        this.posterUrl = channel.attributes["tvg-logo"]
+                        this.description = "Group: ${channel.attributes["group-title"]}"
+                    }
+                    
+                    return newTvSeriesLoadResponse(
+                        name = channelName,
+                        url = url,
+                        type = TvType.TvSeries,
+                        episodes = listOf(episode)
+                    ) {
+                        this.posterUrl = channel.attributes["tvg-logo"]
+                        this.plot = "Single channel from $linkName"
+                    }
+                }
+            }
+            
+            url == "empty" -> {
+                return newTvSeriesLoadResponse(
+                    name = "No IPTV Links",
+                    url = url,
+                    type = TvType.TvSeries,
+                    episodes = emptyList()
+                ) {
+                    this.plot = "Add IPTV links in the plugin settings to see content."
+                }
             }
         }
 
-        return newLiveStreamLoadResponse(
-            name = loadData.title,
-            url = url, dataUrl = url,
-        ) {
-            posterUrl = loadData.poster
-            this.recommendations = recommendations
-        }
+        throw Exception("Invalid URL format")
     }
 
     override suspend fun loadLinks(
@@ -212,7 +252,7 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val loadData = parseJson<LoadData>(data)
-        val item = items[name]!!.items.first { it.url == loadData.url }
+        
         if (loadData.url.contains(".mpd")) {
             callback.invoke(
                 newDrmExtractorLink(
@@ -224,28 +264,15 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                     this.kid = loadData.keyid.toString().trim()
                     this.key = loadData.key.toString().trim()
                 }
-                /* DrmExtractorLink(
-                     name = this.name,
-                     source = loadData.title,
-                     url = loadData.url,
-                     referer = "",
-                     quality = Qualities.Unknown.value,
-                     type = INFER_TYPE,
-                     kid = loadData.keyid.toString().trim(),
-                     key = loadData.key.toString().trim(),
-                 )*/
             )
         } else {
             callback.invoke(
-
                 newExtractorLink(
                     name = this.name,
                     source = loadData.title,
                     url = loadData.url,
                     type = ExtractorLinkType.M3U8
                 ) {
-                    this.headers = item.headers
-                    this.referer = item.headers["referrer"] ?: ""
                     this.quality = Qualities.Unknown.value
                 }
             )
@@ -258,7 +285,6 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
         return object : Interceptor {
             override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
                 val request = chain.request()
-
                 return chain.proceed(request)
             }
         }
