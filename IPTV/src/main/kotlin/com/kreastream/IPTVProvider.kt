@@ -13,7 +13,8 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
     override val hasQuickSearch = true
     override val hasDownloadSupport = false
     override val supportedTypes = setOf(
-        TvType.TvSeries
+        TvType.TvSeries,
+        TvType.Live
     )
 
     private val allPlaylists = mutableMapOf<String, Playlist?>()
@@ -194,6 +195,26 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
         println("IPTV Debug - Original URL: $url")
         println("IPTV Debug - Clean URL: $cleanUrl")
         
+        // Check if this is a LoadData JSON string (for live channels)
+        if (cleanUrl.startsWith("{") && cleanUrl.contains("\"url\"")) {
+            try {
+                val loadData = parseJson<LoadData>(cleanUrl)
+                println("IPTV Debug - Handling live channel: ${loadData.title}")
+                
+                return newLiveStreamLoadResponse(
+                    name = loadData.title,
+                    url = url,
+                    dataUrl = url
+                ) {
+                    posterUrl = loadData.poster
+                    plot = "Live channel: ${loadData.title} from group: ${loadData.group}"
+                }
+            } catch (e: Exception) {
+                println("IPTV Debug - Error parsing LoadData: ${e.message}")
+                // Fall through to other URL handlers
+            }
+        }
+        
         when {
             cleanUrl.startsWith("series:") -> {
                 val linkName = cleanUrl.removePrefix("series:")
@@ -371,33 +392,38 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
             return false
         }
         
-        val loadData = parseJson<LoadData>(data)
-        
-        if (loadData.url.contains(".mpd")) {
-            callback.invoke(
-                newDrmExtractorLink(
-                    name = this.name,
-                    source = loadData.title,
-                    url = loadData.url,
-                    uuid = CLEARKEY_UUID
-                ) {
-                    this.kid = loadData.keyid.toString().trim()
-                    this.key = loadData.key.toString().trim()
-                }
-            )
-        } else {
-            callback.invoke(
-                newExtractorLink(
-                    name = this.name,
-                    source = loadData.title,
-                    url = loadData.url,
-                    type = ExtractorLinkType.M3U8
-                ) {
-                    this.quality = Qualities.Unknown.value
-                }
-            )
+        try {
+            val loadData = parseJson<LoadData>(data)
+            
+            if (loadData.url.contains(".mpd")) {
+                callback.invoke(
+                    newDrmExtractorLink(
+                        name = this.name,
+                        source = loadData.title,
+                        url = loadData.url,
+                        uuid = CLEARKEY_UUID
+                    ) {
+                        this.kid = loadData.keyid?.trim() ?: ""
+                        this.key = loadData.key?.trim() ?: ""
+                    }
+                )
+            } else {
+                callback.invoke(
+                    newExtractorLink(
+                        name = this.name,
+                        source = loadData.title,
+                        url = loadData.url,
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+            }
+            return true
+        } catch (e: Exception) {
+            println("IPTV Debug - Error in loadLinks: ${e.message}")
+            return false
         }
-        return true
     }
 
     @Suppress("ObjectLiteralToLambda")
