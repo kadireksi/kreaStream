@@ -59,7 +59,7 @@ class YouTubeParser(private val api: MainAPI) {
             }
         }
         return HomePageList(
-            name = "Trending",
+            name = "Trendler",
             list = searchResponses,
             isHorizontalImages = true
         )
