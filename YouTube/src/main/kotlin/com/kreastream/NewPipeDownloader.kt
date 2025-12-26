@@ -10,8 +10,7 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import java.util.concurrent.TimeUnit
 
-// Copied from DownloaderTestImpl. I only changed the cookies as the playlists wouldn't show up in search results.
-// Now why is it called downloader if downloading it's not its only job I don't know
+// Improved downloader with better headers to match official NewPipe app
 class NewPipeDownloader(builder: OkHttpClient.Builder): Downloader() {
     private val client: OkHttpClient = builder.readTimeout(30, TimeUnit.SECONDS).build()
     override fun execute(request: Request): Response {
@@ -26,6 +25,12 @@ class NewPipeDownloader(builder: OkHttpClient.Builder): Downloader() {
         val requestBuilder: okhttp3.Request.Builder = okhttp3.Request.Builder()
             .method(httpMethod, requestBody).url(url)
             .addHeader("User-Agent", USER_AGENT)
+            .addHeader("Accept-Language", "en-US,en;q=0.9")
+            .addHeader("Accept-Encoding", "gzip, deflate")
+            .addHeader("Accept", "*/*")
+            .addHeader("Sec-Fetch-Dest", "empty")
+            .addHeader("Sec-Fetch-Mode", "cors")
+            .addHeader("Sec-Fetch-Site", "same-origin")
 
         for ((headerName, headerValueList) in headers) {
             if (headerValueList.size > 1) {
@@ -52,8 +57,9 @@ class NewPipeDownloader(builder: OkHttpClient.Builder): Downloader() {
     }
 
     companion object {
+        // Updated User-Agent to match latest Chrome/Android
         private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Linux; Android 13; SM-A515F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
         private var instance: NewPipeDownloader? = null
 
         fun init(builder: OkHttpClient.Builder?): NewPipeDownloader? {

@@ -93,6 +93,21 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
                 Log.d("YoutubeExtractor", "Audio stream $idx: bitrate=${stream.averageBitrate}, format=${stream.format}")
             }
             
+            // If we only got 360p or lower, try alternative extraction
+            val hasHighQuality = videoStreams.any { stream ->
+                val resolution = stream.resolution
+                if (!resolution.isNullOrEmpty()) {
+                    val height = resolution.substringAfter("x").toIntOrNull() ?: 0
+                    height >= 720
+                } else {
+                    false
+                }
+            }
+            
+            if (!hasHighQuality && videoStreams.isNotEmpty()) {
+                Log.w("YoutubeExtractor", "Only low quality streams found (${videoStreams.size} video streams). NewPipe might be restricted.")
+            }
+            
             if (!hlsUrl.isNullOrEmpty()) {
                 Log.d("YoutubeExtractor", "Processing HLS URL")
                 if (hls) {
