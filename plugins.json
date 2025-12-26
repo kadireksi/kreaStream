@@ -12,7 +12,7 @@
         "tvTypes": [
             "TvSeries"
         ],
-        "version": 251220,
+        "version": 251222,
         "internalName": "Ddizi",
         "description": "DDizi.im i\u00e7in Cloudstream eklentisi",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/Ddizi.cs3",
@@ -32,29 +32,28 @@
             "TvSeries",
             "Live"
         ],
-        "version": 251213,
+        "version": 251224,
         "internalName": "TurkTV",
         "description": "T\u00fcrk Tv Dizi ve Canl\u0131 TV Radyo Yay\u0131nlar\u0131",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
         "name": "TurkTV"
     },
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=yabancidizi.tv&sz=%size%",
+        "iconUrl": "https://raw.githubusercontent.com/doGior/doGiorsHadEnough/refs/heads/master/TV/television.png",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/kadireksi/kreaStream",
-        "fileSize": 38511,
+        "fileSize": 27844,
         "status": 1,
-        "language": "tr",
         "authors": [
             "kreastream"
         ],
         "tvTypes": [
-            "TvSeries"
+            "Live"
         ],
-        "version": 251220,
-        "internalName": "YabanciDizi",
-        "description": "Son \u00e7\u0131kan yabanc\u0131 dizi ve filmleri yabancidizi' de izle. En yeni yabanc\u0131 film ve diziler, t\u00fcrk\u00e7e altyaz\u0131l\u0131 yada dublaj olarak 1080p kalitesinde hd izle.",
-        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/YabanciDizi.cs3",
-        "name": "YabanciDizi"
+        "version": 251226,
+        "internalName": "TV",
+        "description": "Live streams from the Free TV github repository. Forked from the Free-TV plugin in the ItalianProvider repo",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TV.cs3",
+        "name": "TV"
     }
 ]
