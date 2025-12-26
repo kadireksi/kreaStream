@@ -83,6 +83,16 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
             
             Log.d("YoutubeExtractor", "Video streams count: ${videoStreams.size}, Audio streams count: ${audioStreams.size}")
             
+            // Log all available video streams for debugging
+            videoStreams.forEachIndexed { idx, stream ->
+                Log.d("YoutubeExtractor", "Video stream $idx: resolution=${stream.resolution}, itag=${stream.formatId}, fps=${stream.fps}")
+            }
+            
+            // Log all available audio streams for debugging
+            audioStreams.forEachIndexed { idx, stream ->
+                Log.d("YoutubeExtractor", "Audio stream $idx: bitrate=${stream.averageBitrate}, format=${stream.format}")
+            }
+            
             if (!hlsUrl.isNullOrEmpty()) {
                 Log.d("YoutubeExtractor", "Processing HLS URL")
                 if (hls) {
@@ -125,11 +135,17 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
                 videoStreams.forEach { stream ->
                     try {
                         val streamUrl = stream.content
-                        val quality = stream.resolution?.let { 
-                            it.substringBefore("x").toIntOrNull() ?: Qualities.Unknown.value
-                        } ?: Qualities.Unknown.value
+                        val resolution = stream.resolution
+                        Log.d("YoutubeExtractor", "Stream resolution: $resolution")
                         
-                        Log.d("YoutubeExtractor", "Adding video stream: $streamUrl with quality: $quality")
+                        val quality = if (!resolution.isNullOrEmpty()) {
+                            // Extract height from resolution string like "1920x1080"
+                            resolution.substringAfter("x").toIntOrNull() ?: Qualities.Unknown.value
+                        } else {
+                            Qualities.Unknown.value
+                        }
+                        
+                        Log.d("YoutubeExtractor", "Adding video stream: $streamUrl with quality: $quality, resolution: $resolution")
                         
                         callback.invoke(
                             newExtractorLink(
@@ -144,6 +160,35 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
                         )
                     } catch (e: Exception) {
                         Log.d("YoutubeExtractor", "Failed to process video stream: ${e.message}")
+                        e.printStackTrace()
+                    }
+                }
+                
+                // Also add audio streams so player can combine them for better quality
+                if (audioStreams.isNotEmpty()) {
+                    Log.d("YoutubeExtractor", "Adding ${audioStreams.size} audio streams to complement video")
+                    audioStreams.forEach { stream ->
+                        try {
+                            val streamUrl = stream.content
+                            val quality = stream.averageBitrate ?: Qualities.Unknown.value
+                            
+                            Log.d("YoutubeExtractor", "Adding audio stream: $streamUrl with bitrate: $quality")
+                            
+                            callback.invoke(
+                                newExtractorLink(
+                                    this.name,
+                                    this.name,
+                                    streamUrl,
+                                    type = ExtractorLinkType.M3U8
+                                ) {
+                                    this.referer = referer ?: ""
+                                    this.quality = quality
+                                }
+                            )
+                        } catch (e: Exception) {
+                            Log.d("YoutubeExtractor", "Failed to process audio stream: ${e.message}")
+                            e.printStackTrace()
+                        }
                     }
                 }
             } else if (audioStreams.isNotEmpty()) {
@@ -168,6 +213,7 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
                         )
                     } catch (e: Exception) {
                         Log.d("YoutubeExtractor", "Failed to process audio stream: ${e.message}")
+                        e.printStackTrace()
                     }
                 }
             } else {
