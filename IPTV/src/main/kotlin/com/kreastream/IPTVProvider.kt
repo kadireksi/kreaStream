@@ -122,9 +122,18 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse {
+        // Remove leading slash if present
+        val cleanUrl = url.removePrefix("/")
+        
+        // Debug logging
+        println("IPTV Debug - Original URL: $url")
+        println("IPTV Debug - Clean URL: $cleanUrl")
+        
         when {
-            url.startsWith("series:") -> {
-                val linkName = url.removePrefix("series:")
+            cleanUrl.startsWith("series:") -> {
+                val linkName = cleanUrl.removePrefix("series:")
+                println("IPTV Debug - Loading series for: $linkName")
+                
                 val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
                 val link = savedLinks.find { it.name == linkName }
                 
@@ -135,9 +144,12 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 // Load playlist if not already loaded
                 if (allPlaylists[linkName] == null) {
                     try {
+                        println("IPTV Debug - Fetching playlist from: ${link.link}")
                         val playlistContent = app.get(link.link, headers = headers, timeout = 30).text
                         allPlaylists[linkName] = IptvPlaylistParser().parseM3U(playlistContent)
+                        println("IPTV Debug - Playlist loaded with ${allPlaylists[linkName]?.items?.size} items")
                     } catch (e: Exception) {
+                        println("IPTV Debug - Error loading playlist: ${e.message}")
                         throw Exception("Failed to load IPTV playlist: ${e.message}")
                     }
                 }
@@ -169,6 +181,7 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                     }
                 }
 
+                println("IPTV Debug - Created ${episodes.size} episodes")
                 return newTvSeriesLoadResponse(
                     name = linkName,
                     url = url,
@@ -180,8 +193,8 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 }
             }
             
-            url.startsWith("error:") -> {
-                val linkName = url.removePrefix("error:")
+            cleanUrl.startsWith("error:") -> {
+                val linkName = cleanUrl.removePrefix("error:")
                 return newTvSeriesLoadResponse(
                     name = "$linkName (Error)",
                     url = url,
@@ -192,8 +205,8 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 }
             }
             
-            url.startsWith("channel:") -> {
-                val parts = url.removePrefix("channel:").split(":", limit = 2)
+            cleanUrl.startsWith("channel:") -> {
+                val parts = cleanUrl.removePrefix("channel:").split(":", limit = 2)
                 val linkName = parts[0]
                 val channelName = parts[1]
                 
@@ -230,7 +243,7 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 }
             }
             
-            url == "empty" -> {
+            cleanUrl == "empty" -> {
                 return newTvSeriesLoadResponse(
                     name = "No IPTV Links",
                     url = url,
@@ -242,7 +255,7 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
             }
         }
 
-        throw Exception("Invalid URL format")
+        throw Exception("Invalid URL format: $url (cleaned: $cleanUrl)")
     }
 
     override suspend fun loadLinks(

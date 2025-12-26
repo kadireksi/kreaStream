@@ -18,28 +18,28 @@ import kotlinx.coroutines.*
 
 class IPTVSettingsFragment(private val plugin: IPTVPlugin) : BottomSheetDialogFragment() {
     private fun <T : View> View.findView(name: String): T {
-        val id = plugin.resources!!.getIdentifier(name, "id", BuildConfig.LIBRARY_PACKAGE_NAME)
+        val id = plugin.resources!!.getIdentifier(name, "id", "com.kreastream")
         return this.findViewById(id)
     }
 
     private fun getLayout(name: String, inflater: LayoutInflater, container: ViewGroup?): View {
-        val id = plugin.resources!!.getIdentifier(name, "layout", BuildConfig.LIBRARY_PACKAGE_NAME)
+        val id = plugin.resources!!.getIdentifier(name, "layout", "com.kreastream")
         val layout = plugin.resources!!.getLayout(id)
         return inflater.inflate(layout, container, false)
     }
 
     private fun getDrawable(name: String): Drawable? {
-        val id = plugin.resources!!.getIdentifier(name, "drawable", BuildConfig.LIBRARY_PACKAGE_NAME)
+        val id = plugin.resources!!.getIdentifier(name, "drawable", "com.kreastream")
         return ResourcesCompat.getDrawable(plugin.resources!!, id, null)
     }
 
     private fun getString(name: String): String? {
-        val id = plugin.resources!!.getIdentifier(name, "string", BuildConfig.LIBRARY_PACKAGE_NAME)
+        val id = plugin.resources!!.getIdentifier(name, "string", "com.kreastream")
         return plugin.resources!!.getString(id)
     }
 
     private fun View.makeTvCompatible() {
-        val outlineId = plugin.resources!!.getIdentifier("outline", "drawable", BuildConfig.LIBRARY_PACKAGE_NAME)
+        val outlineId = plugin.resources!!.getIdentifier("outline", "drawable", "com.kreastream")
         this.background = plugin.resources!!.getDrawable(outlineId, null)
     }
 
