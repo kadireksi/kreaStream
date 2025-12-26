@@ -55,5 +55,23 @@
         "description": "T\u00fcrk Tv Dizi ve Canl\u0131 TV Radyo Yay\u0131nlar\u0131",
         "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/TurkTV.cs3",
         "name": "TurkTV"
+    },
+    {
+        "iconUrl": "https://www.youtube.com/s/desktop/711fd789/img/logos/favicon_144x144.png",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/kadireksi/kreaStream",
+        "fileSize": 46213,
+        "status": 1,
+        "authors": [
+            "kreastream"
+        ],
+        "tvTypes": [
+            "Others"
+        ],
+        "version": 251226,
+        "internalName": "YouTube",
+        "description": "Videos, playlists and channels from YouTube",
+        "url": "https://raw.githubusercontent.com/kadireksi/kreaStream/builds/YouTube.cs3",
+        "name": "YouTube"
     }
 ]
