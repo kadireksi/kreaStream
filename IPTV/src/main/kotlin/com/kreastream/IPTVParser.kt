@@ -4,7 +4,8 @@ import java.io.InputStream
 
 data class Link(
     val name: String, 
-    val link: String, 
+    val link: String,
+    val order: Int = 0
 )
 
 data class Playlist(

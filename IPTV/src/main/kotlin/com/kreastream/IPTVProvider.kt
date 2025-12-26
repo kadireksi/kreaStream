@@ -20,7 +20,7 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
     private val headers = mapOf("User-Agent" to "Player (Linux; Android 14)")
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+        val savedLinks = getKey<Array<Link>>("iptv_links")?.sortedBy { it.order } ?: emptyList()
         
         if (savedLinks.isEmpty()) {
             return newHomePageResponse(
@@ -82,7 +82,7 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+        val savedLinks = getKey<Array<Link>>("iptv_links")?.sortedBy { it.order } ?: emptyList()
         val results = mutableListOf<SearchResponse>()
         
         savedLinks.forEach { link ->
@@ -134,7 +134,7 @@ class IPTVProvider(override var mainUrl: String, override var name: String) : Ma
                 val linkName = cleanUrl.removePrefix("series:")
                 println("IPTV Debug - Loading series for: $linkName")
                 
-                val savedLinks = getKey<Array<Link>>("iptv_links") ?: emptyArray()
+                val savedLinks = getKey<Array<Link>>("iptv_links")?.sortedBy { it.order } ?: emptyList()
                 val link = savedLinks.find { it.name == linkName }
                 
                 if (link == null) {
