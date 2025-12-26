@@ -29,6 +29,8 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
         callback: (ExtractorLink) -> Unit,
     ) {
         try {
+            Log.d("YoutubeExtractor", "Starting extraction for URL: $url")
+            
             val link =
                 YoutubeStreamLinkHandlerFactory.getInstance().fromUrl(
                     url.replace(schemaStripRegex, "")
@@ -39,21 +41,50 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
                 link
             ) {}
 
+            Log.d("YoutubeExtractor", "Fetching page...")
             extractor.fetchPage()
+            Log.d("YoutubeExtractor", "Page fetched successfully")
 
             Log.d("YoutubeExtractor", "Is HLS enabled: $hls")
             
             // Try to get HLS URL first
             val hlsUrl = try {
-                extractor.hlsUrl
+                val url = extractor.hlsUrl
+                Log.d("YoutubeExtractor", "HLS URL retrieved: ${if (url.isNullOrEmpty()) "EMPTY" else "OK"}")
+                url
             } catch (e: Exception) {
                 Log.d("YoutubeExtractor", "Failed to get HLS URL: ${e.message}")
+                e.printStackTrace()
                 null
             }
             
             Log.d("YoutubeExtractor", "HLS Url: $hlsUrl")
             
+            // Try to get video streams if HLS is not available
+            val videoStreams = try {
+                val streams = extractor.videoStreams
+                Log.d("YoutubeExtractor", "Video streams retrieved: ${streams.size} streams")
+                streams
+            } catch (e: Exception) {
+                Log.d("YoutubeExtractor", "Failed to get video streams: ${e.message}")
+                e.printStackTrace()
+                emptyList()
+            }
+            
+            // Try to get audio streams as fallback
+            val audioStreams = try {
+                val streams = extractor.audioStreams
+                Log.d("YoutubeExtractor", "Audio streams retrieved: ${streams.size} streams")
+                streams
+            } catch (e: Exception) {
+                Log.d("YoutubeExtractor", "Failed to get audio streams: ${e.message}")
+                emptyList()
+            }
+            
+            Log.d("YoutubeExtractor", "Video streams count: ${videoStreams.size}, Audio streams count: ${audioStreams.size}")
+            
             if (!hlsUrl.isNullOrEmpty()) {
+                Log.d("YoutubeExtractor", "Processing HLS URL")
                 if (hls) {
                     callback.invoke(
                         newExtractorLink(
@@ -89,8 +120,58 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
                         )
                     }
                 }
+            } else if (videoStreams.isNotEmpty()) {
+                Log.d("YoutubeExtractor", "Using video streams instead of HLS")
+                videoStreams.forEach { stream ->
+                    try {
+                        val streamUrl = stream.content
+                        val quality = stream.resolution?.let { 
+                            it.substringBefore("x").toIntOrNull() ?: Qualities.Unknown.value
+                        } ?: Qualities.Unknown.value
+                        
+                        Log.d("YoutubeExtractor", "Adding video stream: $streamUrl with quality: $quality")
+                        
+                        callback.invoke(
+                            newExtractorLink(
+                                this.name,
+                                this.name,
+                                streamUrl,
+                                type = ExtractorLinkType.VIDEO
+                            ) {
+                                this.referer = referer ?: ""
+                                this.quality = quality
+                            }
+                        )
+                    } catch (e: Exception) {
+                        Log.d("YoutubeExtractor", "Failed to process video stream: ${e.message}")
+                    }
+                }
+            } else if (audioStreams.isNotEmpty()) {
+                Log.d("YoutubeExtractor", "Using audio streams as fallback")
+                audioStreams.forEach { stream ->
+                    try {
+                        val streamUrl = stream.content
+                        val quality = stream.averageBitrate ?: Qualities.Unknown.value
+                        
+                        Log.d("YoutubeExtractor", "Adding audio stream: $streamUrl with bitrate: $quality")
+                        
+                        callback.invoke(
+                            newExtractorLink(
+                                this.name,
+                                this.name,
+                                streamUrl,
+                                type = ExtractorLinkType.M3U8
+                            ) {
+                                this.referer = referer ?: ""
+                                this.quality = quality
+                            }
+                        )
+                    } catch (e: Exception) {
+                        Log.d("YoutubeExtractor", "Failed to process audio stream: ${e.message}")
+                    }
+                }
             } else {
-                Log.w("YoutubeExtractor", "No HLS URL found for video")
+                Log.w("YoutubeExtractor", "No HLS URL, video streams, or audio streams found for video")
             }
             
             // Get subtitles
@@ -109,6 +190,7 @@ open class YouTubeExtractor(private val hls: Boolean) : ExtractorApi() {
         } catch (e: Exception) {
             logError(e)
             Log.e("YoutubeExtractor", "Error extracting URL: ${e.message}")
+            e.printStackTrace()
         }
     }
 }
